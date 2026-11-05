@@ -15,6 +15,9 @@ struct GraphView: View {
     @State private var drag: CGSize = .zero
     @State private var offset: CGSize = .zero
     @State private var zoom: CGFloat = 1
+    @State private var settling = false
+    @State private var generation = 0
+    @State private var lastReload = Date.distantPast
 
     struct Node: Identifiable {
         var entity: GraphEntity
@@ -54,6 +57,12 @@ struct GraphView: View {
         .padding(.top, 24)
         .padding(.bottom, 24)
         .task(id: size) { await load() }
+        // While indexing, the graph grows in front of you.
+        .onChange(of: Indexer.shared.totals.entities) { _, _ in
+            guard Date().timeIntervalSince(lastReload) > 10 else { return }
+            lastReload = .now
+            Task { await load() }
+        }
     }
 
     private var center: CGPoint {
@@ -62,10 +71,14 @@ struct GraphView: View {
     }
 
     private var canvas: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30)) { _ in
-            Canvas { context, _ in
+        TimelineView(.animation(minimumInterval: 1 / 30, paused: !settling && drag == .zero)) { _ in
+            // Drawn off the main thread, so a busy graph never blocks clicks.
+            Canvas(rendersAsynchronously: true) { context, _ in
                 let center = self.center
                 let byID = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
+                // Text is the expensive part of each frame: label the forty
+                // most-mentioned only.
+                let labelled = Set(nodes.sorted { $0.entity.mentions > $1.entity.mentions }.prefix(40).map(\.id))
                 func point(_ p: CGPoint) -> CGPoint { CGPoint(x: center.x + p.x * zoom, y: center.y + p.y * zoom) }
 
                 for edge in edges {
@@ -101,7 +114,7 @@ struct GraphView: View {
                     if selected == node.id {
                         context.stroke(Circle().path(in: rect.insetBy(dx: -3, dy: -3)), with: .color(Ink.accent), lineWidth: 2)
                     }
-                    if radius > 7 || selected == node.id || node.entity.kind == .me {
+                    if (radius > 9 && labelled.contains(node.id)) || selected == node.id || node.entity.kind == .me {
                         context.draw(
                             Text(node.entity.name).font(.system(size: node.entity.kind == .me ? 14 : 10, weight: node.entity.kind == .me ? .heavy : .semibold, design: .rounded)).foregroundStyle(Ink.text),
                             at: CGPoint(x: p.x, y: p.y + radius + 8))
@@ -109,7 +122,7 @@ struct GraphView: View {
                 }
             }
         }
-        .task { await simulate() }
+        .task(id: generation) { await simulate() }
         .onGeometryChange(for: CGSize.self, of: \.size) { canvasSize = $0 }
         .background(Ink.surface)
         .gesture(
@@ -187,18 +200,31 @@ struct GraphView: View {
     // MARK: Layout
 
     private func load() async {
+        lastReload = .now
         let entities = (try? await MemoryStore.shared.entities(limit: size, kinds: kinds)) ?? []
         edges = (try? await MemoryStore.shared.edges(among: entities.map(\.id))) ?? []
+        // Keep nodes that were already placed where they are, so a refresh
+        // grows the graph instead of reshuffling it.
+        let placed = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
         nodes = entities.enumerated().map { index, entity in
+            if var existing = placed[entity.id] {
+                existing.entity = entity
+                return existing
+            }
             let angle = Double(index) * 2.399963
             let r = entity.kind == .me ? 0 : 60 + sqrt(Double(index)) * 40
             return Node(entity: entity, position: CGPoint(x: cos(angle) * r, y: sin(angle) * r))
         }
+        generation += 1
     }
 
+    /// Runs the layout until it settles, then stops redrawing.
     private func simulate() async {
-        for _ in 0..<400 {
-            guard !nodes.isEmpty else { try? await Task.sleep(for: .milliseconds(200)); continue }
+        guard !nodes.isEmpty else { return }
+        settling = true
+        defer { settling = false }
+        for _ in 0..<300 {
+            guard !Task.isCancelled else { return }
             step()
             try? await Task.sleep(for: .milliseconds(16))
         }

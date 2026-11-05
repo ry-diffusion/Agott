@@ -98,8 +98,12 @@ private struct MenuBarContent: View {
     var body: some View {
         Button("Ask Agott…") { Copilot.shared.beginTyping() }
         Text(indexer.statusText)
-        Button(indexer.isRunning ? "Stop indexing" : "Update Memory") {
-            if indexer.isRunning { indexer.stop() } else { indexer.run() }
+        if indexer.isPaused {
+            Button("Resume indexing") { indexer.resume() }
+        } else if indexer.isRunning || indexer.isLearning {
+            Button("Pause indexing") { indexer.pause() }
+        } else {
+            Button("Update Memory") { indexer.run() }
         }
         Divider()
         Button("Open Agott") {

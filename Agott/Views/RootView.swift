@@ -185,6 +185,20 @@ struct IndexingPill: View {
                         .foregroundStyle(Ink.text)
                         .monospacedDigit()
                         .contentTransition(.numericText())
+                    if let progress = indexer.progress {
+                        Text(progress, format: .percent.precision(.fractionLength(0)))
+                            .font(.callout.weight(.bold))
+                            .foregroundStyle(Ink.spot)
+                            .monospacedDigit()
+                            .contentTransition(.numericText())
+                    }
+                    Button {
+                        indexer.pause()
+                    } label: {
+                        Image(systemName: "pause.fill").font(.caption.weight(.bold)).foregroundStyle(Ink.text)
+                    }
+                    .buttonStyle(.plain)
+                    .help(Text("Pause indexing"))
                 }
                 .padding(.horizontal, 14).padding(.vertical, 7)
                 .glassEffect(.regular.interactive(), in: .capsule)

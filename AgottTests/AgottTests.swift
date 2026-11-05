@@ -54,6 +54,33 @@ struct MemoryStoreTests {
         #expect(chats.first?.lastFromMe == true)
     }
 
+    /// Reading newest-first inserts history before existing moments. The
+    /// moments must come out the same as reading in order.
+    @Test func newestFirstChunksLikeInOrder() async throws {
+        var all: [RawMessage] = []
+        for i in 0..<60 {
+            // Bursts of 6 messages, an hour apart.
+            let minutes = Double(i / 6) * 60 + Double(i % 6)
+            all.append(message(i, sender: i % 2 == 0 ? "Ana Souza" : "Eu", me: i % 2 == 1, minutes: minutes, "msg \(i)"))
+        }
+        let inOrder = tempStore()
+        try await inOrder.ingest(all)
+
+        let backwards = tempStore()
+        for page in stride(from: all.count, to: 0, by: -13) {
+            try await backwards.ingest(Array(all[max(0, page - 13)..<page]))
+        }
+
+        func texts(_ store: MemoryStore) async throws -> [String] {
+            let ids = try await store.recentChunkIDs(filter: .none, limit: 100)
+            return try await store.chunks(ids: ids).map(\.text).sorted()
+        }
+        let a = try await texts(inOrder)
+        let b = try await texts(backwards)
+        #expect(a.count == 10)
+        #expect(a == b)
+    }
+
     @Test func graphLinksPeopleAndFacts() async throws {
         let store = tempStore()
         try await store.ingest([
@@ -229,6 +256,37 @@ struct RetryTests {
             _ = try await OpenCodeExecutor.open(URLRequest(url: URL(string: "https://flaky.test/chat/completions")!))
         }
         #expect(FlakyServer.requests == OpenCodeExecutor.maxAttempts)
+    }
+}
+
+@MainActor
+struct ClaudeReaderTests {
+    @Test func readsEachFileOnceThenOnlyNewLines() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "claude-\(UUID().uuidString)/proj")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let file = root.appending(path: "session.jsonl")
+        func line(_ type: String, _ text: String, _ id: String) -> String {
+            #"{"type":"\#(type)","uuid":"\#(id)","timestamp":"2026-11-05T10:00:00.000Z","message":{"role":"\#(type)","content":"\#(text)"}}"# + "\n"
+        }
+        let toolResult = #"{"type":"user","uuid":"t","message":{"content":[{"type":"tool_result","tool_use_id":"x","content":"huge"}]}}"# + "\n"
+        try (line("user", "build me an app", "a") + toolResult + line("assistant", "sure", "b")).write(to: file, atomically: true, encoding: .utf8)
+        defer {
+            var progress = UserDefaults.standard.dictionary(forKey: ClaudeHistorySource.progressKey) ?? [:]
+            progress.removeValue(forKey: file.path)
+            UserDefaults.standard.set(progress, forKey: ClaudeHistorySource.progressKey)
+        }
+
+        var source = ClaudeHistorySource()
+        source.root = root
+        let first = try source.read(after: 0, limit: 10, contacts: ContactBook())
+        #expect(first.map(\.externalID) == ["a", "b"])  // tool result skipped
+        #expect(try source.read(after: 0, limit: 10, contacts: ContactBook()).isEmpty)  // nothing new
+
+        let handle = try FileHandle(forWritingTo: file)
+        try handle.seekToEnd()
+        try handle.write(contentsOf: Data(line("user", "and a graph", "c").utf8))
+        try handle.close()
+        #expect(try source.read(after: 0, limit: 10, contacts: ContactBook()).map(\.externalID) == ["c"])
     }
 }
 

@@ -17,7 +17,8 @@ struct MuseFace: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion)) { context in
+        // Full rate only while something moves; idle faces just blink.
+        TimelineView(.animation(minimumInterval: isAnimated ? 1 / 30 : 1 / 8, paused: reduceMotion)) { context in
             face(t: context.date.timeIntervalSinceReferenceDate)
         }
         .frame(width: size, height: size)
@@ -118,6 +119,13 @@ struct MuseFace: View {
                 .offset(x: size * 0.6, y: 0)
         case .idle, .talking:
             EmptyView()
+        }
+    }
+
+    private var isAnimated: Bool {
+        switch mood {
+        case .listening, .thinking, .talking, .working, .happy, .love, .sleepy: true
+        case .idle, .confused, .surprised: false
         }
     }
 

@@ -70,6 +70,8 @@ final class AppSettings {
     var learningProvider: ModelProvider { didSet { save(learningProvider.rawValue, "learningProvider") } }
     /// The OpenCode model's context window, in tokens.
     var contextTokens: Int { didSet { save(contextTokens, "contextTokens") } }
+    /// Let the model read new moments after every indexing run.
+    var autoLearn: Bool { didSet { save(autoLearn, "autoLearn") } }
     /// How much of that window one learning batch may fill.
     var batchFill: Double { didSet { save(batchFill, "batchFill") } }
     /// A paragraph about you, written by Agott from what it has learned and
@@ -101,6 +103,7 @@ final class AppSettings {
         learningProvider = ModelProvider(rawValue: defaults.string(forKey: "learningProvider") ?? "") ?? .openCode
         contextTokens = defaults.object(forKey: "contextTokens") as? Int ?? 128_000
         batchFill = defaults.object(forKey: "batchFill") as? Double ?? 0.5
+        autoLearn = defaults.object(forKey: "autoLearn") as? Bool ?? true
         aboutMe = defaults.string(forKey: "aboutMe") ?? ""
         apiKey = Keychain.get("opencode-api-key") ?? ""
     }

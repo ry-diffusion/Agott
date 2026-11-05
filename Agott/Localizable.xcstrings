@@ -354,6 +354,16 @@
         }
       }
     },
+    "Analyze new memories after each indexing run": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analisar memórias novas depois de cada indexação"
+          }
+        }
+      }
+    },
     "Anything: a name, a plan, a feeling…": {
       "localizations": {
         "pt-BR": {
@@ -1164,6 +1174,16 @@
         }
       }
     },
+    "Indexing paused": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indexação pausada"
+          }
+        }
+      }
+    },
     "Insert": {
       "localizations": {
         "pt-BR": {
@@ -1674,6 +1694,26 @@
         }
       }
     },
+    "Pause": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pausar"
+          }
+        }
+      }
+    },
+    "Pause indexing": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pausar indexação"
+          }
+        }
+      }
+    },
     "People": {
       "localizations": {
         "pt-BR": {
@@ -1874,6 +1914,16 @@
         }
       }
     },
+    "Reading %@… %@ of %@": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lendo %1$@… %2$@ de %3$@"
+          }
+        }
+      }
+    },
     "Reading moment %lld of %lld…": {
       "localizations": {
         "pt-BR": {
@@ -1980,6 +2030,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Lembretes"
+          }
+        }
+      }
+    },
+    "Resume indexing": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retomar indexação"
           }
         }
       }
@@ -2240,16 +2300,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Parar"
-          }
-        }
-      }
-    },
-    "Stop indexing": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Parar de indexar"
           }
         }
       }

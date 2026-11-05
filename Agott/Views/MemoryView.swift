@@ -13,8 +13,11 @@ struct MemoryView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 ScreenHeader(title: "Memory", subtitle: "Everything Agott remembers, and where it came from.", symbol: "brain") {
-                    if indexer.isRunning {
-                        Button { indexer.stop() } label: { Label("Stop", systemImage: "stop.fill") }
+                    if indexer.isPaused {
+                        Button { indexer.resume() } label: { Label("Resume indexing", systemImage: "play.fill") }
+                            .buttonStyle(.candy)
+                    } else if indexer.isRunning || indexer.isLearning {
+                        Button { indexer.pause() } label: { Label("Pause", systemImage: "pause.fill") }
                             .buttonStyle(.candy(.soft))
                     } else {
                         Button { indexer.run() } label: { Label("Update memory", systemImage: "arrow.triangle.2.circlepath") }
@@ -48,7 +51,11 @@ struct MemoryView: View {
                     Text(indexer.statusText).font(Lettering.display(18, relativeTo: .title3)).foregroundStyle(Ink.text)
                     if indexer.isRunning {
                         if let progress = indexer.progress {
-                            ProgressView(value: progress).tint(Ink.spot)
+                            HStack(spacing: 10) {
+                                ProgressView(value: progress).tint(Ink.spot)
+                                Text(progress, format: .percent.precision(.fractionLength(0)))
+                                    .font(.callout.weight(.bold)).monospacedDigit().foregroundStyle(Ink.text)
+                            }
                         } else {
                             ProgressView().progressViewStyle(.linear).tint(Ink.spot)
                         }

@@ -31,6 +31,7 @@ struct SettingsView: View {
             }
 
             Section("Learning about you") {
+                Toggle("Analyze new memories after each indexing run", isOn: $settings.autoLearn)
                 Picker("Model that reads your messages", selection: $settings.learningProvider) {
                     ForEach(ModelProvider.allCases) { Text($0.title).tag($0) }
                 }

@@ -114,6 +114,20 @@ actor MemoryStore {
             [.text(source.rawValue), .double(value)])
     }
 
+    /// Named progress markers beyond the one per source (e.g. how far back a
+    /// newest-first pass has reached).
+    func cursor(named name: String) throws -> Double {
+        var value = 0.0
+        try open().rows("SELECT value FROM cursors WHERE source = ?", [.text(name)]) { value = $0.double(0) }
+        return value
+    }
+
+    func setCursor(_ value: Double, named name: String) throws {
+        try open().run(
+            "INSERT INTO cursors(source, value) VALUES(?, ?) ON CONFLICT(source) DO UPDATE SET value = excluded.value",
+            [.text(name), .double(value)])
+    }
+
     // MARK: Ingestion
 
     /// Stores new messages and rebuilds the moments they belong to.
@@ -123,6 +137,7 @@ actor MemoryStore {
         guard !messages.isEmpty else { return 0 }
         let db = try open()
         var earliestByChat: [String: (MemorySource, String, Double)] = [:]
+        var latestByChat: [String: Double] = [:]
         var inserted = 0
 
         try db.transaction {
@@ -143,6 +158,7 @@ actor MemoryStore {
                 guard db.changes > 0 else { continue }
                 inserted += 1
                 let key = "\(message.source.rawValue)|\(message.chatID)"
+                latestByChat[key] = max(latestByChat[key] ?? ts, ts)
                 if let existing = earliestByChat[key], existing.2 <= ts { continue }
                 earliestByChat[key] = (message.source, message.chatID, ts)
             }
@@ -150,8 +166,8 @@ actor MemoryStore {
 
         guard inserted > 0 else { return 0 }
         try db.transaction {
-            for (_, (source, chatID, earliest)) in earliestByChat {
-                try rechunk(db: db, source: source, chatID: chatID, from: earliest)
+            for (key, (source, chatID, earliest)) in earliestByChat {
+                try rechunk(db: db, source: source, chatID: chatID, from: earliest, through: latestByChat[key] ?? earliest)
             }
         }
         try refreshChats(db: db, keys: Array(earliestByChat.values.map { ($0.0, $0.1) }))
@@ -164,24 +180,52 @@ actor MemoryStore {
     private static let momentCharacters = 1400
     private static let momentMessages = 24
 
-    private func rechunk(db: SQLiteDB, source: MemorySource, chatID: String, from earliest: Double) throws {
-        // Start at the moment the new messages fall into, so a conversation
-        // that carried on is extended rather than split in two.
+    /// Rebuilds the moments that new messages between `earliest` and `latest`
+    /// touch, and only those. Reading newest-first adds history *before*
+    /// moments that already exist; rebuilding everything after the insertion
+    /// point would throw away (and re-embed) a whole chat on every page.
+    private func rechunk(db: SQLiteDB, source: MemorySource, chatID: String, from earliest: Double, through latest: Double) throws {
+        // Start at the moment the earliest new message falls into, so a
+        // conversation that carried on is extended rather than split.
         var start = earliest
         try db.rows(
             "SELECT start_ts FROM chunks WHERE source = ? AND chat_id = ? AND start_ts <= ? ORDER BY start_ts DESC LIMIT 1",
             [.text(source.rawValue), .text(chatID), .double(earliest)]
         ) { start = $0.double(0) }
+        // End where the moment holding the latest new message ends.
+        var stop = latest
+        try db.rows(
+            "SELECT end_ts FROM chunks WHERE source = ? AND chat_id = ? AND start_ts <= ? ORDER BY start_ts DESC LIMIT 1",
+            [.text(source.rawValue), .text(chatID), .double(latest)]
+        ) { stop = max(latest, $0.double(0)) }
+
+        // A later moment that begins within the gap belongs to the same
+        // conversation as the new messages: absorb it, and keep going.
+        var nextStart = Double.greatestFiniteMagnitude
+        while true {
+            var next: (start: Double, end: Double)?
+            try db.rows(
+                "SELECT start_ts, end_ts FROM chunks WHERE source = ? AND chat_id = ? AND start_ts > ? ORDER BY start_ts LIMIT 1",
+                [.text(source.rawValue), .text(chatID), .double(stop)]
+            ) { next = ($0.double(0), $0.double(1)) }
+            guard let next else { break }
+            if next.start - stop <= Self.momentGap {
+                stop = next.end
+            } else {
+                nextStart = next.start
+                break
+            }
+        }
 
         try db.run(
-            "DELETE FROM chunks WHERE source = ? AND chat_id = ? AND start_ts >= ?",
-            [.text(source.rawValue), .text(chatID), .double(start)])
+            "DELETE FROM chunks WHERE source = ? AND chat_id = ? AND start_ts >= ? AND start_ts <= ?",
+            [.text(source.rawValue), .text(chatID), .double(start), .double(stop)])
 
         struct Line { var ts: Double; var sender: String; var text: String; var chat: String }
         var lines: [Line] = []
         try db.rows(
-            "SELECT ts, sender, text, chat_name FROM messages WHERE source = ? AND chat_id = ? AND ts >= ? ORDER BY ts",
-            [.text(source.rawValue), .text(chatID), .double(start)]
+            "SELECT ts, sender, text, chat_name FROM messages WHERE source = ? AND chat_id = ? AND ts >= ? AND ts < ? ORDER BY ts",
+            [.text(source.rawValue), .text(chatID), .double(start), .double(nextStart)]
         ) { row in
             lines.append(Line(ts: row.double(0), sender: row.text(1) ?? "?", text: row.text(2) ?? "", chat: row.text(3) ?? ""))
         }

@@ -11,6 +11,8 @@ struct PeopleView: View {
     @State private var circles: [PeopleCircle] = []
     @State private var circle: String?
     @State private var detecting = false
+    @State private var reloading: Task<Void, Never>?
+    @State private var lastLoad = Date.distantPast
 
     struct Row: Identifiable, Hashable {
         var chat: ChatSummary
@@ -110,12 +112,17 @@ struct PeopleView: View {
         .task(id: showGroups) { await load() }
         .task { circles = await Circles.cached() }
         // New messages or a finished index change who needs you.
+        // One reload at a time, at most every 15 seconds: indexing changes
+        // the totals several times a second, and each reload reads every chat.
         .onChange(of: Indexer.shared.totals.messages) { _, _ in
-            Task {
+            guard reloading == nil, Date().timeIntervalSince(lastLoad) > 15 else { return }
+            reloading = Task {
                 await load()
                 circles = await Circles.cached()
+                reloading = nil
             }
         }
+        .onDisappear { reloading?.cancel(); reloading = nil }
     }
 
     private var list: some View {
@@ -155,6 +162,7 @@ struct PeopleView: View {
     }
 
     private func load() async {
+        lastLoad = .now
         loading = true
         defer { loading = false }
         let chats = (try? await MemoryStore.shared.chats(

@@ -8,7 +8,24 @@ nonisolated protocol MessageSource: Sendable {
     var isPresent: Bool { get }
     /// Reads messages newer than `after` (seconds since 1970), oldest first,
     /// at most `limit` of them.
-    func read(after: Double, limit: Int, contacts: ContactBook) throws -> [RawMessage]
+    /// Reads messages strictly between `after` and `before` (seconds since
+    /// 1970), oldest first, or newest first when `newestFirst` is set.
+    func read(after: Double, before: Double?, newestFirst: Bool, limit: Int, contacts: ContactBook) throws -> [RawMessage]
+    /// Whether the source can page newest-first. Message databases can;
+    /// append-only transcripts cannot.
+    var supportsNewestFirst: Bool { get }
+    /// How many messages lie between `after` and `before`, if the source can
+    /// tell cheaply. Used for progress.
+    func estimatedCount(after: Double, before: Double?) -> Int?
+}
+
+extension MessageSource {
+    var supportsNewestFirst: Bool { false }
+    func estimatedCount(after: Double, before: Double?) -> Int? { nil }
+
+    func read(after: Double, limit: Int, contacts: ContactBook) throws -> [RawMessage] {
+        try read(after: after, before: nil, newestFirst: false, limit: limit, contacts: contacts)
+    }
 }
 
 nonisolated enum SourceError: LocalizedError {
@@ -45,7 +62,21 @@ nonisolated struct IMessageSource: MessageSource {
 
     var isPresent: Bool { FileManager.default.fileExists(atPath: Self.path) }
 
-    func read(after: Double, limit: Int, contacts: ContactBook) throws -> [RawMessage] {
+    var supportsNewestFirst: Bool { true }
+
+    static func appleNanos(_ unix: Double?) -> Double {
+        guard let unix, unix < 1e14 else { return 9e30 }
+        return max(0, unix - appleEpochOffset) * 1_000_000_000
+    }
+
+    func estimatedCount(after: Double, before: Double?) -> Int? {
+        guard let db = try? SQLiteDB(path: Self.path, readOnly: true) else { return nil }
+        return try? db.scalarInt(
+            "SELECT COUNT(*) FROM message WHERE date > ? AND date < ? AND associated_message_type = 0",
+            [.double(Self.appleNanos(after)), .double(Self.appleNanos(before))])
+    }
+
+    func read(after: Double, before: Double?, newestFirst: Bool, limit: Int, contacts: ContactBook) throws -> [RawMessage] {
         guard isPresent else { throw SourceError.missing("Messages") }
         guard FileManager.default.isReadableFile(atPath: Self.path),
               let db = try? SQLiteDB(path: Self.path, readOnly: true),
@@ -53,7 +84,8 @@ nonisolated struct IMessageSource: MessageSource {
         else { throw SourceError.needsFullDiskAccess("Messages") }
 
         // `date` is nanoseconds since 2001 on anything recent, seconds before.
-        let afterApple = max(0, after - appleEpochOffset) * 1_000_000_000
+        let afterApple = Self.appleNanos(after)
+        let beforeApple = Self.appleNanos(before)
         var result: [RawMessage] = []
         try db.rows(
             """
@@ -64,10 +96,10 @@ nonisolated struct IMessageSource: MessageSource {
             LEFT JOIN handle h ON h.ROWID = m.handle_id
             LEFT JOIN chat_message_join cmj ON cmj.message_id = m.ROWID
             LEFT JOIN chat c ON c.ROWID = cmj.chat_id
-            WHERE m.date > ? AND m.associated_message_type = 0
-            ORDER BY m.date LIMIT ?
+            WHERE m.date > ? AND m.date < ? AND m.associated_message_type = 0
+            ORDER BY m.date \(newestFirst ? "DESC" : "ASC") LIMIT ?
             """,
-            [.double(afterApple), .of(limit)]
+            [.double(afterApple), .double(beforeApple), .of(limit)]
         ) { row in
             let rawDate = row.double(4)
             let seconds = rawDate > 1e12 ? rawDate / 1e9 : rawDate
@@ -126,13 +158,28 @@ nonisolated struct WhatsAppSource: MessageSource {
 
     var isPresent: Bool { FileManager.default.fileExists(atPath: Self.path) }
 
-    func read(after: Double, limit: Int, contacts: ContactBook) throws -> [RawMessage] {
+    var supportsNewestFirst: Bool { true }
+
+    static func appleSeconds(_ unix: Double?) -> Double {
+        guard let unix, unix < 1e14 else { return 9e30 }
+        return unix - appleEpochOffset
+    }
+
+    func estimatedCount(after: Double, before: Double?) -> Int? {
+        guard let db = try? SQLiteDB(path: Self.path, readOnly: true) else { return nil }
+        return try? db.scalarInt(
+            "SELECT COUNT(*) FROM ZWAMESSAGE WHERE ZMESSAGEDATE > ? AND ZMESSAGEDATE < ? AND ZTEXT IS NOT NULL AND ZTEXT != ''",
+            [.double(Self.appleSeconds(after)), .double(Self.appleSeconds(before))])
+    }
+
+    func read(after: Double, before: Double?, newestFirst: Bool, limit: Int, contacts: ContactBook) throws -> [RawMessage] {
         guard isPresent else { throw SourceError.missing("WhatsApp") }
         guard let db = try? SQLiteDB(path: Self.path, readOnly: true),
               (try? db.scalarInt("SELECT COUNT(*) FROM ZWAMESSAGE LIMIT 1")) != nil
         else { throw SourceError.needsFullDiskAccess("WhatsApp") }
 
-        let afterApple = after - appleEpochOffset
+        let afterApple = Self.appleSeconds(after)
+        let beforeApple = Self.appleSeconds(before)
         var result: [RawMessage] = []
         // Message types: 0 text, 1 image, 2 video, 3 voice, 7 link…
         // Only text carries words; a caption on an image is in ZTEXT too.
@@ -144,12 +191,12 @@ nonisolated struct WhatsAppSource: MessageSource {
             FROM ZWAMESSAGE m
             JOIN ZWACHATSESSION s ON s.Z_PK = m.ZCHATSESSION
             LEFT JOIN ZWAGROUPMEMBER g ON g.Z_PK = m.ZGROUPMEMBER
-            WHERE m.ZMESSAGEDATE > ? AND m.ZTEXT IS NOT NULL AND m.ZTEXT != ''
+            WHERE m.ZMESSAGEDATE > ? AND m.ZMESSAGEDATE < ? AND m.ZTEXT IS NOT NULL AND m.ZTEXT != ''
               AND COALESCE(s.ZCONTACTJID, '') NOT LIKE '%status%'
               AND COALESCE(s.ZREMOVED, 0) = 0
-            ORDER BY m.ZMESSAGEDATE LIMIT ?
+            ORDER BY m.ZMESSAGEDATE \(newestFirst ? "DESC" : "ASC") LIMIT ?
             """,
-            [.double(afterApple), .of(limit)]
+            [.double(afterApple), .double(beforeApple), .of(limit)]
         ) { row in
             let text = row.text(2) ?? ""
             let date = Date(timeIntervalSince1970: row.double(3) + appleEpochOffset)
@@ -190,59 +237,114 @@ nonisolated struct WhatsAppSource: MessageSource {
 nonisolated struct ClaudeHistorySource: MessageSource {
     var kind: MemorySource { .claude }
 
-    static let root = URL.homeDirectory.appending(path: ".claude/projects", directoryHint: .isDirectory)
+    static let defaultRoot = URL.homeDirectory.appending(path: ".claude/projects", directoryHint: .isDirectory)
+    var root: URL = Self.defaultRoot
 
-    var isPresent: Bool { FileManager.default.fileExists(atPath: Self.root.path) }
+    var isPresent: Bool { FileManager.default.fileExists(atPath: root.path) }
 
-    func read(after: Double, limit: Int, contacts: ContactBook) throws -> [RawMessage] {
+    /// Bytes already read per transcript, so each file is parsed once and a
+    /// growing session only costs its new lines.
+    static let progressKey = "claudeFileProgress"
+
+    static func resetProgress() {
+        UserDefaults.standard.removeObject(forKey: progressKey)
+    }
+
+    /// Reads everything new in one pass and ignores `limit`: transcripts are
+    /// appended to, so the unit of progress is a byte offset per file, not a
+    /// date. Re-reading files to page through dates was what pinned a core.
+    func read(after: Double, before: Double?, newestFirst: Bool, limit: Int, contacts: ContactBook) throws -> [RawMessage] {
         guard isPresent else { throw SourceError.missing("Claude Code history") }
-        let files = (FileManager.default.enumerator(
-            at: Self.root, includingPropertiesForKeys: [.contentModificationDateKey])?
+        var progress = UserDefaults.standard.dictionary(forKey: Self.progressKey) as? [String: Int] ?? [:]
+        let files = (FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.fileSizeKey])?
             .compactMap { $0 as? URL } ?? [])
             .filter { $0.pathExtension == "jsonl" && !$0.path.contains("/subagents/") }
-            .filter { url in
-                let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
-                return (modified?.timeIntervalSince1970 ?? 0) > after
-            }
 
         let iso = ISO8601DateFormatter()
         iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         var result: [RawMessage] = []
 
         for file in files {
-            guard let data = try? Data(contentsOf: file) else { continue }
+            let size = (try? file.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+            let done = progress[file.path] ?? 0
+            guard size > done else { continue }
+            guard let handle = try? FileHandle(forReadingFrom: file) else { continue }
+            defer { try? handle.close() }
+            try? handle.seek(toOffset: UInt64(done > size ? 0 : done))
+            guard let data = try? handle.readToEnd(), !data.isEmpty else { continue }
+
             let project = file.deletingLastPathComponent().lastPathComponent
                 .replacingOccurrences(of: "-Users-\(NSUserName())-", with: "")
                 .replacingOccurrences(of: "-", with: "/")
             let session = file.deletingPathExtension().lastPathComponent
-            var title: String?
-            var index = 0
+            var consumed = 0
 
-            for line in data.split(separator: UInt8(ascii: "\n")) {
-                index += 1
-                guard let object = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
-                      let type = object["type"] as? String, type == "user" || type == "assistant",
+            Self.lines(in: data) { line, end in
+                consumed = end
+                guard let object = Self.parse(line),
+                      let type = object["type"] as? String,
                       object["isMeta"] as? Bool != true,
                       let message = object["message"] as? [String: Any]
-                else { continue }
-                let date = (object["timestamp"] as? String).flatMap(iso.date(from:)) ?? .now
-                guard date.timeIntervalSince1970 > after else { continue }
-
+                else { return }
                 let text = Self.text(of: message["content"])
-                guard !text.isEmpty, !Self.isNoise(text) else { continue }
+                guard !text.isEmpty, !Self.isNoise(text) else { return }
                 let isMe = type == "user"
-                if isMe, title == nil { title = String(text.prefix(60)) }
-
+                let date = (object["timestamp"] as? String).flatMap(iso.date(from:)) ?? .now
+                let title = String((isMe ? text : session).prefix(60))
                 result.append(RawMessage(
-                    source: .claude, externalID: (object["uuid"] as? String) ?? "\(session)#\(index)",
-                    chatID: session, chatName: "\(project) — \(title ?? session.prefix(8).description)",
+                    source: .claude, externalID: (object["uuid"] as? String) ?? "\(session)#\(done + end)",
+                    chatID: session, chatName: "\(project) — \(title)",
                     isGroup: false, sender: isMe ? AppSettings.myNameSnapshot : "Claude",
                     isFromMe: isMe, date: date,
                     text: String(text.prefix(isMe ? 2400 : 500))))
             }
+            // Only whole lines count as read; a half-written last line is
+            // picked up next time.
+            progress[file.path] = done + consumed
         }
-        result.sort { $0.date < $1.date }
-        return Array(result.prefix(limit))
+        UserDefaults.standard.set(progress, forKey: Self.progressKey)
+        // One chat name per session: the first thing you asked in it.
+        var titles: [String: String] = [:]
+        for message in result.sorted(by: { $0.date < $1.date }) where message.isFromMe && titles[message.chatID] == nil {
+            titles[message.chatID] = message.chatName
+        }
+        return result
+            .map { message in
+                var message = message
+                if let title = titles[message.chatID] { message.chatName = title }
+                return message
+            }
+            .sorted { $0.date < $1.date }
+    }
+
+    /// Calls `body` with each complete line and the offset just past it.
+    private static func lines(in data: Data, _ body: (UnsafeRawBufferPointer, Int) -> Void) {
+        data.withUnsafeBytes { raw in
+            guard let base = raw.baseAddress else { return }
+            var start = 0
+            while start < raw.count {
+                guard let hit = memchr(base + start, 0x0A, raw.count - start) else { return }
+                let end = base.distance(to: UnsafeRawPointer(hit))
+                body(UnsafeRawBufferPointer(start: base + start, count: end - start), end + 1)
+                start = end + 1
+            }
+        }
+    }
+
+    private static let userMarker = Array(#""type":"user""#.utf8)
+    private static let assistantMarker = Array(#""type":"assistant""#.utf8)
+    private static let toolResultMarker = Array(#""tool_use_id""#.utf8)
+
+    /// Cheap byte checks first; JSON only for lines that can hold your words.
+    /// Tool results (file dumps, command output) are most of the bytes and
+    /// none of the meaning, so they are never decoded.
+    private static func parse(_ line: UnsafeRawBufferPointer) -> [String: Any]? {
+        guard line.count > 20, line.count < 400_000 else { return nil }
+        func contains(_ needle: [UInt8]) -> Bool {
+            needle.withUnsafeBytes { n in memmem(line.baseAddress, line.count, n.baseAddress, n.count) != nil }
+        }
+        guard contains(userMarker) || contains(assistantMarker), !contains(toolResultMarker) else { return nil }
+        return (try? JSONSerialization.jsonObject(with: Data(line))) as? [String: Any]
     }
 
     static func text(of content: Any?) -> String {

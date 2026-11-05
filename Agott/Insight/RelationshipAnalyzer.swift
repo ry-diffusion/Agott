@@ -59,8 +59,13 @@ enum RelationshipAnalyzer {
 
     /// Runs off the main actor: sentiment over thousands of lines is real work.
     @concurrent nonisolated static func stats(for chat: ChatSummary, store: MemoryStore = .shared) async -> RelationshipStats {
+        // A chat whose size and last message have not moved has not changed.
+        let stamp = "\(chat.messageCount)|\(chat.lastDate.timeIntervalSince1970)"
+        if let cached = await StatsCache.shared.get(chat.id, stamp: stamp) { return cached }
         let lines = (try? await store.lines(source: chat.source, chatID: chat.chatID, limit: 8000)) ?? []
-        return compute(lines)
+        let stats = compute(lines)
+        await StatsCache.shared.set(chat.id, stamp: stamp, stats: stats)
+        return stats
     }
 
     nonisolated static func compute(_ lines: [ChatLine], now: Date = .now) -> RelationshipStats {
@@ -220,5 +225,20 @@ enum RelationshipAnalyzer {
         return Card.Replies(
             context: ideas.context,
             options: ideas.options.map { .init(text: $0.text, tone: $0.tone, why: $0.why) })
+    }
+}
+
+/// Relationship statistics already computed, keyed by chat and its size.
+actor StatsCache {
+    static let shared = StatsCache()
+    private var entries: [String: (stamp: String, stats: RelationshipStats)] = [:]
+
+    func get(_ id: String, stamp: String) -> RelationshipStats? {
+        guard let entry = entries[id], entry.stamp == stamp else { return nil }
+        return entry.stats
+    }
+
+    func set(_ id: String, stamp: String, stats: RelationshipStats) {
+        entries[id] = (stamp, stats)
     }
 }
