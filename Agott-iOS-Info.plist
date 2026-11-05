@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The iPhone finds the Mac running Agott over Bonjour. iOS will not let
+	     an app browse for a service type it has not declared here, and Xcode
+	     has no INFOPLIST_KEY_ setting for this array. Generated keys are
+	     merged on top of this file. -->
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_agott._tcp</string>
+	</array>
+</dict>
+</plist>

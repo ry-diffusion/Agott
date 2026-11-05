@@ -1,0 +1,270 @@
+import CoreGraphics
+import Foundation
+import FoundationModels
+import ImageIO
+import UniformTypeIdentifiers
+
+/// DeepSeek V4 Flash (or any OpenAI-compatible model) as a Foundation Models
+/// `LanguageModel`.
+///
+/// This is what lets the rest of Agott be written once. Tools are ordinary
+/// `Tool`s with `@Generable` arguments; sessions are ordinary
+/// `LanguageModelSession`s. Whether the words come from Apple's on-device model,
+/// Private Cloud Compute, or DeepSeek through OpenCode Go is one line in
+/// `ModelHub`, and the tool loop, the transcript and guided generation behave
+/// the same for all three.
+nonisolated struct OpenCodeLanguageModel: LanguageModel {
+    typealias Executor = OpenCodeExecutor
+
+    var configuration: OpenCodeExecutor.Configuration
+
+    var capabilities: LanguageModelCapabilities {
+        var list: [LanguageModelCapabilities.Capability] = [.toolCalling, .guidedGeneration, .reasoning]
+        if configuration.supportsVision { list.append(.vision) }
+        return LanguageModelCapabilities(list)
+    }
+
+    var executorConfiguration: OpenCodeExecutor.Configuration { configuration }
+}
+
+nonisolated struct OpenCodeExecutor: LanguageModelExecutor {
+    typealias Model = OpenCodeLanguageModel
+
+    struct Configuration: Hashable, Sendable {
+        /// e.g. https://opencode.ai/zen/go/v1
+        var baseURL: String
+        var model: String
+        var apiKey: String
+        var supportsVision: Bool = false
+    }
+
+    enum ExecutorError: LocalizedError {
+        case missingKey
+        case badURL
+        case http(Int, String)
+
+        var errorDescription: String? {
+            switch self {
+            case .missingKey: String(localized: "Add your OpenCode Go API key in Settings.")
+            case .badURL: String(localized: "The model endpoint URL is not valid.")
+            case .http(let code, let body): String(localized: "The model server answered \(code): \(body)")
+            }
+        }
+    }
+
+    let configuration: Configuration
+
+    init(configuration: Configuration) throws {
+        self.configuration = configuration
+    }
+
+    func respond(
+        to request: LanguageModelExecutorGenerationRequest,
+        model: OpenCodeLanguageModel,
+        streamingInto channel: LanguageModelExecutorGenerationChannel
+    ) async throws {
+        guard !configuration.apiKey.isEmpty else { throw ExecutorError.missingKey }
+        let base = configuration.baseURL.hasSuffix("/") ? String(configuration.baseURL.dropLast()) : configuration.baseURL
+        guard let url = URL(string: base + "/chat/completions") else { throw ExecutorError.badURL }
+
+        var body: [String: Any] = [
+            "model": configuration.model,
+            "messages": Self.messages(from: request, vision: configuration.supportsVision),
+            "stream": true,
+        ]
+        if !request.enabledToolDefinitions.isEmpty {
+            body["tools"] = request.enabledToolDefinitions.map(Self.tool)
+            body["tool_choice"] = "auto"
+        }
+        if let temperature = request.generationOptions.temperature { body["temperature"] = temperature }
+        if let maximum = request.generationOptions.maximumResponseTokens { body["max_tokens"] = maximum }
+        if request.schema != nil { body["response_format"] = ["type": "json_object"] }
+
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "POST"
+        urlRequest.timeoutInterval = 300
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        urlRequest.setValue("Bearer \(configuration.apiKey)", forHTTPHeaderField: "Authorization")
+        // OpenCode Go routes and caches by conversation, and asks clients to
+        // name themselves. The transcript's first entry is created with the
+        // session and never changes, so its id is a stable conversation id.
+        urlRequest.setValue(Self.sessionID(for: request), forHTTPHeaderField: "x-opencode-session")
+        urlRequest.setValue("Agott/1.0 (macOS; Foundation Models)", forHTTPHeaderField: "User-Agent")
+        urlRequest.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (bytes, response) = try await URLSession.shared.bytes(for: urlRequest)
+        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+            var text = ""
+            for try await line in bytes.lines { text += line; if text.count > 2000 { break } }
+            throw ExecutorError.http(http.statusCode, String(text.prefix(400)))
+        }
+
+        let responseID = UUID().uuidString
+        let reasoningID = UUID().uuidString
+        let toolsID = UUID().uuidString
+        var pendingCalls: [Int: (id: String, name: String, arguments: String)] = [:]
+
+        for try await line in bytes.lines {
+            try Task.checkCancellation()
+            guard line.hasPrefix("data:") else { continue }
+            let payload = line.dropFirst(5).trimmingCharacters(in: .whitespaces)
+            if payload == "[DONE]" { break }
+            guard let data = payload.data(using: .utf8),
+                  let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let choice = (object["choices"] as? [[String: Any]])?.first,
+                  let delta = choice["delta"] as? [String: Any]
+            else { continue }
+
+            if let reasoning = delta["reasoning_content"] as? String, !reasoning.isEmpty {
+                await channel.send(.reasoning(entryID: reasoningID, action: .appendText(reasoning, tokenCount: 1)))
+            }
+            if let content = delta["content"] as? String, !content.isEmpty {
+                await channel.send(.response(entryID: responseID, action: .appendText(content, tokenCount: 1)))
+            }
+            for call in (delta["tool_calls"] as? [[String: Any]]) ?? [] {
+                let index = call["index"] as? Int ?? 0
+                var entry = pendingCalls[index] ?? (id: "", name: "", arguments: "")
+                if let id = call["id"] as? String, !id.isEmpty { entry.id = id }
+                if let function = call["function"] as? [String: Any] {
+                    if let name = function["name"] as? String, !name.isEmpty { entry.name = name }
+                    if let arguments = function["arguments"] as? String { entry.arguments += arguments }
+                }
+                pendingCalls[index] = entry
+            }
+        }
+
+        // Tool calls are handed over whole: the framework parses arguments as
+        // generated content, and half an argument object parses as nothing.
+        for index in pendingCalls.keys.sorted() {
+            guard let call = pendingCalls[index], !call.name.isEmpty else { continue }
+            let arguments = call.arguments.trimmingCharacters(in: .whitespacesAndNewlines)
+            await channel.send(.toolCalls(
+                entryID: toolsID,
+                action: .toolCall(
+                    id: call.id.isEmpty ? "call_\(index)_\(UUID().uuidString.prefix(8))" : call.id,
+                    name: call.name,
+                    action: .appendArguments(arguments.isEmpty ? "{}" : arguments, tokenCount: 1))))
+        }
+    }
+
+    static func sessionID(for request: LanguageModelExecutorGenerationRequest) -> String {
+        guard let first = request.transcript.first else { return request.id.uuidString }
+        return "agott-\(first.id)"
+    }
+
+    // MARK: Transcript → Chat Completions
+
+    static func messages(from request: LanguageModelExecutorGenerationRequest, vision: Bool) -> [[String: Any]] {
+        var messages: [[String: Any]] = []
+        var pendingReasoning: String?
+
+        for entry in request.transcript {
+            switch entry {
+            case .instructions(let instructions):
+                messages.append(["role": "system", "content": text(instructions.segments)])
+            case .prompt(let prompt):
+                messages.append(["role": "user", "content": content(prompt.segments, vision: vision)])
+            case .reasoning(let reasoning):
+                pendingReasoning = text(reasoning.segments)
+            case .toolCalls(let calls):
+                var message: [String: Any] = [
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": calls.map { call in
+                        [
+                            "id": call.id,
+                            "type": "function",
+                            "function": ["name": call.toolName, "arguments": call.arguments.jsonString],
+                        ] as [String: Any]
+                    },
+                ]
+                if let reasoning = pendingReasoning, !reasoning.isEmpty { message["reasoning_content"] = reasoning }
+                pendingReasoning = nil
+                messages.append(message)
+            case .toolOutput(let output):
+                messages.append([
+                    "role": "tool",
+                    "tool_call_id": output.id,
+                    "content": text(output.segments),
+                ])
+            case .response(let response):
+                messages.append(["role": "assistant", "content": text(response.segments)])
+                pendingReasoning = nil
+            case .data:
+                continue
+            @unknown default:
+                continue
+            }
+        }
+
+        if let schema = request.schema,
+           let data = try? JSONEncoder().encode(schema),
+           let json = String(data: data, encoding: .utf8)
+        {
+            messages.append([
+                "role": "system",
+                "content": "Answer with a single JSON object, and nothing else, that satisfies this JSON schema:\n\(json)",
+            ])
+        }
+        return messages
+    }
+
+    static func tool(_ definition: Transcript.ToolDefinition) -> [String: Any] {
+        var parameters: Any = ["type": "object", "properties": [String: Any]()]
+        if let data = try? JSONEncoder().encode(definition.parameters),
+           let object = try? JSONSerialization.jsonObject(with: data)
+        {
+            parameters = object
+        }
+        return [
+            "type": "function",
+            "function": [
+                "name": definition.name,
+                "description": definition.description,
+                "parameters": parameters,
+            ] as [String: Any],
+        ]
+    }
+
+    private static func text(_ segments: [Transcript.Segment]) -> String {
+        segments.compactMap { segment -> String? in
+            switch segment {
+            case .text(let text): text.content
+            case .structure(let structure): structure.content.jsonString
+            case .attachment(let attachment): attachment.label.map { "[attachment: \($0)]" }
+            @unknown default: nil
+            }
+        }.joined(separator: "\n")
+    }
+
+    /// Plain text unless there is an image and the model can see.
+    private static func content(_ segments: [Transcript.Segment], vision: Bool) -> Any {
+        guard vision, segments.contains(where: { if case .attachment = $0 { true } else { false } }) else {
+            return text(segments)
+        }
+        return segments.compactMap { segment -> [String: Any]? in
+            switch segment {
+            case .text(let text):
+                return ["type": "text", "text": text.content]
+            case .structure(let structure):
+                return ["type": "text", "text": structure.content.jsonString]
+            case .attachment(let attachment):
+                guard case .image(let image) = attachment.content, let jpeg = jpegData(image.cgImage) else { return nil }
+                return ["type": "image_url", "image_url": ["url": "data:image/jpeg;base64,\(jpeg.base64EncodedString())"]]
+            @unknown default:
+                return nil
+            }
+        }
+    }
+
+    static func jpegData(_ image: CGImage, quality: Double = 0.7) -> Data? {
+        let data = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(data, UTType.jpeg.identifier as CFString, 1, nil) else {
+            return nil
+        }
+        CGImageDestinationAddImage(destination, image, [kCGImageDestinationLossyCompressionQuality: quality] as CFDictionary)
+        guard CGImageDestinationFinalize(destination) else { return nil }
+        return data as Data
+    }
+}
