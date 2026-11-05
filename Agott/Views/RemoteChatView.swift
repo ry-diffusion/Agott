@@ -128,9 +128,10 @@ private struct RemoteTurnView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            StepsView(steps: turn.steps, isStreaming: turn.isStreaming)
             if !turn.text.isEmpty {
                 Text(AssistantTurnView.markdown(turn.text)).textSelection(.enabled)
-            } else if turn.isStreaming && turn.cards.isEmpty {
+            } else if turn.isStreaming && turn.cards.isEmpty && turn.steps.isEmpty {
                 TypingDots()
             }
             ForEach(turn.cards) { card in

@@ -74,12 +74,32 @@
         }
       }
     },
+    "%lld steps": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld passos"
+          }
+        }
+      }
+    },
     "%lld%% · %@": {
       "localizations": {
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
             "value": "%1$lld%% · %2$@"
+          }
+        }
+      }
+    },
+    "%llds": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%llds"
           }
         }
       }
@@ -204,6 +224,26 @@
         }
       }
     },
+    "Adding a task": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adicionando uma tarefa"
+          }
+        }
+      }
+    },
+    "Adding an event": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adicionando um evento"
+          }
+        }
+      }
+    },
     "Agott": {
       "localizations": {
         "pt-BR": {
@@ -290,6 +330,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "O Agott vai clicar, digitar, rodar scripts e enviar sem confirmar."
+          }
+        }
+      }
+    },
+    "All": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tudo"
           }
         }
       }
@@ -544,6 +594,16 @@
         }
       }
     },
+    "Checking on everyone": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vendo como está todo mundo"
+          }
+        }
+      }
+    },
     "Checking on everyone…": {
       "localizations": {
         "pt-BR": {
@@ -554,12 +614,42 @@
         }
       }
     },
+    "Checking which apps I can control": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vendo quais apps eu consigo controlar"
+          }
+        }
+      }
+    },
+    "Checking your calendar": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Olhando sua agenda"
+          }
+        }
+      }
+    },
     "Checking your calendar…": {
       "localizations": {
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
             "value": "Olhando seu calendário…"
+          }
+        }
+      }
+    },
+    "Checking your tasks": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Olhando suas tarefas"
           }
         }
       }
@@ -600,6 +690,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Clicar na tela"
+          }
+        }
+      }
+    },
+    "Clicking": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clicando"
           }
         }
       }
@@ -654,6 +754,16 @@
         }
       }
     },
+    "Comparing what you say to and about %@": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Comparando o que você diz pra e sobre %@"
+          }
+        }
+      }
+    },
     "Comparing what you say to and about %@…": {
       "localizations": {
         "pt-BR": {
@@ -670,6 +780,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Comparando o que você diz pra pessoa e sobre ela…"
+          }
+        }
+      }
+    },
+    "Completing a task": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Concluindo uma tarefa"
           }
         }
       }
@@ -830,6 +950,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Rascunhar um e-mail"
+          }
+        }
+      }
+    },
+    "Drafting an email": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rascunhando um e-mail"
+          }
+        }
+      }
+    },
+    "Drafting replies": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escrevendo respostas"
           }
         }
       }
@@ -1084,6 +1224,16 @@
         }
       }
     },
+    "Hide steps": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ocultar passos"
+          }
+        }
+      }
+    },
     "Hold to ask Agott": {
       "localizations": {
         "pt-BR": {
@@ -1304,6 +1454,36 @@
         }
       }
     },
+    "Looked at %@": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Olhei o %@"
+          }
+        }
+      }
+    },
+    "Looked at WhatsApp": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Olhei o WhatsApp"
+          }
+        }
+      }
+    },
+    "Looking at you and %@": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Olhando você e %@"
+          }
+        }
+      }
+    },
     "Looking at you and %@…": {
       "localizations": {
         "pt-BR": {
@@ -1314,12 +1494,32 @@
         }
       }
     },
+    "Looking at your circles": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Olhando seus círculos"
+          }
+        }
+      }
+    },
     "Looking at your circles…": {
       "localizations": {
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
             "value": "Olhando seus círculos…"
+          }
+        }
+      }
+    },
+    "Looking at your screen": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Olhando sua tela"
           }
         }
       }
@@ -1350,6 +1550,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Macs por perto"
+          }
+        }
+      }
+    },
+    "Making a checklist": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Montando uma checklist"
           }
         }
       }
@@ -1524,6 +1734,16 @@
         }
       }
     },
+    "No memories from this source yet.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhuma memória dessa fonte ainda."
+          }
+        }
+      }
+    },
     "Not available right now. Agott will use %@.": {
       "localizations": {
         "pt-BR": {
@@ -1550,6 +1770,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nem um pouco preocupado"
+          }
+        }
+      }
+    },
+    "Nothing in memory about this": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nada na memória sobre isso"
           }
         }
       }
@@ -1660,6 +1890,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Chave de API do OpenCode Go"
+          }
+        }
+      }
+    },
+    "Opening %@": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrindo %@"
           }
         }
       }
@@ -1814,6 +2054,26 @@
         }
       }
     },
+    "Pressing %@": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pressionando %@"
+          }
+        }
+      }
+    },
+    "Pressing a button": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apertando um botão"
+          }
+        }
+      }
+    },
     "Pressing…": {
       "localizations": {
         "pt-BR": {
@@ -1934,6 +2194,16 @@
         }
       }
     },
+    "Reading your chat with %@": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lendo sua conversa com %@"
+          }
+        }
+      }
+    },
     "Reading your chat with %@…": {
       "localizations": {
         "pt-BR": {
@@ -1954,12 +2224,32 @@
         }
       }
     },
+    "Reading your inbox": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lendo sua caixa de entrada"
+          }
+        }
+      }
+    },
     "Reading your inbox…": {
       "localizations": {
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
             "value": "Lendo sua caixa de entrada…"
+          }
+        }
+      }
+    },
+    "Reading your story with %@": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lendo sua história com %@"
           }
         }
       }
@@ -1984,6 +2274,16 @@
         }
       }
     },
+    "Recent memories": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Memórias recentes"
+          }
+        }
+      }
+    },
     "Refresh": {
       "localizations": {
         "pt-BR": {
@@ -2000,6 +2300,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "Atualizar círculos"
+          }
+        }
+      }
+    },
+    "Remembered %lld things": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lembrei de %lld coisas"
+          }
+        }
+      }
+    },
+    "Remembered 3 things": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lembrei de 3 coisas"
+          }
+        }
+      }
+    },
+    "Remembering": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lembrando"
+          }
+        }
+      }
+    },
+    "Remembering “%@”": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lembrando “%@”"
           }
         }
       }
@@ -2074,6 +2414,16 @@
         }
       }
     },
+    "Running a script": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rodando um script"
+          }
+        }
+      }
+    },
     "Running a script…": {
       "localizations": {
         "pt-BR": {
@@ -2090,6 +2440,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Salva no seu Chaveiro. Só sai deste Mac para falar com o OpenCode."
+          }
+        }
+      }
+    },
+    "Saving to memory": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Guardando na memória"
           }
         }
       }
@@ -2120,6 +2480,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Gravação de Tela"
+          }
+        }
+      }
+    },
+    "Scrolling": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rolando"
           }
         }
       }
@@ -2204,12 +2574,62 @@
         }
       }
     },
+    "She's joking about the inn near the lagoon; explain the slang with two examples.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ela está brincando com a pousada perto da lagoa; explicar a gíria com dois exemplos."
+          }
+        }
+      }
+    },
+    "Show %lld more": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar mais %lld"
+          }
+        }
+      }
+    },
+    "Show less": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar menos"
+          }
+        }
+      }
+    },
+    "Show more": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar mais"
+          }
+        }
+      }
+    },
     "Show or hide the key": {
       "localizations": {
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
             "value": "Mostrar ou ocultar a chave"
+          }
+        }
+      }
+    },
+    "Show steps": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar passos"
           }
         }
       }
@@ -2290,6 +2710,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Estável"
+          }
+        }
+      }
+    },
+    "Steps": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Passos"
           }
         }
       }
@@ -2544,6 +2974,26 @@
         }
       }
     },
+    "Thought for %llds": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pensou por %llds"
+          }
+        }
+      }
+    },
+    "Thought for %llds · %lld steps": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pensou por %1$llds · %2$lld passos"
+          }
+        }
+      }
+    },
     "Thursday football": {
       "localizations": {
         "pt-BR": {
@@ -2680,6 +3130,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Digitar texto"
+          }
+        }
+      }
+    },
+    "Typing": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Digitando"
           }
         }
       }
@@ -2934,6 +3394,16 @@
         }
       }
     },
+    "Writing an explanation": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escrevendo uma explicação"
+          }
+        }
+      }
+    },
     "You": {
       "localizations": {
         "pt-BR": {
@@ -3054,6 +3524,26 @@
         }
       }
     },
+    "declined": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "recusado"
+          }
+        }
+      }
+    },
+    "done": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "feito"
+          }
+        }
+      }
+    },
     "esc to close": {
       "localizations": {
         "pt-BR": {
@@ -3100,6 +3590,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "iPhone"
+          }
+        }
+      }
+    },
+    "in progress": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "em andamento"
           }
         }
       }

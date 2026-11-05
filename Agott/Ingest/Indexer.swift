@@ -238,6 +238,9 @@ final class Indexer {
                 try await ingestLive(batch)
                 forward = batch.map(\.date.timeIntervalSince1970).max() ?? forward
                 try await store.setCursor(forward, for: source.kind)
+                #if os(macOS)
+                if source.kind == .claude, !Task.isCancelled { ClaudeHistorySource.commitProgress() }
+                #endif
                 if batch.count < 5000 { break }
             }
             states[source.kind] = .ready

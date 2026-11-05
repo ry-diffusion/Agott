@@ -163,7 +163,18 @@ enum DemoData {
             detail: "Play a chill playlist in Music\n\ntell application \"Music\" to play playlist \"Chill\"")
         return [
             Turn(role: .user, text: "o que significa “tô de boa na lagoa”?", screenApp: "WhatsApp", memoryCount: 3),
-            Turn(role: .assistant, text: String(localized: "haha it's slang, relax\n\nshe's not actually at the lagoon. well, almost"), cards: [.explanation(explanation)]),
+            Turn(role: .assistant, text: String(localized: "haha it's slang, relax\n\nshe's not actually at the lagoon. well, almost"), cards: [.explanation(explanation)],
+                 steps: [
+                    Step(id: "d1", kind: .context, title: String(localized: "Looked at WhatsApp"), symbol: "eye", state: .done,
+                         started: Date().addingTimeInterval(-9), ended: Date().addingTimeInterval(-8)),
+                    Step(id: "d2", kind: .context, title: String(localized: "Remembered 3 things"), symbol: "brain.head.profile", state: .done,
+                         detail: "· Ana Souza\n· Faculdade 2026", started: Date().addingTimeInterval(-8), ended: Date().addingTimeInterval(-8)),
+                    Step(id: "d3", kind: .thinking, title: String(localized: "Thinking"), symbol: "brain", state: .done,
+                         detail: String(localized: "She's joking about the inn near the lagoon; explain the slang with two examples."),
+                         started: Date().addingTimeInterval(-8), ended: Date().addingTimeInterval(-5)),
+                    Step(id: "d4", kind: .tool, title: String(localized: "Writing an explanation"), symbol: "lightbulb", state: .done,
+                         started: Date().addingTimeInterval(-5), ended: Date().addingTimeInterval(-4)),
+                 ]),
             Turn(role: .user, text: "e como eu respondo ela?", memoryCount: 5),
             Turn(role: .assistant, text: String(localized: "she's been waiting since this morning\n\nhere, in your style:"), cards: [.replies(replies)]),
             Turn(role: .user, text: "como tá minha relação com a Ana?"),

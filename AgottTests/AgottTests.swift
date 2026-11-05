@@ -280,6 +280,9 @@ struct ClaudeReaderTests {
         source.root = root
         let first = try source.read(after: 0, limit: 10, contacts: ContactBook())
         #expect(first.map(\.externalID) == ["a", "b"])  // tool result skipped
+        // Not committed (as if the app stopped before storing): read again.
+        #expect(try source.read(after: 0, limit: 10, contacts: ContactBook()).map(\.externalID) == ["a", "b"])
+        ClaudeHistorySource.commitProgress()
         #expect(try source.read(after: 0, limit: 10, contacts: ContactBook()).isEmpty)  // nothing new
 
         let handle = try FileHandle(forWritingTo: file)
@@ -287,6 +290,74 @@ struct ClaudeReaderTests {
         try handle.write(contentsOf: Data(line("user", "and a graph", "c").utf8))
         try handle.close()
         #expect(try source.read(after: 0, limit: 10, contacts: ContactBook()).map(\.externalID) == ["c"])
+        ClaudeHistorySource.commitProgress()
+    }
+}
+
+/// A fake OpenCode Go: the first call asks for a tool, the second answers.
+final class FakeModelServer: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { request.url?.host == "fake-model.test" }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        var body = request.httpBody ?? Data()
+        if body.isEmpty, let stream = request.httpBodyStream {
+            stream.open()
+            var buffer = [UInt8](repeating: 0, count: 4096)
+            while stream.hasBytesAvailable {
+                let read = stream.read(&buffer, maxLength: buffer.count)
+                if read <= 0 { break }
+                body.append(buffer, count: read)
+            }
+            stream.close()
+        }
+        let hasToolResult = String(decoding: body, as: UTF8.self).contains(#""role":"tool""#)
+        let events: [String] = hasToolResult
+            ? [#"{"choices":[{"delta":{"content":"achei: floripa no feriado"}}]}"#]
+            : [#"{"choices":[{"delta":{"reasoning_content":"preciso lembrar da viagem"}}]}"#,
+               #"{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","function":{"name":"echo_memory","arguments":"{\"query\":\"Floripa\"}"}}]}}]}"#]
+        let sse = events.map { "data: \($0)\n\n" }.joined() + "data: [DONE]\n\n"
+        let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1",
+                                       headerFields: ["Content-Type": "text/event-stream"])!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(sse.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
+nonisolated struct EchoMemoryTool: Tool {
+    let name = "echo_memory"
+    let description = "Looks something up."
+    @Generable struct Arguments { var query: String }
+    @concurrent func call(arguments: Arguments) async throws -> String { "found \(arguments.query) trip in November" }
+}
+
+@MainActor
+struct StepsTests {
+    @Test func toolLoopProducesThinkingAndToolSteps() async throws {
+        URLProtocol.registerClass(FakeModelServer.self)
+        defer { URLProtocol.unregisterClass(FakeModelServer.self) }
+        let model = OpenCodeLanguageModel(configuration: .init(
+            baseURL: "https://fake-model.test", model: "fake", apiKey: "test-key"))
+        let session = LanguageModelSession(model: model, tools: [EchoMemoryTool()], instructions: "Be brief.")
+        let baseline = session.transcript.count
+        let answer = try await session.respond(to: "quando é a viagem?").content
+        #expect(answer.contains("floripa"))
+
+        let steps = StepTracker.steps(from: session.transcript, after: baseline, busy: false, clock: .init())
+        #expect(steps.contains { $0.kind == .thinking && ($0.detail ?? "").contains("viagem") })
+        let tool = try #require(steps.first { $0.kind == .tool })
+        #expect(tool.state == .done)
+        #expect((tool.detail ?? "").contains("found Floripa"))
+    }
+
+    @Test func busyModelShowsThinking() {
+        let transcript = Transcript(entries: [.prompt(.init(segments: [.text(.init(content: "oi"))]))])
+        let steps = StepTracker.steps(from: transcript, after: 0, busy: true, clock: .init())
+        #expect(steps.last?.kind == .thinking)
+        #expect(steps.last?.state == .running)
     }
 }
 

@@ -21,6 +21,38 @@ nonisolated struct Turn: Identifiable, Codable, Hashable, Sendable {
     var memoryCount = 0
     var error: String?
     var isStreaming = false
+    /// What Agott did to write this reply: thinking, context, tool calls.
+    var steps: [Step] = []
+
+    init(id: UUID = UUID(), role: Role, text: String, cards: [Card] = [], date: Date = Date(),
+         screenApp: String? = nil, memoryCount: Int = 0, error: String? = nil, isStreaming: Bool = false,
+         steps: [Step] = []) {
+        self.id = id
+        self.role = role
+        self.text = text
+        self.cards = cards
+        self.date = date
+        self.screenApp = screenApp
+        self.memoryCount = memoryCount
+        self.error = error
+        self.isStreaming = isStreaming
+        self.steps = steps
+    }
+
+    // Conversations saved before steps existed still load.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        role = try c.decode(Role.self, forKey: .role)
+        text = try c.decodeIfPresent(String.self, forKey: .text) ?? ""
+        cards = try c.decodeIfPresent([Card].self, forKey: .cards) ?? []
+        date = try c.decodeIfPresent(Date.self, forKey: .date) ?? Date()
+        screenApp = try c.decodeIfPresent(String.self, forKey: .screenApp)
+        memoryCount = try c.decodeIfPresent(Int.self, forKey: .memoryCount) ?? 0
+        error = try c.decodeIfPresent(String.self, forKey: .error)
+        isStreaming = try c.decodeIfPresent(Bool.self, forKey: .isStreaming) ?? false
+        steps = try c.decodeIfPresent([Step].self, forKey: .steps) ?? []
+    }
 }
 
 /// One conversation with Agott, and the loop that runs it.
@@ -102,24 +134,48 @@ final class Agent {
             self.mood = .working
         }
 
-        // Context: the screen, then memory.
+        // Context: the screen, then memory. Each shows as a step.
         var context: [String] = []
+        var contextSteps: [Step] = []
+        func show(_ step: Step) {
+            if let i = contextSteps.firstIndex(where: { $0.id == step.id }) { contextSteps[i] = step } else { contextSteps.append(step) }
+            if let index = turns.firstIndex(where: { $0.id == replyID }) { turns[index].steps = contextSteps }
+        }
         #if os(macOS)
         if lookAtScreen && AppSettings.shared.useScreenContext {
             status = String(localized: "Looking at your screen…")
+            var step = Step(id: "screen", kind: .context, title: String(localized: "Looking at your screen"), symbol: "eye",
+                            state: .running, started: .now)
+            show(step)
             let snapshot = await ScreenReader.shared.capture(ocr: true)
             if !snapshot.text.isEmpty || !snapshot.elements.isEmpty {
                 context.append("What is on the user's screen right now:\n" + snapshot.rendered(maxElements: 80, maxText: 5000))
                 user.screenApp = snapshot.appName
+                step.title = String(localized: "Looked at \(snapshot.appName)")
+                step.detail = String(snapshot.text.prefix(600))
             }
+            step.state = .done
+            step.ended = .now
+            show(step)
         }
         #endif
         status = String(localized: "Remembering…")
+        var memoryStep = Step(id: "memory", kind: .context, title: String(localized: "Remembering"), symbol: "brain.head.profile",
+                              state: .running, started: .now)
+        show(memoryStep)
         let recall = await Retriever().recall(text, limit: 6)
         if !recall.isEmpty {
             context.append(recall.rendered(characterBudget: 7000))
             user.memoryCount = recall.hits.count + recall.facts.count
+            memoryStep.title = String(localized: "Remembered \(user.memoryCount) things")
+            memoryStep.detail = recall.hits.prefix(5).map { "· \($0.chunk.chatName)" }.joined(separator: "\n")
+        } else {
+            memoryStep.title = String(localized: "Nothing in memory about this")
         }
+        memoryStep.state = .done
+        memoryStep.ended = .now
+        show(memoryStep)
+        self.contextSteps = contextSteps
         if let index = turns.firstIndex(where: { $0.id == user.id }) { turns[index] = user }
 
         let prompt = context.isEmpty
@@ -143,6 +199,21 @@ final class Agent {
             sessionProvider = provider
         }
         guard let session else { return }
+
+        // Watch the transcript while the model works, so thinking and every
+        // tool call appear as they happen, not after.
+        let baseline = session.transcript.count
+        let clock = StepTracker.Clock()
+        let watcher = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                self?.updateSteps(replyID: replyID, session: session, baseline: baseline, clock: clock, busy: true)
+                try? await Task.sleep(for: .milliseconds(200))
+            }
+        }
+        defer {
+            watcher.cancel()
+            updateSteps(replyID: replyID, session: session, baseline: baseline, clock: clock, busy: false)
+        }
 
         do {
             let stream = session.streamResponse(to: prompt)
@@ -170,6 +241,19 @@ final class Agent {
             fail(replyID, error)
         } catch {
             fail(replyID, error)
+        }
+    }
+
+    @ObservationIgnored private var contextSteps: [Step] = []
+
+    private func updateSteps(replyID: UUID, session: LanguageModelSession, baseline: Int, clock: StepTracker.Clock, busy: Bool) {
+        guard let index = turns.firstIndex(where: { $0.id == replyID }) else { return }
+        let derived = StepTracker.steps(from: session.transcript, after: baseline, busy: busy, clock: clock)
+        let steps = contextSteps + derived
+        if turns[index].steps != steps { turns[index].steps = steps }
+        if busy, let running = derived.last(where: { $0.state == .running }) {
+            status = running.title + "…"
+            mood = running.kind == .thinking ? .thinking : .working
         }
     }
 

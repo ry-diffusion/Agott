@@ -8,6 +8,10 @@ struct MemoryView: View {
     @State private var hits: [MemoryHit] = []
     @State private var searching = false
     @State private var importing = false
+    @State private var recent: [MemoryChunk] = []
+    @State private var feedSource: MemorySource?
+    @State private var feedLimit = 30
+    @State private var lastFeed = Date.distantPast
 
     var body: some View {
         ScrollView {
@@ -27,6 +31,9 @@ struct MemoryView: View {
                 totals
                 sources
                 search
+                if query.isEmpty || hits.isEmpty {
+                    feed
+                }
             }
             .padding(.horizontal, 28)
             .padding(.top, 24)
@@ -36,6 +43,12 @@ struct MemoryView: View {
         }
         .scrollIndicators(.never)
         .task { await indexer.refreshTotals() }
+        .task(id: "\(feedSource?.rawValue ?? "all")-\(feedLimit)") { await loadFeed() }
+        // New memories arrive while indexing; refresh the feed now and then.
+        .onChange(of: indexer.totals.chunks) { _, _ in
+            guard Date().timeIntervalSince(lastFeed) > 10 else { return }
+            Task { await loadFeed() }
+        }
         #if os(macOS)
         .fileImporter(isPresented: $importing, allowedContentTypes: [.json]) { result in
             if case .success(let url) = result { Task { await indexer.importClaudeExport(url) } }
@@ -134,6 +147,67 @@ struct MemoryView: View {
         }
     }
 
+    /// The newest moments, so memory is something you can look through, not
+    /// only search.
+    private var feed: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                PanelTitle(title: "Recent memories", symbol: "clock.arrow.circlepath")
+                Spacer()
+                GlassEffectContainer(spacing: 6) {
+                    HStack(spacing: 6) {
+                        feedChip(nil, title: String(localized: "All"), symbol: "tray.full")
+                        ForEach([MemorySource.whatsapp, .imessage, .claude], id: \.self) { source in
+                            feedChip(source, title: source.displayName, symbol: source.symbol)
+                        }
+                    }
+                }
+            }
+            if recent.isEmpty {
+                Text(indexer.totals.chunks == 0 ? "Nothing indexed yet" : "No memories from this source yet.")
+                    .foregroundStyle(Ink.muted)
+                    .padding(.vertical, 8)
+            }
+            LazyVStack(alignment: .leading, spacing: 10) {
+                ForEach(recent) { chunk in
+                    MemoryMoment(chunk: chunk)
+                }
+            }
+            if recent.count >= feedLimit {
+                Button {
+                    feedLimit += 30
+                } label: {
+                    Label("Show more", systemImage: "arrow.down")
+                }
+                .buttonStyle(.candy(.soft))
+                .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    private func feedChip(_ source: MemorySource?, title: String, symbol: String) -> some View {
+        let selected = feedSource == source
+        return Button {
+            feedLimit = 30
+            feedSource = source
+        } label: {
+            Label(title, systemImage: symbol)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(selected ? AnyShapeStyle(.white) : AnyShapeStyle(Ink.text))
+                .padding(.horizontal, 10).padding(.vertical, 5)
+                .glassEffect(selected ? .regular.tint(Ink.spot).interactive() : .regular.interactive(), in: .capsule)
+        }
+        .buttonStyle(PressScale())
+    }
+
+    private func loadFeed() async {
+        lastFeed = .now
+        var filter = MemoryStore.Filter()
+        if let feedSource { filter.sources = [feedSource] }
+        let ids = (try? await MemoryStore.shared.recentChunkIDs(filter: filter, limit: feedLimit)) ?? []
+        recent = (try? await MemoryStore.shared.chunks(ids: ids)) ?? []
+    }
+
     private func runSearch() async {
         searching = true
         hits = await Retriever().recall(query, limit: 12).hits
@@ -208,5 +282,55 @@ private struct SourceTile: View {
         case .failed(let message): return message
         default: return String(localized: "\(count) messages remembered")
         }
+    }
+}
+
+/// One moment of conversation, as it was said.
+private struct MemoryMoment: View {
+    var chunk: MemoryChunk
+    @State private var open = false
+
+    private var lines: [Substring] { chunk.text.split(separator: "\n") }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: chunk.source.symbol).font(.caption.weight(.bold)).foregroundStyle(Ink.muted)
+                Text(chunk.chatName).font(.headline).foregroundStyle(Ink.text).lineLimit(1)
+                Spacer()
+                Text(chunk.end, format: .relative(presentation: .named)).font(.caption).foregroundStyle(Ink.muted)
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                ForEach(Array(lines.prefix(open ? 40 : 4).enumerated()), id: \.offset) { _, line in
+                    MomentLine(line: String(line))
+                }
+            }
+            if lines.count > 4 {
+                Button(open ? "Show less" : "Show \(lines.count - 4) more") { open.toggle() }
+                    .buttonStyle(.plain)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Ink.spot)
+            }
+        }
+        .panel(padding: 14)
+    }
+}
+
+/// "[2026-11-05 14:02] Ana: texto" drawn as sender and words.
+private struct MomentLine: View {
+    var line: String
+
+    var body: some View {
+        let body = line.split(separator: "] ", maxSplits: 1).last.map(String.init) ?? line
+        let parts = body.split(separator: ":", maxSplits: 1)
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            if parts.count == 2 {
+                Text(parts[0]).font(.callout.weight(.semibold)).foregroundStyle(Ink.text).lineLimit(1)
+                Text(parts[1].trimmingCharacters(in: .whitespaces)).font(.callout).foregroundStyle(Ink.text).lineLimit(3)
+            } else {
+                Text(body).font(.callout).foregroundStyle(Ink.text).lineLimit(3)
+            }
+        }
+        .textSelection(.enabled)
     }
 }

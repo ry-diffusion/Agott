@@ -248,6 +248,18 @@ nonisolated struct ClaudeHistorySource: MessageSource {
 
     static func resetProgress() {
         UserDefaults.standard.removeObject(forKey: progressKey)
+        pending = nil
+    }
+
+    /// Offsets reached by the last read, saved only once its messages are
+    /// stored. Saving them before would lose messages if the app stopped in
+    /// between.
+    nonisolated(unsafe) private static var pending: [String: Int]?
+
+    static func commitProgress() {
+        guard let pending else { return }
+        UserDefaults.standard.set(pending, forKey: progressKey)
+        Self.pending = nil
     }
 
     /// Reads everything new in one pass and ignores `limit`: transcripts are
@@ -302,7 +314,7 @@ nonisolated struct ClaudeHistorySource: MessageSource {
             // picked up next time.
             progress[file.path] = done + consumed
         }
-        UserDefaults.standard.set(progress, forKey: Self.progressKey)
+        Self.pending = progress
         // One chat name per session: the first thing you asked in it.
         var titles: [String: String] = [:]
         for message in result.sorted(by: { $0.date < $1.date }) where message.isFromMe && titles[message.chatID] == nil {

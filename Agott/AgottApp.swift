@@ -58,7 +58,18 @@ struct AgottApp: App {
 import AppKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// True when the app is only the host for unit tests. It must not index
+    /// or listen, or tests would write into your real memory.
+    static var isTestHost: Bool { ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        guard !Self.isTestHost else { return }
+        // Claude history progress is now saved only after storing; read it
+        // once more from the start so nothing from before is missing.
+        if !UserDefaults.standard.bool(forKey: "claudeProgressV2") {
+            ClaudeHistorySource.resetProgress()
+            UserDefaults.standard.set(true, forKey: "claudeProgressV2")
+        }
         _ = ScreenReader.shared
         if let appearance = LaunchOptions.value("-AgottAppearance") {
             NSApp.appearance = NSAppearance(named: appearance == "light" ? .aqua : .darkAqua)
@@ -79,6 +90,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
     func applicationDidBecomeActive(_ notification: Notification) {
+        guard !Self.isTestHost else { return }
         // Accessibility is granted outside the app; pick it up when we return.
         if !LaunchOptions.isDemo, AppSettings.shared.hasOnboarded, !Copilot.shared.keys.isActive { Copilot.shared.start() }
         // Coming back from System Settings with Full Disk Access granted:

@@ -12,6 +12,7 @@ struct AssistantTurnView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            StepsView(steps: turn.steps, isStreaming: turn.isStreaming)
             if !turn.text.isEmpty {
                 if compact {
                     Text(Self.markdown(turn.text))
@@ -29,7 +30,7 @@ struct AssistantTurnView: View {
                         }
                     }
                 }
-            } else if turn.isStreaming && turn.cards.isEmpty {
+            } else if turn.isStreaming && turn.cards.isEmpty && turn.steps.isEmpty {
                 TypingDots().balloon(.leading)
             }
             ForEach(turn.cards) { card in
