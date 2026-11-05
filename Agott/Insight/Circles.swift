@@ -182,7 +182,7 @@ nonisolated struct CirclesTool: Tool {
     @concurrent func call(arguments: Arguments) async throws -> String {
         await CardBus.status(String(localized: "Looking at your circles…"))
         var circles = await Circles.cached()
-        if circles.isEmpty { circles = try await Circles.refresh() }
+        if circles.isEmpty { circles = (try? await Circles.refresh()) ?? [] }
         if let filter = arguments.filter?.folded, !filter.isEmpty {
             circles = circles.filter { $0.name.folded.contains(filter) || $0.kind.rawValue.contains(filter) }
         }

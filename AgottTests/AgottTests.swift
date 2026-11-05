@@ -332,7 +332,13 @@ final class FakeModelServer: URLProtocol {
         let sent = String(decoding: body, as: UTF8.self)
         let path = request.url?.path ?? ""
         let events: [String]
-        if path.hasSuffix("/responses") {
+        if path.hasSuffix("/responses"), sent.contains("json_schema") {
+            // OpenAI's rule: a JSON answer needs "json" in the input messages.
+            let inputPart = sent.components(separatedBy: #""input""#).dropFirst().joined()
+            events = inputPart.localizedCaseInsensitiveContains("json")
+                ? [#"{"type":"response.output_text.delta","delta":"{\"closeness\": 80, \"vibe\": \"carinhosa\"}"}"#]
+                : [#"{"type":"error","message":"Response input messages must contain the word 'json'"}"#]
+        } else if path.hasSuffix("/responses") {
             // OpenAI Responses, the way GPT-6 Luna streams.
             events = sent.contains("function_call_output")
                 ? [#"{"type":"response.output_text.delta","delta":"achei: floripa no feriado"}"#, #"{"type":"response.completed"}"#]
@@ -427,6 +433,16 @@ struct StepsTests {
         #expect(read.closeness == 80)
         #expect(read.vibe == "carinhosa")
         #expect(OpenCodeExecutor.cleanJSON("ok: {\"a\": 1} bye") == "{\"a\": 1}")
+    }
+
+    /// GPT-6 Luna: JSON answers through the Responses API.
+    @Test func responsesJSONAnswer() async throws {
+        URLProtocol.registerClass(FakeModelServer.self)
+        defer { URLProtocol.unregisterClass(FakeModelServer.self) }
+        let model = OpenCodeLanguageModel(configuration: .init(baseURL: "https://fake-model.test", model: "gpt-6-luna", apiKey: "k", api: .responses))
+        let session = LanguageModelSession(model: model, instructions: "Read the relationship.")
+        let read = try await session.respond(to: "o que a clara pensa sobre mim", generating: Mini.self).content
+        #expect(read.closeness == 80)
     }
 
     @Test func busyModelShowsThinking() {

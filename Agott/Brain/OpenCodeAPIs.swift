@@ -132,7 +132,12 @@ extension OpenCodeExecutor {
                 continue
             }
         }
-        if let schema = schemaInstruction(request) { instructions.append(schema) }
+        // OpenAI requires the word JSON in the messages themselves (not only
+        // in the instructions) for JSON answers, so the schema goes in both.
+        if let schema = schemaInstruction(request) {
+            instructions.append(schema)
+            input.append(["role": "developer", "content": schema])
+        }
         return (instructions.joined(separator: "\n\n"), input)
     }
 
@@ -154,7 +159,11 @@ extension OpenCodeExecutor {
             body["tool_choice"] = "auto"
         }
         if let maximum = request.generationOptions.maximumResponseTokens { body["max_output_tokens"] = maximum }
-        if request.schema != nil { body["text"] = ["format": ["type": "json_object"]] }
+        if let schema = request.schema,
+           let data = try? JSONEncoder().encode(schema),
+           let object = try? JSONSerialization.jsonObject(with: data) {
+            body["text"] = ["format": ["type": "json_schema", "name": "answer", "schema": object, "strict": false]]
+        }
         body["reasoning"] = ["summary": "auto"]
 
         let bytes = try await Self.open(makeRequest(path: "/responses", body: body, for: request))

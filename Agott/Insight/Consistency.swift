@@ -127,8 +127,12 @@ nonisolated struct ConsistencyTool: Tool {
         guard let chat = try await MemoryStore.shared.findChats(named: arguments.person, limit: 1).first else {
             return "No chat found with \(arguments.person)."
         }
-        let card = try await Consistency.check(chat)
-        await CardBus.post(.consistency(card))
-        return "Shown: gap \(card.gap)/100. \(card.verdict)"
+        do {
+            let card = try await Consistency.check(chat)
+            await CardBus.post(.consistency(card))
+            return "Shown: gap \(card.gap)/100. \(card.verdict)"
+        } catch {
+            return "Could not finish the comparison (\(error.localizedDescription.prefix(160))). Try read_chat and search_memory to look at it directly."
+        }
     }
 }

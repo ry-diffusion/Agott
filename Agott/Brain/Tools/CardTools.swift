@@ -107,8 +107,14 @@ nonisolated struct RelationshipReadTool: Tool {
             return "No chat found with \(arguments.person)."
         }
         let stats = await RelationshipAnalyzer.stats(for: chat)
-        let card = try await RelationshipAnalyzer.read(chat, stats: stats)
-        await CardBus.post(.person(card))
-        return "Shown: closeness \(card.closeness)/100, \(card.vibe). \(card.summary)"
+        do {
+            let card = try await RelationshipAnalyzer.read(chat, stats: stats)
+            await CardBus.post(.person(card))
+            return "Shown: closeness \(card.closeness)/100, \(card.vibe). \(card.summary)"
+        } catch {
+            // Answer from the numbers instead of failing the whole reply.
+            return "Could not write the full read (\(error.localizedDescription.prefix(160))). Measured facts instead: "
+                + RelationshipAnalyzer.statsLine(stats) + ". Read recent messages with read_chat if needed."
+        }
     }
 }
