@@ -53,13 +53,10 @@ struct ChatView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(verbatim: "Agott").font(Lettering.display(22, relativeTo: .title2)).foregroundStyle(Ink.text)
                 HStack(spacing: 6) {
-                    Chip(text: ModelHub.resolved().title, symbol: "cpu")
-                    if let status = agent.status {
-                        Chip(text: status, symbol: "ellipsis", spot: true)
-                            .transition(.opacity)
-                    } else {
-                        Text(agent.mood.accessibilityName).font(.caption).foregroundStyle(Ink.muted)
-                    }
+                    Chip(text: ModelHub.currentModelLabel, symbol: "cpu")
+                    // What Agott is doing shows in the reply's steps; the
+                    // header only carries its mood.
+                    Text(agent.mood.accessibilityName).font(.caption).foregroundStyle(Ink.muted)
                 }
             }
             Spacer()
@@ -70,6 +67,8 @@ struct ChatView: View {
         .padding(.horizontal, 28)
         .padding(.top, 22)
         .padding(.bottom, 12)
+        .frame(maxWidth: 836)
+        .frame(maxWidth: .infinity)
         .animation(Motion.settle, value: agent.status)
     }
 
@@ -105,7 +104,10 @@ struct ChatView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 9)
-        .glassEffect(agent.isBusy ? .regular.tint(Ink.spot.opacity(0.35)) : .regular, in: .rect(cornerRadius: 24))
+        .glassEffect(.regular, in: .rect(cornerRadius: 24))
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(Ink.spot.opacity(agent.isBusy ? 0.7 : 0), lineWidth: 1.5))
         .frame(maxWidth: 760)
         .padding(.horizontal, 24)
         .padding(.bottom, 20)

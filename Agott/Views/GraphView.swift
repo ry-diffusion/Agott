@@ -3,21 +3,27 @@ import SwiftUI
 /// Your life as a graph, laid out by a small force simulation.
 ///
 /// You are pinned at the centre. People, groups, places and projects settle
-/// around you, pulled closer by the weight of what connects you and pushed
-/// apart from each other so names stay readable.
+/// around you. A raw graph of everyone you have ever texted is a hairball, so
+/// this one is edited: contacts known only by a phone number stay out, each
+/// node keeps only its strongest few connections, labels never collide, and
+/// the view fits itself to what is there. Click anything to focus on it: its
+/// connections light up, everything else steps back, and the side panel says
+/// what Agott knows about it.
 struct GraphView: View {
     @State private var nodes: [Node] = []
     @State private var edges: [GraphEdge] = []
     @State private var selected: Int64?
     @State private var neighbors: [(GraphEntity, GraphEdge)] = []
+    @State private var facts: [MemoryFact] = []
     @State private var kinds: Set<EntityKind> = [.me, .person, .group, .place, .organization, .project, .topic]
-    @State private var size = 120
+    @State private var size = 80
     @State private var drag: CGSize = .zero
     @State private var offset: CGSize = .zero
     @State private var zoom: CGFloat = 1
     @State private var settling = false
     @State private var generation = 0
     @State private var lastReload = Date.distantPast
+    @State private var canvasSize: CGSize = .zero
 
     struct Node: Identifiable {
         var entity: GraphEntity
@@ -31,14 +37,17 @@ struct GraphView: View {
             ScreenHeader(title: "Graph", subtitle: "The people and things in your life, and how they connect.", symbol: "point.3.connected.trianglepath.dotted") {
                 HStack(spacing: 8) {
                     Picker("Size", selection: $size) {
-                        Text(verbatim: "60").tag(60)
-                        Text(verbatim: "120").tag(120)
-                        Text(verbatim: "250").tag(250)
+                        Text(verbatim: "40").tag(40)
+                        Text(verbatim: "80").tag(80)
+                        Text(verbatim: "150").tag(150)
                     }
                     .pickerStyle(.segmented)
                     .frame(width: 150)
                     .labelsHidden()
+                    CandyIconButton(symbol: "arrow.up.left.and.down.right.magnifyingglass") { fit(animated: true) }
+                        .help(Text("Fit to view"))
                     CandyIconButton(symbol: "arrow.clockwise") { Task { await load() } }
+                        .help(Text("Refresh"))
                 }
             }
             HStack(spacing: 14) {
@@ -46,7 +55,7 @@ struct GraphView: View {
                     .clipShape(RoundedRectangle(cornerRadius: Radius.surface, style: .continuous))
                 if let selected, let node = nodes.first(where: { $0.id == selected }) {
                     inspector(node.entity)
-                        .frame(width: 280)
+                        .frame(width: 300)
                         .panel(padding: 0)
                         .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
@@ -70,55 +79,96 @@ struct GraphView: View {
                 y: canvasSize.height / 2 + offset.height + drag.height)
     }
 
+    /// Ids within one hop of the selection.
+    private var focus: Set<Int64>? {
+        guard let selected else { return nil }
+        var ids: Set<Int64> = [selected]
+        for edge in edges where edge.source == selected || edge.target == selected {
+            ids.insert(edge.source)
+            ids.insert(edge.target)
+        }
+        return ids
+    }
+
     private var canvas: some View {
         TimelineView(.animation(minimumInterval: 1 / 30, paused: !settling && drag == .zero)) { _ in
             // Drawn off the main thread, so a busy graph never blocks clicks.
-            Canvas(rendersAsynchronously: true) { context, _ in
+            Canvas(rendersAsynchronously: true) { context, size in
                 let center = self.center
+                let focus = self.focus
                 let byID = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
-                // Text is the expensive part of each frame: label the forty
-                // most-mentioned only.
-                let labelled = Set(nodes.sorted { $0.entity.mentions > $1.entity.mentions }.prefix(40).map(\.id))
                 func point(_ p: CGPoint) -> CGPoint { CGPoint(x: center.x + p.x * zoom, y: center.y + p.y * zoom) }
+                func dimmed(_ id: Int64) -> Bool { focus.map { !$0.contains(id) } ?? false }
 
                 for edge in edges {
                     guard let a = byID[edge.source], let b = byID[edge.target] else { continue }
                     var path = Path()
                     path.move(to: point(a.position))
                     path.addLine(to: point(b.position))
-                    let highlighted = selected == edge.source || selected == edge.target
-                    context.stroke(path, with: .color(highlighted ? Ink.spot : Ink.text.opacity(0.18)),
-                                   lineWidth: highlighted ? 1.6 : min(3, 0.4 + log2(edge.weight + 1) * 0.3))
+                    let lit = selected == edge.source || selected == edge.target
+                    let faded = focus != nil && !lit
+                    context.stroke(
+                        path,
+                        with: .color(lit ? Ink.spot : Ink.text.opacity(faded ? 0.04 : 0.14)),
+                        lineWidth: lit ? 1.8 : min(2.2, 0.5 + log2(edge.weight + 1) * 0.2))
                 }
+
+                // Labels: the selection and its neighbours first, then by
+                // importance, skipping any that would overlap one already drawn.
+                var placed: [CGRect] = []
+                let order = nodes.sorted { a, b in
+                    let fa = focus?.contains(a.id) ?? false, fb = focus?.contains(b.id) ?? false
+                    if fa != fb { return fa }
+                    if (a.entity.kind == .me) != (b.entity.kind == .me) { return a.entity.kind == .me }
+                    return a.entity.mentions > b.entity.mentions
+                }
+                var labels: [(Node, CGPoint)] = []
+
                 for node in nodes {
-                    let radius = Self.radius(node.entity)
+                    let radius = Self.radius(node.entity) * min(1.4, max(0.7, zoom))
                     let p = point(node.position)
+                    guard p.x > -20, p.y > -20, p.x < size.width + 20, p.y < size.height + 20 else { continue }
                     let rect = CGRect(x: p.x - radius, y: p.y - radius, width: radius * 2, height: radius * 2)
-                    // Kinds differ by mark, like a legend in print: solid,
-                    // ringed, dotted, squared.
+                    var layer = context
+                    layer.opacity = dimmed(node.id) ? 0.18 : 1
                     let shape = Self.mark(node.entity.kind, in: rect)
                     switch node.entity.kind {
                     case .me:
-                        context.fill(shape, with: .color(Ink.spot))
-                        context.stroke(shape, with: .color(Ink.text), lineWidth: Ink.line)
+                        layer.fill(shape, with: .color(Ink.spot))
                     case .person:
-                        context.fill(shape, with: .color(Ink.text))
+                        layer.fill(shape, with: .color(Ink.text.opacity(0.85)))
                     case .group, .project:
-                        context.fill(shape, with: .color(Ink.surface))
-                        context.stroke(shape, with: .color(Ink.text), lineWidth: Ink.line)
-                        context.fill(Circle().path(in: rect.insetBy(dx: rect.width * 0.32, dy: rect.height * 0.32)), with: .color(Ink.text))
+                        layer.fill(shape, with: .color(Ink.surface))
+                        layer.stroke(shape, with: .color(Ink.text.opacity(0.8)), lineWidth: 1.2)
+                        layer.fill(Circle().path(in: rect.insetBy(dx: rect.width * 0.34, dy: rect.height * 0.34)), with: .color(Ink.text))
                     default:
-                        context.fill(shape, with: .color(Ink.surface))
-                        context.stroke(shape, with: .color(Ink.text), lineWidth: Ink.line)
+                        layer.fill(shape, with: .color(Ink.surface))
+                        layer.stroke(shape, with: .color(Ink.text.opacity(0.8)), lineWidth: 1.2)
                     }
                     if selected == node.id {
-                        context.stroke(Circle().path(in: rect.insetBy(dx: -3, dy: -3)), with: .color(Ink.accent), lineWidth: 2)
+                        layer.stroke(Circle().path(in: rect.insetBy(dx: -4, dy: -4)), with: .color(Ink.spot), lineWidth: 2)
                     }
-                    if (radius > 9 && labelled.contains(node.id)) || selected == node.id || node.entity.kind == .me {
-                        context.draw(
-                            Text(node.entity.name).font(.system(size: node.entity.kind == .me ? 14 : 10, weight: node.entity.kind == .me ? .heavy : .semibold, design: .rounded)).foregroundStyle(Ink.text),
-                            at: CGPoint(x: p.x, y: p.y + radius + 8))
-                    }
+                }
+                for node in order.prefix(focus == nil ? 45 : 60) {
+                    let radius = Self.radius(node.entity) * min(1.4, max(0.7, zoom))
+                    let p = point(node.position)
+                    labels.append((node, CGPoint(x: p.x, y: p.y + radius + 9)))
+                }
+                for (node, at) in labels {
+                    let isMe = node.entity.kind == .me
+                    let text = Text(node.entity.name.count > 22 ? String(node.entity.name.prefix(21)) + "…" : node.entity.name)
+                        .font(.system(size: isMe ? 13 : 10.5, weight: isMe ? .heavy : .semibold, design: .rounded))
+                        .foregroundStyle(Ink.text)
+                    let resolved = context.resolve(text)
+                    let measured = resolved.measure(in: CGSize(width: 200, height: 40))
+                    let box = CGRect(x: at.x - measured.width / 2 - 3, y: at.y - measured.height / 2 - 1,
+                                     width: measured.width + 6, height: measured.height + 2)
+                    guard isMe || node.id == selected || !placed.contains(where: { $0.intersects(box) }) else { continue }
+                    placed.append(box)
+                    var layer = context
+                    layer.opacity = dimmed(node.id) ? 0.25 : 1
+                    layer.fill(Path(roundedRect: box, cornerRadius: 4), with: .color(Ink.surface.opacity(0.85)))
+                    layer.draw(resolved, at: at)
                 }
             }
         }
@@ -144,13 +194,18 @@ struct GraphView: View {
         }
     }
 
-    @State private var canvasSize: CGSize = .zero
-
     private func pick(at location: CGPoint) {
         let nearest = nodes.min { distance($0, location) < distance($1, location) }
-        if let nearest, distance(nearest, location) < max(14, Self.radius(nearest.entity) + 8) {
+        if let nearest, distance(nearest, location) < max(16, Self.radius(nearest.entity) + 10) {
             selected = nearest.id
-            Task { neighbors = (try? await MemoryStore.shared.neighbors(of: nearest.id, limit: 30)) ?? [] }
+            let entity = nearest.entity
+            Task {
+                neighbors = (try? await MemoryStore.shared.neighbors(of: entity.id, limit: 40)) ?? []
+                facts = (try? await MemoryStore.shared.facts(matching: entity.kind == .me ? nil : entity.name, limit: 30)) ?? []
+                if entity.kind == .me {
+                    facts = (try? await MemoryStore.shared.facts(about: entity.name, limit: 30)) ?? []
+                }
+            }
         } else {
             selected = nil
         }
@@ -176,20 +231,40 @@ struct GraphView: View {
 
     private func inspector(_ entity: GraphEntity) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                Label(entity.name, systemImage: entity.kind.symbol).font(Lettering.display(17, relativeTo: .title3)).foregroundStyle(Ink.text)
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    Label(entity.name, systemImage: entity.kind.symbol)
+                        .font(Lettering.display(17, relativeTo: .title3)).foregroundStyle(Ink.text)
+                    Spacer()
+                    Button { selected = nil } label: { Image(systemName: "xmark").foregroundStyle(Ink.muted) }
+                        .buttonStyle(.plain)
+                }
                 Text("\(entity.kind.label) · seen \(entity.mentions) times").font(.caption).foregroundStyle(Ink.muted)
-                Divider()
-                ForEach(Array(neighbors.enumerated()), id: \.offset) { _, pair in
-                    let (other, edge) = pair
-                    HStack(alignment: .firstTextBaseline) {
-                        Image(systemName: other.kind.symbol).foregroundStyle(Ink.text)
-                        VStack(alignment: .leading) {
-                            Text(other.name).font(.callout)
-                            Text(edge.relation).font(.caption).foregroundStyle(Ink.muted)
+
+                if !facts.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        PanelTitle(title: "What Agott knows", symbol: "pin")
+                        ForEach(facts.prefix(12)) { fact in
+                            Text("\(Text(fact.subject).bold()) \(fact.predicate) \(Text(fact.object).foregroundStyle(Ink.spot))")
+                                .font(.callout).foregroundStyle(Ink.text)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
-                        Spacer()
-                        Text("×\(Int(edge.weight))").font(.caption).monospacedDigit().foregroundStyle(Ink.muted)
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    PanelTitle(title: "Connections", symbol: "point.3.connected.trianglepath.dotted")
+                    ForEach(Array(neighbors.filter { !Self.isPhoneOnly($0.0.name) }.enumerated()), id: \.offset) { _, pair in
+                        let (other, edge) = pair
+                        HStack(alignment: .firstTextBaseline) {
+                            Image(systemName: other.kind.symbol).foregroundStyle(Ink.muted).frame(width: 18)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(other.name).font(.callout).foregroundStyle(Ink.text)
+                                Text(edge.relation).font(.caption).foregroundStyle(Ink.muted)
+                            }
+                            Spacer()
+                            Text("×\(Int(edge.weight))").font(.caption).monospacedDigit().foregroundStyle(Ink.muted)
+                        }
                     }
                 }
             }
@@ -197,12 +272,21 @@ struct GraphView: View {
         }
     }
 
-    // MARK: Layout
+    // MARK: Data
+
+    /// A contact known only by a number tells you nothing on a map.
+    static func isPhoneOnly(_ name: String) -> Bool {
+        let digits = name.filter(\.isNumber).count
+        return digits >= 7 && !name.contains(where: \.isLetter)
+    }
 
     private func load() async {
         lastReload = .now
-        let entities = (try? await MemoryStore.shared.entities(limit: size, kinds: kinds)) ?? []
-        edges = (try? await MemoryStore.shared.edges(among: entities.map(\.id))) ?? []
+        let candidates = (try? await MemoryStore.shared.entities(limit: size * 3, kinds: kinds)) ?? []
+        let entities = Array(candidates.filter { $0.kind == .me || !Self.isPhoneOnly($0.name) }.prefix(size))
+        let all = (try? await MemoryStore.shared.edges(among: entities.map(\.id))) ?? []
+        edges = Self.prune(all, keep: 3)
+
         // Keep nodes that were already placed where they are, so a refresh
         // grows the graph instead of reshuffling it.
         let placed = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
@@ -212,73 +296,96 @@ struct GraphView: View {
                 return existing
             }
             let angle = Double(index) * 2.399963
-            let r = entity.kind == .me ? 0 : 60 + sqrt(Double(index)) * 40
+            let r = entity.kind == .me ? 0 : 80 + sqrt(Double(index)) * 55
             return Node(entity: entity, position: CGPoint(x: cos(angle) * r, y: sin(angle) * r))
         }
         generation += 1
     }
 
-    /// Runs the layout until it settles, then stops redrawing.
+    /// Each node keeps only its strongest `keep` connections (an edge stays
+    /// if either end ranks it highly), which turns a hairball into a map.
+    static func prune(_ edges: [GraphEdge], keep: Int) -> [GraphEdge] {
+        var byNode: [Int64: [GraphEdge]] = [:]
+        for edge in edges {
+            byNode[edge.source, default: []].append(edge)
+            byNode[edge.target, default: []].append(edge)
+        }
+        var kept = Set<String>()
+        for (_, list) in byNode {
+            for edge in list.sorted(by: { $0.weight > $1.weight }).prefix(keep) {
+                kept.insert("\(edge.source)-\(edge.target)-\(edge.relation)")
+            }
+        }
+        return edges.filter { kept.contains("\($0.source)-\($0.target)-\($0.relation)") }
+    }
+
+    /// Runs the layout until it settles, fits it to the view, then stops
+    /// redrawing.
     private func simulate() async {
         guard !nodes.isEmpty else { return }
         settling = true
         defer { settling = false }
-        for _ in 0..<300 {
+        for tick in 0..<320 {
             guard !Task.isCancelled else { return }
-            step()
+            step(cooling: max(0.15, 1 - Double(tick) / 320))
+            if tick == 60 || tick == 319 { fit(animated: tick == 319) }
             try? await Task.sleep(for: .milliseconds(16))
         }
     }
 
-    private func step() {
+    /// Zooms and centres so everything is visible with a margin.
+    private func fit(animated: Bool) {
+        guard !nodes.isEmpty, canvasSize.width > 0 else { return }
+        let xs = nodes.map(\.position.x), ys = nodes.map(\.position.y)
+        let bounds = CGRect(x: xs.min()!, y: ys.min()!, width: max(1, xs.max()! - xs.min()!), height: max(1, ys.max()! - ys.min()!))
+        let scale = min(1.8, max(0.3, min((canvasSize.width - 140) / bounds.width, (canvasSize.height - 120) / bounds.height)))
+        let change = {
+            zoom = scale
+            offset = CGSize(width: -bounds.midX * scale, height: -bounds.midY * scale)
+        }
+        if animated { withAnimation(Motion.settle, change) } else { change() }
+    }
+
+    private func step(cooling: Double) {
         let index = Dictionary(uniqueKeysWithValues: nodes.enumerated().map { ($1.id, $0) })
         var forces = [CGVector](repeating: .zero, count: nodes.count)
+        // Repulsion: everyone pushes everyone, so names get room.
         for i in nodes.indices {
             for j in nodes.indices where j > i {
                 let dx = nodes[i].position.x - nodes[j].position.x
                 let dy = nodes[i].position.y - nodes[j].position.y
-                let d2 = max(dx * dx + dy * dy, 25)
-                let f = 900 / d2
-                forces[i].dx += dx * f / sqrt(d2); forces[i].dy += dy * f / sqrt(d2)
-                forces[j].dx -= dx * f / sqrt(d2); forces[j].dy -= dy * f / sqrt(d2)
+                let d2 = max(dx * dx + dy * dy, 100)
+                let d = sqrt(d2)
+                let f = 4200 / d2
+                forces[i].dx += dx / d * f; forces[i].dy += dy / d * f
+                forces[j].dx -= dx / d * f; forces[j].dy -= dy / d * f
             }
         }
+        // Springs: strong connections sit closer.
         for edge in edges {
             guard let a = index[edge.source], let b = index[edge.target] else { continue }
             let dx = nodes[b].position.x - nodes[a].position.x
             let dy = nodes[b].position.y - nodes[a].position.y
             let d = max(sqrt(dx * dx + dy * dy), 1)
-            let target = 90 / (1 + log2(edge.weight + 1) * 0.3)
-            let f = (d - target) * 0.02
+            let target = 150 / (1 + log2(edge.weight + 1) * 0.15)
+            let f = (d - target) * 0.012
             forces[a].dx += dx / d * f; forces[a].dy += dy / d * f
             forces[b].dx -= dx / d * f; forces[b].dy -= dy / d * f
         }
+        let limit = 10 * cooling
         for i in nodes.indices {
             if nodes[i].entity.kind == .me { nodes[i].position = .zero; continue }
-            forces[i].dx -= nodes[i].position.x * 0.004
-            forces[i].dy -= nodes[i].position.y * 0.004
-            nodes[i].velocity.dx = (nodes[i].velocity.dx + forces[i].dx) * 0.82
-            nodes[i].velocity.dy = (nodes[i].velocity.dy + forces[i].dy) * 0.82
-            nodes[i].position.x += max(-8, min(8, nodes[i].velocity.dx))
-            nodes[i].position.y += max(-8, min(8, nodes[i].velocity.dy))
+            forces[i].dx -= nodes[i].position.x * 0.0015
+            forces[i].dy -= nodes[i].position.y * 0.0015
+            nodes[i].velocity.dx = (nodes[i].velocity.dx + forces[i].dx) * 0.8
+            nodes[i].velocity.dy = (nodes[i].velocity.dy + forces[i].dy) * 0.8
+            nodes[i].position.x += max(-limit, min(limit, nodes[i].velocity.dx))
+            nodes[i].position.y += max(-limit, min(limit, nodes[i].velocity.dy))
         }
     }
 
     static func radius(_ entity: GraphEntity) -> CGFloat {
-        entity.kind == .me ? 16 : min(14, 3 + log2(Double(entity.mentions) + 1) * 1.4)
-    }
-
-    static func color(_ kind: EntityKind) -> Color {
-        switch kind {
-        case .me: Ink.pink
-        case .person: Color(.sRGB, red: 1.0, green: 0.50, blue: 0.62)
-        case .group: Ink.violet
-        case .place: Ink.mint
-        case .organization: Ink.peach
-        case .project: Ink.sky
-        case .topic: Color(.sRGB, red: 0.40, green: 0.80, blue: 0.85)
-        case .thing: Ink.muted
-        }
+        entity.kind == .me ? 13 : min(9, 3.5 + log2(Double(entity.mentions) + 1) * 0.7)
     }
 }
 

@@ -187,10 +187,11 @@ nonisolated struct WhatsAppSource: MessageSource {
             """
             SELECT m.Z_PK, COALESCE(m.ZSTANZAID, m.Z_PK), m.ZTEXT, m.ZMESSAGEDATE, m.ZISFROMME,
                    s.Z_PK, COALESCE(s.ZPARTNERNAME, ''), COALESCE(s.ZCONTACTJID, ''), s.ZSESSIONTYPE,
-                   COALESCE(g.ZCONTACTNAME, g.ZFIRSTNAME, m.ZPUSHNAME, ''), COALESCE(g.ZMEMBERJID, m.ZFROMJID, '')
+                   COALESCE(g.ZCONTACTNAME, g.ZFIRSTNAME, p.ZPUSHNAME, m.ZPUSHNAME, ''), COALESCE(g.ZMEMBERJID, m.ZFROMJID, '')
             FROM ZWAMESSAGE m
             JOIN ZWACHATSESSION s ON s.Z_PK = m.ZCHATSESSION
             LEFT JOIN ZWAGROUPMEMBER g ON g.Z_PK = m.ZGROUPMEMBER
+            LEFT JOIN ZWAPROFILEPUSHNAME p ON p.ZJID = COALESCE(g.ZMEMBERJID, m.ZFROMJID)
             WHERE m.ZMESSAGEDATE > ? AND m.ZMESSAGEDATE < ? AND m.ZTEXT IS NOT NULL AND m.ZTEXT != ''
               AND COALESCE(s.ZCONTACTJID, '') NOT LIKE '%status%'
               AND COALESCE(s.ZREMOVED, 0) = 0
@@ -223,6 +224,22 @@ nonisolated struct WhatsAppSource: MessageSource {
                 sender: sender, isFromMe: isFromMe, date: date, text: text))
         }
         return result
+    }
+}
+
+extension WhatsAppSource {
+    /// Display names WhatsApp knows for people who are not in your contacts,
+    /// keyed by the name Agott used before it knew them: the id as digits.
+    static func profileNames() -> [String: String] {
+        guard let db = try? SQLiteDB(path: path, readOnly: true) else { return [:] }
+        var names: [String: String] = [:]
+        try? db.rows("SELECT ZJID, ZPUSHNAME FROM ZWAPROFILEPUSHNAME WHERE ZPUSHNAME IS NOT NULL AND ZPUSHNAME != ''") { row in
+            guard let jid = row.text(0), let name = row.text(1) else { return }
+            let bare = jid.components(separatedBy: "@").first ?? jid
+            guard bare.allSatisfy(\.isNumber), bare.count > 6 else { return }
+            names["+" + bare] = name.trimmingCharacters(in: .whitespaces)
+        }
+        return names
     }
 }
 

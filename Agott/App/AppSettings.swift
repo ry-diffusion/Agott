@@ -68,8 +68,12 @@ final class AppSettings {
     var hasOnboarded: Bool { didSet { save(hasOnboarded, "hasOnboarded") } }
     /// The model that reads your messages to learn about you.
     var learningProvider: ModelProvider { didSet { save(learningProvider.rawValue, "learningProvider") } }
+    /// OpenCode model for analyzing memories; empty means the chat model.
+    var learningModelName: String { didSet { save(learningModelName, "learningModelName") } }
     /// The OpenCode model's context window, in tokens.
     var contextTokens: Int { didSet { save(contextTokens, "contextTokens") } }
+    /// Read what Spotify or Apple Music is playing, to understand your mood.
+    var listenToMusic: Bool { didSet { save(listenToMusic, "listenToMusic") } }
     /// Let the model read new moments after every indexing run.
     var autoLearn: Bool { didSet { save(autoLearn, "autoLearn") } }
     /// How much of that window one learning batch may fill.
@@ -101,9 +105,11 @@ final class AppSettings {
             .compactMap(MemorySource.init(rawValue:)))
         hasOnboarded = defaults.bool(forKey: "hasOnboarded")
         learningProvider = ModelProvider(rawValue: defaults.string(forKey: "learningProvider") ?? "") ?? .openCode
+        learningModelName = defaults.string(forKey: "learningModelName") ?? ""
         contextTokens = defaults.object(forKey: "contextTokens") as? Int ?? 128_000
         batchFill = defaults.object(forKey: "batchFill") as? Double ?? 0.5
         autoLearn = defaults.object(forKey: "autoLearn") as? Bool ?? true
+        listenToMusic = defaults.object(forKey: "listenToMusic") as? Bool ?? true
         aboutMe = defaults.string(forKey: "aboutMe") ?? ""
         apiKey = Keychain.get("opencode-api-key") ?? ""
     }

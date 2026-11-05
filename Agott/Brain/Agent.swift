@@ -176,6 +176,13 @@ final class Agent {
         memoryStep.ended = .now
         show(memoryStep)
         self.contextSteps = contextSteps
+        #if os(macOS)
+        // What is playing is part of the moment.
+        if let play = MusicListener.shared.nowPlaying {
+            let mood = MusicListener.shared.nowMood.map { " (feels \($0.mood), energy \($0.energy)/100)" } ?? ""
+            context.append("The user is listening to \"\(play.track)\" by \(play.artist) on \(play.app)\(mood).")
+        }
+        #endif
         if let index = turns.firstIndex(where: { $0.id == user.id }) { turns[index] = user }
 
         let prompt = context.isEmpty

@@ -29,6 +29,7 @@ struct MemoryView: View {
                     }
                 }
                 totals
+                MemoryDigest()
                 sources
                 search
                 if query.isEmpty || hits.isEmpty {
@@ -196,6 +197,7 @@ struct MemoryView: View {
                 .foregroundStyle(selected ? AnyShapeStyle(.white) : AnyShapeStyle(Ink.text))
                 .padding(.horizontal, 10).padding(.vertical, 5)
                 .glassEffect(selected ? .regular.tint(Ink.spot).interactive() : .regular.interactive(), in: .capsule)
+            .contentShape(Capsule())
         }
         .buttonStyle(PressScale())
     }
@@ -332,5 +334,85 @@ private struct MomentLine: View {
             }
         }
         .textSelection(.enabled)
+    }
+}
+
+/// What Agott understood, not what it read: the people you are closest to,
+/// what it learned about you, what you work on, and your circles.
+private struct MemoryDigest: View {
+    @State private var people: [(GraphEntity, Double)] = []
+    @State private var facts: [MemoryFact] = []
+    @State private var projects: [GraphEntity] = []
+    @State private var subjects: [GraphEntity] = []
+    @State private var circles: [PeopleCircle] = []
+    @State private var indexer = Indexer.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            PanelTitle(title: "What I understood", symbol: "sparkles")
+            if people.isEmpty && facts.isEmpty && projects.isEmpty {
+                Text("Agott is still reading. What it learns shows up here.")
+                    .foregroundStyle(Ink.muted)
+            } else {
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+                    section("Closest to you", symbol: "heart") {
+                        ForEach(Array(people.enumerated()), id: \.offset) { _, pair in
+                            HStack(spacing: 10) {
+                                Avatar(name: pair.0.name, size: 28)
+                                Text(pair.0.name).font(.callout.weight(.semibold)).foregroundStyle(Ink.text).lineLimit(1)
+                                Spacer()
+                                Text("\(Int(pair.1).formatted()) msgs").font(.caption).monospacedDigit().foregroundStyle(Ink.muted)
+                            }
+                        }
+                    }
+                    section("About you", symbol: "person.text.rectangle") {
+                        ForEach(facts) { fact in
+                            Text("\(fact.predicate) \(Text(fact.object).foregroundStyle(Ink.spot).bold())")
+                                .font(.callout).foregroundStyle(Ink.text).lineLimit(2)
+                        }
+                    }
+                    section("What you work on", symbol: "hammer") {
+                        FlowLayout(spacing: 6) {
+                            ForEach(projects) { Chip(text: $0.name, symbol: "folder") }
+                        }
+                    }
+                    section("What you talk about", symbol: "bubble.left.and.bubble.right") {
+                        FlowLayout(spacing: 6) {
+                            ForEach(subjects) { Chip(text: $0.name, symbol: $0.kind.symbol) }
+                            ForEach(circles) { Chip(text: $0.name, symbol: $0.kind.symbol, spot: true) }
+                        }
+                    }
+                }
+            }
+        }
+        .task { await load() }
+        .onChange(of: indexer.isLearning) { _, learning in if !learning { Task { await load() } } }
+    }
+
+    private func section<Content: View>(_ title: LocalizedStringKey, symbol: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(title, systemImage: symbol).font(.caption.weight(.bold)).foregroundStyle(Ink.muted)
+            content()
+        }
+        .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
+        .panel(padding: 14)
+    }
+
+    private func load() async {
+        let store = MemoryStore.shared
+        let me = AppSettings.shared.myName
+        if let meID = try? await KnowledgeGraph.meID() {
+            let neighbors = (try? await store.neighbors(of: meID, limit: 80)) ?? []
+            people = neighbors
+                .filter { $0.1.relation == "talks with" && $0.0.kind == .person && !GraphView.isPhoneOnly($0.0.name) }
+                .prefix(7)
+                .map { ($0.0, $0.1.weight) }
+        }
+        facts = Array(((try? await store.facts(about: me, limit: 40)) ?? []).prefix(7))
+        projects = ((try? await store.entities(limit: 40, kinds: [.project])) ?? [])
+            .filter { $0.mentions >= 2 }.prefix(10).map { $0 }
+        subjects = ((try? await store.entities(limit: 120, kinds: [.topic, .organization, .place])) ?? [])
+            .filter { $0.mentions >= 5 && KnowledgeGraph.isPlausibleName($0.name) }.prefix(10).map { $0 }
+        circles = await Circles.cached()
     }
 }

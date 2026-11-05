@@ -4,12 +4,25 @@
     "": {
       "shouldTranslate": false
     },
+    "%@ %@": {
+      "shouldTranslate": false
+    },
     "%@ %@ %@": {
       "localizations": {
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
             "value": "%1$@ %2$@ %3$@"
+          }
+        }
+      }
+    },
+    "%@ msgs": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ msgs"
           }
         }
       }
@@ -23,6 +36,9 @@
           }
         }
       }
+    },
+    "%@ · %@": {
+      "shouldTranslate": false
     },
     "%@ · %lld messages since %@": {
       "localizations": {
@@ -84,12 +100,35 @@
         }
       }
     },
+    "%lld%%": {
+      "shouldTranslate": false
+    },
     "%lld%% · %@": {
       "localizations": {
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
             "value": "%1$lld%% · %2$@"
+          }
+        }
+      }
+    },
+    "%lldM context": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lldM de contexto"
+          }
+        }
+      }
+    },
+    "%lldk context": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lldk de contexto"
           }
         }
       }
@@ -204,6 +243,16 @@
         }
       }
     },
+    "Add your OpenCode Go API key in Settings to use these.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Coloque sua chave do OpenCode Go nos Ajustes para usar estes."
+          }
+        }
+      }
+    },
     "Add your OpenCode Go API key in Settings.": {
       "localizations": {
         "pt-BR": {
@@ -260,6 +309,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "O Agott ainda não leu nada. Comece a indexar para ele lembrar do seu histórico do WhatsApp, iMessage e Claude. Roda em segundo plano; você pode continuar usando o app."
+          }
+        }
+      }
+    },
+    "Agott is still reading. What it learns shows up here.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Agott ainda está lendo. O que ele aprender aparece aqui."
+          }
+        }
+      }
+    },
+    "Agott isn't noticing your music.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Agott não está prestando atenção na sua música."
           }
         }
       }
@@ -424,6 +493,9 @@
         }
       }
     },
+    "Apple": {
+      "shouldTranslate": false
+    },
     "Apple Intelligence on your Mac. Fully offline, best for short tasks.": {
       "localizations": {
         "pt-BR": {
@@ -574,6 +646,16 @@
         }
       }
     },
+    "Chat model": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modelo da conversa"
+          }
+        }
+      }
+    },
     "Chats": {
       "localizations": {
         "pt-BR": {
@@ -664,6 +746,16 @@
         }
       }
     },
+    "Choose a model": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escolha um modelo"
+          }
+        }
+      }
+    },
     "Circle %lld": {
       "localizations": {
         "pt-BR": {
@@ -710,6 +802,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Proximidade %lld de 100"
+          }
+        }
+      }
+    },
+    "Closest to you": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mais próximos de você"
           }
         }
       }
@@ -820,6 +922,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ligando os pontos…"
+          }
+        }
+      }
+    },
+    "Connections": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conexões"
           }
         }
       }
@@ -974,16 +1086,6 @@
         }
       }
     },
-    "Endpoint": {
-      "localizations": {
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Endpoint"
-          }
-        }
-      }
-    },
     "English (US)": {
       "localizations": {
         "pt-BR": {
@@ -1094,6 +1196,26 @@
         }
       }
     },
+    "Fit to view": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajustar à tela"
+          }
+        }
+      }
+    },
+    "Fixing the names of your WhatsApp contacts…": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrumando os nomes dos seus contatos do WhatsApp…"
+          }
+        }
+      }
+    },
     "Follow up…": {
       "localizations": {
         "pt-BR": {
@@ -1124,6 +1246,16 @@
         }
       }
     },
+    "Free · private": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grátis · privado"
+          }
+        }
+      }
+    },
     "Full Disk Access": {
       "localizations": {
         "pt-BR": {
@@ -1140,6 +1272,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Diferença %lld de 100"
+          }
+        }
+      }
+    },
+    "Gemini uses Google's API, which Agott doesn't speak yet; every other model works.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Gemini usa a API do Google, que o Agott ainda não fala; todos os outros modelos funcionam."
           }
         }
       }
@@ -1374,6 +1516,16 @@
         }
       }
     },
+    "Last two weeks · %lld songs": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Últimas duas semanas · %lld músicas"
+          }
+        }
+      }
+    },
     "Learn more about me": {
       "localizations": {
         "pt-BR": {
@@ -1430,6 +1582,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ouvindo"
+          }
+        }
+      }
+    },
+    "Listening back to your music…": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvindo de novo suas músicas…"
           }
         }
       }
@@ -1684,12 +1846,32 @@
         }
       }
     },
+    "Music and mood": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Música e humor"
+          }
+        }
+      }
+    },
     "Needs Full Disk Access to read": {
       "localizations": {
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
             "value": "Precisa de Acesso Total ao Disco para ler"
+          }
+        }
+      }
+    },
+    "Needs another API": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Precisa de outra API"
           }
         }
       }
@@ -1740,6 +1922,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nenhuma memória dessa fonte ainda."
+          }
+        }
+      }
+    },
+    "Not available on this Mac": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indisponível neste Mac"
           }
         }
       }
@@ -1800,6 +1992,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nada ainda. Deixe o Agott ler seu histórico do Claude e suas mensagens, ou escreva sobre você aqui."
+          }
+        }
+      }
+    },
+    "Notice what I listen to on Spotify or Apple Music": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perceber o que eu ouço no Spotify ou Apple Music"
           }
         }
       }
@@ -2014,6 +2216,16 @@
         }
       }
     },
+    "Play something on Spotify or Apple Music and Agott will start to notice how your music feels.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toca alguma coisa no Spotify ou Apple Music e o Agott começa a perceber o clima das suas músicas."
+          }
+        }
+      }
+    },
     "Plays with her joke": {
       "localizations": {
         "pt-BR": {
@@ -2080,6 +2292,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Apertando…"
+          }
+        }
+      }
+    },
+    "Price per million tokens, in / out": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preço por milhão de tokens, entrada / saída"
+          }
+        }
+      }
+    },
+    "Private": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privado"
           }
         }
       }
@@ -2274,12 +2506,32 @@
         }
       }
     },
+    "Reasoning": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raciocínio"
+          }
+        }
+      }
+    },
     "Recent memories": {
       "localizations": {
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
             "value": "Memórias recentes"
+          }
+        }
+      }
+    },
+    "Redrawing your graph…": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Redesenhando seu grafo…"
           }
         }
       }
@@ -2434,6 +2686,16 @@
         }
       }
     },
+    "Same as chat model": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mesmo da conversa"
+          }
+        }
+      }
+    },
     "Saved in your Keychain. Never leaves this Mac except to talk to OpenCode.": {
       "localizations": {
         "pt-BR": {
@@ -2504,6 +2766,16 @@
         }
       }
     },
+    "Search models: name, family, what it's good at…": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Busque modelos: nome, família, no que é bom…"
+          }
+        }
+      }
+    },
     "Search people": {
       "localizations": {
         "pt-BR": {
@@ -2530,6 +2802,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Veja como as coisas estão e receba ajuda para responder."
+          }
+        }
+      }
+    },
+    "Sees images": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vê imagens"
           }
         }
       }
@@ -3004,6 +3286,16 @@
         }
       }
     },
+    "Tidying up what I learned about you…": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Organizando o que aprendi sobre você…"
+          }
+        }
+      }
+    },
     "To %@": {
       "localizations": {
         "pt-BR": {
@@ -3100,6 +3392,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Assunto"
+          }
+        }
+      }
+    },
+    "Turn on": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ativar"
           }
         }
       }
@@ -3224,6 +3526,16 @@
         }
       }
     },
+    "Use the chat model for this too.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usar o modelo da conversa para isso também."
+          }
+        }
+      }
+    },
     "Using your Mac": {
       "localizations": {
         "pt-BR": {
@@ -3304,6 +3616,16 @@
         }
       }
     },
+    "What I understood": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O que eu entendi"
+          }
+        }
+      }
+    },
     "What did I talk about with my friends this week?": {
       "localizations": {
         "pt-BR": {
@@ -3330,6 +3652,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "O que você quer dizer? (opcional)"
+          }
+        }
+      }
+    },
+    "What you talk about": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Do que você fala"
+          }
+        }
+      }
+    },
+    "What you work on": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No que você trabalha"
           }
         }
       }
@@ -3470,6 +3812,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Seu copiloto. Eu lembro das suas conversas, vejo sua tela e uso seu Mac. Segure o Option direito em qualquer lugar para falar comigo."
+          }
+        }
+      }
+    },
+    "Your messages are warmest with %@ music and coolest with %@.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suas mensagens ficam mais calorosas com música %1$@ e mais frias com música %2$@."
           }
         }
       }

@@ -311,11 +311,34 @@ final class FakeModelServer: URLProtocol {
             }
             stream.close()
         }
-        let hasToolResult = String(decoding: body, as: UTF8.self).contains(#""role":"tool""#)
-        let events: [String] = hasToolResult
+        let sent = String(decoding: body, as: UTF8.self)
+        let path = request.url?.path ?? ""
+        let events: [String]
+        if path.hasSuffix("/responses") {
+            // OpenAI Responses, the way GPT-6 Luna streams.
+            events = sent.contains("function_call_output")
+                ? [#"{"type":"response.output_text.delta","delta":"achei: floripa no feriado"}"#, #"{"type":"response.completed"}"#]
+                : [#"{"type":"response.reasoning_summary_text.delta","delta":"preciso lembrar da viagem"}"#,
+                   #"{"type":"response.output_item.done","item":{"type":"function_call","call_id":"call_r1","name":"echo_memory","arguments":"{\"query\":\"Floripa\"}"}}"#]
+        } else if path.hasSuffix("/messages") {
+            // Anthropic Messages, the way Claude Haiku streams.
+            events = sent.contains("tool_result")
+                ? [#"{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}"#,
+                   #"{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"achei: floripa no feriado"}}"#,
+                   #"{"type":"message_stop"}"#]
+                : [#"{"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}}"#,
+                   #"{"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"preciso lembrar da viagem"}}"#,
+                   #"{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"toolu_1","name":"echo_memory","input":{}}}"#,
+                   #"{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\"query\":"}}"#,
+                   #"{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"\"Floripa\"}"}}"#,
+                   #"{"type":"message_stop"}"#]
+        } else {
+            let hasToolResult = sent.contains(#""role":"tool""#)
+            events = hasToolResult
             ? [#"{"choices":[{"delta":{"content":"achei: floripa no feriado"}}]}"#]
             : [#"{"choices":[{"delta":{"reasoning_content":"preciso lembrar da viagem"}}]}"#,
                #"{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","function":{"name":"echo_memory","arguments":"{\"query\":\"Floripa\"}"}}]}}]}"#]
+        }
         let sse = events.map { "data: \($0)\n\n" }.joined() + "data: [DONE]\n\n"
         let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1",
                                        headerFields: ["Content-Type": "text/event-stream"])!
@@ -353,11 +376,71 @@ struct StepsTests {
         #expect((tool.detail ?? "").contains("found Floripa"))
     }
 
+    /// GPT-6 Luna (Responses) and Claude Haiku (Messages) go through the same
+    /// tool loop as DeepSeek.
+    @Test(arguments: [OpenCodeExecutor.API.responses, .messages])
+    func otherWireFormatsRunTheToolLoop(api: OpenCodeExecutor.API) async throws {
+        URLProtocol.registerClass(FakeModelServer.self)
+        defer { URLProtocol.unregisterClass(FakeModelServer.self) }
+        let model = OpenCodeLanguageModel(configuration: .init(
+            baseURL: "https://fake-model.test", model: "fake", apiKey: "test-key", api: api))
+        let session = LanguageModelSession(model: model, tools: [EchoMemoryTool()], instructions: "Be brief.")
+        let baseline = session.transcript.count
+        let answer = try await session.respond(to: "quando é a viagem?").content
+        #expect(answer.contains("floripa"))
+        let steps = StepTracker.steps(from: session.transcript, after: baseline, busy: false, clock: .init())
+        #expect(steps.contains { $0.kind == .thinking && ($0.detail ?? "").contains("viagem") })
+        #expect((steps.first { $0.kind == .tool }?.detail ?? "").contains("found Floripa"))
+    }
+
     @Test func busyModelShowsThinking() {
         let transcript = Transcript(entries: [.prompt(.init(segments: [.text(.init(content: "oi"))]))])
         let steps = StepTracker.steps(from: transcript, after: 0, busy: true, clock: .init())
         #expect(steps.last?.kind == .thinking)
         #expect(steps.last?.state == .running)
+    }
+}
+
+@MainActor
+struct MemoryQualityTests {
+    @Test func namesProjectsAndSecrets() {
+        #expect(!KnowledgeGraph.isPlausibleName("Mano"))
+        #expect(!KnowledgeGraph.isPlausibleName("NAO"))
+        #expect(!KnowledgeGraph.isPlausibleName("+141377874698479"))
+        #expect(KnowledgeGraph.isPlausibleName("Dayvid Albuquerque"))
+        #expect(KnowledgeGraph.isPlausibleName("Florianópolis"))
+        #expect(KnowledgeGraph.projectName("git/personal/Licor/wt/slot/cl/h3") == "Licor")
+        #expect(KnowledgeGraph.projectName("git/iAndroid/ios/beryllium//claude/worktrees/wlan26") == "beryllium")
+        #expect(KnowledgeGraph.projectName("git/midas/app/pack") == "pack")
+        #expect(KnowledgeGraph.isSensitive("Moizes keeps the TypeSafe token at /Users/x/TYPESAFE.txt"))
+        #expect(!KnowledgeGraph.isSensitive("Moizes works on Midas Mail"))
+        #expect(KnowledgeGraph.sameMeaning("uv for Python dependencies", "uv to install Python dependencies"))
+        #expect(!KnowledgeGraph.sameMeaning("SvelteKit", "Cloudflare Workers"))
+    }
+
+    @Test func repairRenamesAndCleans() async throws {
+        let store = MemoryStore(url: FileManager.default.temporaryDirectory.appending(path: "agott-repair-\(UUID().uuidString).sqlite"))
+        let base = Date().addingTimeInterval(-3600)
+        try await store.ingest([
+            RawMessage(source: .whatsapp, externalID: "r1", chatID: "g", chatName: "Grupo", isGroup: true,
+                       sender: "+141377874698479", isFromMe: false, date: base, text: "bora jogar quinta"),
+            RawMessage(source: .whatsapp, externalID: "r2", chatID: "g", chatName: "Grupo", isGroup: true,
+                       sender: "Eu", isFromMe: true, date: base.addingTimeInterval(60), text: "bora"),
+        ])
+        try await store.renameSenders(["+141377874698479": "Lucas"], source: .whatsapp)
+        let ids = try await store.keywordSearch("Lucas")
+        let chunk = try #require(try await store.chunks(ids: ids).first)
+        #expect(chunk.text.contains("] Lucas: bora jogar"))
+        #expect(chunk.participants.contains("Lucas"))
+
+        for (p, o) in [("uses", "uv for Python dependencies"), ("uses", "uv to install Python dependencies"),
+                       ("keeps", "the API token at ~/secret.txt"), ("is named", "Eu")] {
+            try await store.addFact(subject: "Eu", predicate: p, object: o, confidence: 0.8, source: .claude, chunkID: nil, at: .now)
+        }
+        try await store.cleanFacts(me: "Eu")
+        let facts = try await store.facts(limit: 50)
+        #expect(facts.count == 1)
+        #expect(facts.first?.predicate == "uses")
     }
 }
 

@@ -81,6 +81,8 @@ enum Persona {
         - Calendar, tasks and mail: calendar, create_event, tasks, create_task, complete_task, read_mail, \
         draft_email. Mail is drafted, never sent.
         - When they tell you something lasting about themselves or someone, call remember.
+        - Their music says a lot about their mood: music_mood shows what they have been listening to and how it \
+        felt. Use it with care, never to diagnose; notice, don't label.
         - Cards speak for themselves: after showing one, add at most a sentence.
         """
         return text
@@ -100,7 +102,7 @@ enum Persona {
             CreateEventTool(), TasksTool(), CompleteTaskTool(),
         ]
         #if os(macOS)
-        tools += [PressTool(), ClickTool(), TypeTextTool(), PressKeysTool(), ScrollTool(), OpenTool(),
+        tools += [MusicMoodTool(), PressTool(), ClickTool(), TypeTextTool(), PressKeysTool(), ScrollTool(), OpenTool(),
                   AppleScriptTool(), ScriptableAppsTool(), ReadMailTool(), DraftEmailTool()]
         #endif
         return tools

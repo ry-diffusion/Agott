@@ -66,6 +66,7 @@ struct PeopleView: View {
             .foregroundStyle(selected ? AnyShapeStyle(.white) : AnyShapeStyle(Ink.text))
             .padding(.horizontal, 12).padding(.vertical, 7)
             .glassEffect(selected ? .regular.tint(Ink.spot).interactive() : .regular.interactive(), in: .capsule)
+            .contentShape(Capsule())
         }
         .buttonStyle(PressScale())
     }

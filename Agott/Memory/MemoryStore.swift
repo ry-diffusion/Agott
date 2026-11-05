@@ -96,7 +96,15 @@ actor MemoryStore {
 
     CREATE TABLE IF NOT EXISTS cursors(source TEXT PRIMARY KEY, value REAL NOT NULL);
     CREATE TABLE IF NOT EXISTS insights(key TEXT PRIMARY KEY, json TEXT NOT NULL, ts REAL NOT NULL);
+    CREATE TABLE IF NOT EXISTS plays(
+        ts REAL NOT NULL, track TEXT NOT NULL, artist TEXT NOT NULL, album TEXT NOT NULL, app TEXT NOT NULL,
+        PRIMARY KEY(ts, track));
+    CREATE INDEX IF NOT EXISTS plays_ts ON plays(ts);
     """
+
+    /// For one-time repairs that need raw SQL.
+    func openForRepair() throws -> SQLiteDB { try open() }
+    func dropVectorCache() { vectorCache = nil }
 
     // MARK: Cursors
 
@@ -706,16 +714,33 @@ actor MemoryStore {
         return result
     }
 
+    /// Moments worth learning from, alternating your Claude sessions (who
+    /// you are at work) with your own chats (who you are with people), newest
+    /// first. Taking Claude first left every personal chat unread.
     func learningCandidateIDs(me: String, limit: Int) throws -> [Int64] {
-        var ids: [Int64] = []
-        try open().rows(
+        var work: [Int64] = []
+        var personal: [Int64] = []
+        let db = try open()
+        try db.rows(
+            "SELECT id FROM chunks WHERE learned = 0 AND source = 'claude' ORDER BY end_ts DESC LIMIT ?",
+            [.of(limit)]
+        ) { work.append(Int64($0.int(0))) }
+        try db.rows(
             """
             SELECT id FROM chunks
-            WHERE learned = 0 AND (source = 'claude' OR (participants LIKE ? AND length(text) > 300))
-            ORDER BY (source = 'claude') DESC, end_ts DESC LIMIT ?
+            WHERE learned = 0 AND source != 'claude' AND participants LIKE ? AND length(text) > 300
+            ORDER BY end_ts DESC LIMIT ?
             """,
             [.text("%\(me)%"), .of(limit)]
-        ) { ids.append(Int64($0.int(0))) }
+        ) { personal.append(Int64($0.int(0))) }
+        var ids: [Int64] = []
+        var w = work.makeIterator(), p = personal.makeIterator()
+        while ids.count < limit {
+            let a = p.next(), b = w.next()
+            if a == nil && b == nil { break }
+            if let a { ids.append(a) }
+            if let b, ids.count < limit { ids.append(b) }
+        }
         return ids
     }
 
@@ -770,6 +795,36 @@ actor MemoryStore {
 
     func deleteFact(id: Int64) throws {
         try open().run("DELETE FROM facts WHERE id = ?", [.int(id)])
+    }
+
+    // MARK: Music
+
+    func logPlay(_ play: Play) throws {
+        try open().run(
+            "INSERT OR IGNORE INTO plays(ts, track, artist, album, app) VALUES (?, ?, ?, ?, ?)",
+            [.double(play.date.timeIntervalSince1970), .text(play.track), .text(play.artist), .text(play.album), .text(play.app)])
+    }
+
+    func plays(since: Date) throws -> [Play] {
+        var result: [Play] = []
+        try open().rows(
+            "SELECT ts, track, artist, album, app FROM plays WHERE ts >= ? ORDER BY ts DESC LIMIT 2000",
+            [.double(since.timeIntervalSince1970)]
+        ) { row in
+            result.append(Play(date: Date(timeIntervalSince1970: row.double(0)), track: row.text(1) ?? "",
+                               artist: row.text(2) ?? "", album: row.text(3) ?? "", app: row.text(4) ?? ""))
+        }
+        return result
+    }
+
+    /// Your own messages in a time window, for lining up mood with words.
+    func myMessages(from: Date, to: Date) throws -> [String] {
+        var result: [String] = []
+        try open().rows(
+            "SELECT text FROM messages WHERE is_me = 1 AND source != 'claude' AND ts BETWEEN ? AND ? LIMIT 60",
+            [.double(from.timeIntervalSince1970), .double(to.timeIntervalSince1970)]
+        ) { result.append($0.text(0) ?? "") }
+        return result
     }
 
     // MARK: Insights cache

@@ -9,16 +9,10 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section("Brain") {
-                Picker("Model", selection: $settings.provider) {
-                    ForEach(ModelProvider.allCases) { provider in
-                        Text(provider.title).tag(provider)
-                    }
-                }
+                ModelPickerRow(title: "Chat model", provider: $settings.provider, model: $settings.modelName, allowsSame: false)
                 Text(settings.provider.detail).font(.caption).foregroundStyle(Ink.muted)
-                if settings.provider == .openCode {
+                if settings.provider == .openCode || settings.learningProvider == .openCode {
                     APIKeyField()
-                    TextField("Endpoint", text: $settings.baseURL)
-                    TextField("Model", text: $settings.modelName)
                 }
                 if !ModelHub.isAvailable(settings.provider) {
                     Label("Not available right now. Agott will use \(ModelHub.resolved().title).", systemImage: "exclamationmark.triangle")
@@ -32,9 +26,8 @@ struct SettingsView: View {
 
             Section("Learning about you") {
                 Toggle("Analyze new memories after each indexing run", isOn: $settings.autoLearn)
-                Picker("Model that reads your messages", selection: $settings.learningProvider) {
-                    ForEach(ModelProvider.allCases) { Text($0.title).tag($0) }
-                }
+                ModelPickerRow(title: "Model that reads your messages", provider: $settings.learningProvider,
+                               model: $settings.learningModelName, allowsSame: true)
                 if settings.learningProvider == .openCode {
                     Stepper(value: $settings.contextTokens, in: 16_000...1_000_000, step: 16_000) {
                         Text("Context window: \(settings.contextTokens.formatted()) tokens")
@@ -73,6 +66,7 @@ struct SettingsView: View {
 
             Section("Using your Mac") {
                 Toggle("Look at the screen when I ask from the overlay", isOn: $settings.useScreenContext)
+                Toggle("Notice what I listen to on Spotify or Apple Music", isOn: $settings.listenToMusic)
                 Toggle("Autopilot: act without asking first", isOn: $settings.autopilot)
                 if settings.autopilot {
                     Label("Agott will click, type, run scripts and send without confirmation.", systemImage: "exclamationmark.triangle.fill")

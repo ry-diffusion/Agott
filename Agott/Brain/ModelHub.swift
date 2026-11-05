@@ -20,23 +20,29 @@ enum ModelHub {
         return ModelProvider.allCases.first(where: { isAvailable($0) }) ?? first
     }
 
-    static func openCodeModel(vision: Bool = false) -> OpenCodeLanguageModel {
-        OpenCodeLanguageModel(configuration: .init(
-            baseURL: settings.baseURL,
-            model: vision ? settings.visionModelName : settings.modelName,
+    /// An OpenCode model, by id. Each model's own endpoint comes from the
+    /// catalogue, so models served from different paths just work.
+    static func openCodeModel(vision: Bool = false, modelName: String? = nil) -> OpenCodeLanguageModel {
+        let id = modelName ?? (vision ? settings.visionModelName : settings.modelName)
+        let entry = ModelCatalog.shared.model(id)
+        return OpenCodeLanguageModel(configuration: .init(
+            baseURL: entry?.chatBaseURL ?? settings.baseURL,
+            model: id,
             apiKey: settings.apiKey,
-            supportsVision: vision))
+            supportsVision: vision && (entry?.vision ?? true),
+            api: entry?.executorAPI ?? .chatCompletions))
     }
 
     static func session(
         provider: ModelProvider? = nil,
         tools: [any Tool] = [],
         instructions: String,
-        vision: Bool = false
+        vision: Bool = false,
+        modelName: String? = nil
     ) -> LanguageModelSession {
         switch resolved(provider) {
         case .openCode:
-            LanguageModelSession(model: openCodeModel(vision: vision), tools: tools, instructions: instructions)
+            LanguageModelSession(model: openCodeModel(vision: vision, modelName: modelName), tools: tools, instructions: instructions)
         case .privateCloud:
             LanguageModelSession(model: PrivateCloudComputeLanguageModel(), tools: tools, instructions: instructions)
         case .onDevice:
@@ -49,9 +55,10 @@ enum ModelHub {
         _ type: T.Type,
         prompt: String,
         instructions: String,
-        provider: ModelProvider? = nil
+        provider: ModelProvider? = nil,
+        modelName: String? = nil
     ) async throws -> T {
-        let session = session(provider: provider, instructions: instructions)
+        let session = session(provider: provider, instructions: instructions, modelName: modelName)
         return try await session.respond(to: prompt, generating: type).content
     }
 
@@ -68,6 +75,18 @@ enum ModelHub {
 
     /// Who reads your messages to learn about you: your choice in Settings,
     /// falling back to whatever works.
+    /// What the header shows: the model's own name when it is an OpenCode one.
+    static var currentModelLabel: String {
+        let provider = resolved()
+        guard provider == .openCode else { return provider.title }
+        return ModelCatalog.shared.model(settings.modelName)?.name ?? settings.modelName
+    }
+
+    /// The OpenCode model used for analyzing memories, if it differs.
+    static var learningModel: String? {
+        settings.learningModelName.isEmpty ? nil : settings.learningModelName
+    }
+
     static var learningProvider: ModelProvider {
         resolved(settings.learningProvider)
     }

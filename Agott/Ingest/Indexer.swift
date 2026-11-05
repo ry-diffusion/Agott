@@ -89,7 +89,7 @@ final class Indexer {
     }
 
     func run() {
-        guard task == nil, !isPaused else { return }
+        guard task == nil, !isPaused, !MemoryRepair.shared.isRunning else { return }
         // Utility priority: indexing yields to everything you are doing.
         task = Task(priority: .utility) {
             await index()
@@ -137,7 +137,11 @@ final class Indexer {
         guard !Task.isCancelled else { phase = .idle; return }
         phase = .linking
         do {
-            while try await KnowledgeGraph.link() > 0, !Task.isCancelled {}
+            while !Task.isCancelled {
+                let batch = ContinuousClock.now
+                guard try await KnowledgeGraph.link() > 0 else { break }
+                await Pace.rest(after: batch)
+            }
         } catch {
             lastError = error.localizedDescription
         }
@@ -259,9 +263,15 @@ final class Indexer {
         for slice in stride(from: 0, to: batch.count, by: 5000) {
             guard !Task.isCancelled else { return }
             let part = Array(batch[slice..<min(slice + 5000, batch.count)])
+            let started = ContinuousClock.now
             try await MemoryStore.shared.ingest(part)
             readSoFar += part.count
-            while try await KnowledgeGraph.link() > 0, !Task.isCancelled {}
+            await Pace.rest(after: started)
+            while !Task.isCancelled {
+                let batch = ContinuousClock.now
+                guard try await KnowledgeGraph.link() > 0 else { break }
+                await Pace.rest(after: batch)
+            }
             // Totals drive several screens; once a second is plenty.
             if Date().timeIntervalSince(lastTotals) > 1 {
                 lastTotals = .now
@@ -284,6 +294,7 @@ final class Indexer {
         while !Task.isCancelled {
             guard let batch = try? await MemoryStore.shared.chunksNeedingVectors(limit: 128), !batch.isEmpty else { break }
             phase = .embedding(done: done, total: goal)
+            let started = ContinuousClock.now
             let vectors = await Task.detached(priority: .utility) { () -> [(Int64, [Float])] in
                 var out: [(Int64, [Float])] = []
                 for (id, text) in batch {
@@ -297,7 +308,7 @@ final class Indexer {
             try? await MemoryStore.shared.storeVectors(vectors.map { ($0.0, $0.1.isEmpty ? [0] : $0.1) })
             done += batch.count
             // Leave room for everything else on the Mac.
-            try? await Task.sleep(for: .milliseconds(15))
+            await Pace.rest(after: started)
         }
     }
 

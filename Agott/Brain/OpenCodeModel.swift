@@ -31,11 +31,20 @@ nonisolated struct OpenCodeExecutor: LanguageModelExecutor {
     typealias Model = OpenCodeLanguageModel
 
     struct Configuration: Hashable, Sendable {
-        /// e.g. https://opencode.ai/zen/go/v1
+        /// e.g. https://opencode.ai/inference/go/openai/v1
         var baseURL: String
         var model: String
         var apiKey: String
         var supportsVision: Bool = false
+        /// Which wire format the model is served in.
+        var api: API = .chatCompletions
+    }
+
+    /// OpenCode Go serves models in different formats; Agott speaks three.
+    enum API: String, Hashable, Sendable, Codable {
+        case chatCompletions = "chat-completions"
+        case responses
+        case messages
     }
 
     enum ExecutorError: LocalizedError {
@@ -64,6 +73,11 @@ nonisolated struct OpenCodeExecutor: LanguageModelExecutor {
         streamingInto channel: LanguageModelExecutorGenerationChannel
     ) async throws {
         guard !configuration.apiKey.isEmpty else { throw ExecutorError.missingKey }
+        switch configuration.api {
+        case .responses: return try await respondResponses(to: request, streamingInto: channel)
+        case .messages: return try await respondMessages(to: request, streamingInto: channel)
+        case .chatCompletions: break
+        }
         let base = configuration.baseURL.hasSuffix("/") ? String(configuration.baseURL.dropLast()) : configuration.baseURL
         guard let url = URL(string: base + "/chat/completions") else { throw ExecutorError.badURL }
 
@@ -269,7 +283,7 @@ nonisolated struct OpenCodeExecutor: LanguageModelExecutor {
         ]
     }
 
-    private static func text(_ segments: [Transcript.Segment]) -> String {
+    static func text(_ segments: [Transcript.Segment]) -> String {
         segments.compactMap { segment -> String? in
             switch segment {
             case .text(let text): text.content

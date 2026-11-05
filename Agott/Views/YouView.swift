@@ -49,6 +49,10 @@ struct YouView: View {
                     }
                 }
 
+                #if os(macOS)
+                MusicMoodSection()
+                #endif
+
                 HStack {
                     PanelTitle(title: "What Agott knows", symbol: "pin")
                     Spacer()
@@ -102,3 +106,73 @@ struct YouView: View {
         facts = (try? await MemoryStore.shared.facts(limit: 400)) ?? []
     }
 }
+
+#if os(macOS)
+/// What you have been listening to, and how it felt.
+private struct MusicMoodSection: View {
+    @State private var listener = MusicListener.shared
+    @State private var settings = AppSettings.shared
+    @State private var summary: MusicMood.Summary?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            PanelTitle(title: "Music and mood", symbol: "music.note")
+            if !settings.listenToMusic {
+                HStack {
+                    Text("Agott isn't noticing your music.").foregroundStyle(Ink.muted)
+                    Button("Turn on") { settings.listenToMusic = true; listener.start() }
+                        .buttonStyle(.candy(.soft, compact: true))
+                }
+            } else {
+                if let play = listener.nowPlaying {
+                    HStack(spacing: 12) {
+                        Image(systemName: "waveform").font(.title3.weight(.bold)).foregroundStyle(Ink.spot)
+                            .symbolEffect(.variableColor.iterative, options: .repeating)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(play.track).font(.headline).foregroundStyle(Ink.text).lineLimit(1)
+                            Text("\(play.artist) · \(play.app)").font(.caption).foregroundStyle(Ink.muted).lineLimit(1)
+                        }
+                        Spacer()
+                        if let mood = listener.nowMood {
+                            Chip(text: mood.mood.capitalized, symbol: "heart", spot: true)
+                        }
+                    }
+                    .panel(padding: 12)
+                }
+                if let summary, summary.plays > 0 {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Last two weeks · \(summary.plays) songs").font(.caption.weight(.bold)).foregroundStyle(Ink.muted)
+                        let total = max(1, summary.moods.map(\.1).reduce(0, +))
+                        ForEach(summary.moods.prefix(5), id: \.0) { mood, count in
+                            HStack(spacing: 10) {
+                                Text(mood.capitalized).font(.callout).foregroundStyle(Ink.text).frame(width: 96, alignment: .leading)
+                                GeometryReader { proxy in
+                                    Capsule().fill(Ink.spot)
+                                        .frame(width: max(6, proxy.size.width * CGFloat(count) / CGFloat(total)))
+                                }
+                                .frame(height: 8)
+                                Text("\(Int(Double(count) / Double(total) * 100))%").font(.caption).monospacedDigit()
+                                    .foregroundStyle(Ink.muted).frame(width: 40, alignment: .trailing)
+                            }
+                        }
+                        if let best = summary.toneByMood.first, let worst = summary.toneByMood.last, summary.toneByMood.count > 1 {
+                            Label("Your messages are warmest with \(best.0) music and coolest with \(worst.0).", systemImage: "text.bubble")
+                                .font(.callout).foregroundStyle(Ink.text)
+                        }
+                        if !summary.topArtists.isEmpty {
+                            FlowLayout(spacing: 6) {
+                                ForEach(summary.topArtists, id: \.0) { Chip(text: "\($0.0) · \($0.1)", symbol: "music.mic") }
+                            }
+                        }
+                    }
+                    .panel(padding: 14)
+                } else {
+                    Text("Play something on Spotify or Apple Music and Agott will start to notice how your music feels.")
+                        .font(.callout).foregroundStyle(Ink.muted)
+                }
+            }
+        }
+        .task(id: listener.nowPlaying?.track) { summary = await MusicMood.summary(days: 14) }
+    }
+}
+#endif

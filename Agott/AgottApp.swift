@@ -83,7 +83,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         if AppSettings.shared.hasOnboarded { Copilot.shared.start() }
-        Indexer.shared.startAutomatic()
+        // Repair what older versions wrote, then keep indexing.
+        MusicListener.shared.start()
+        Task(priority: .utility) { await ModelCatalog.shared.refresh() }
+        Task(priority: .utility) {
+            await MemoryRepair.shared.runIfNeeded()
+            Indexer.shared.startAutomatic()
+        }
         RemoteHost.shared.start()
     }
 

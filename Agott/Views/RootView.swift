@@ -146,16 +146,23 @@ private struct SidebarTile: View {
                     .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(selected ? AnyShapeStyle(.white) : AnyShapeStyle(Ink.text))
                     .frame(width: 46, height: 46)
+                    // Not interactive glass: it handles presses itself and
+                    // could swallow the first click on a tab.
                     .glassEffect(
-                        selected ? .regular.tint(Ink.spot).interactive() : (hovering ? .regular.interactive() : .clear.interactive()),
+                        selected ? .regular.tint(Ink.spot) : (hovering ? .regular : .clear),
                         in: .rect(cornerRadius: 14))
                 Text(item.title)
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(selected ? Ink.text : Ink.muted)
             }
-
+            .frame(width: 66)
+            .padding(.vertical, 2)
+            // The whole tile is clickable, gaps included.
+            .contentShape(Rectangle())
         }
         .buttonStyle(PressScale())
+        .accessibilityLabel(Text(item.title))
+        .accessibilityAddTraits(selected ? .isSelected : [])
         .onHover { hovering = $0 }
         .animation(Motion.bouncy, value: selected)
         .animation(.spring(duration: 0.2), value: hovering)
@@ -169,7 +176,15 @@ struct IndexingPill: View {
     @State private var indexer = Indexer.shared
 
     var body: some View {
-        if indexer.isRunning || indexer.isLearning {
+        if let note = MemoryRepair.shared.note {
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text(note).font(.callout.weight(.semibold)).foregroundStyle(Ink.text)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 7)
+            .glassEffect(.regular, in: .capsule)
+            .transition(.move(edge: .top).combined(with: .opacity))
+        } else if indexer.isRunning || indexer.isLearning {
             Button(action: open) {
                 HStack(spacing: 8) {
                     if let progress = indexer.progress {
