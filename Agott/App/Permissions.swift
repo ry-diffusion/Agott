@@ -114,8 +114,14 @@ enum Permissions {
         }
     }
 
+    /// Full Disk Access cannot be requested; the app has to be added to the
+    /// list by hand. So this opens the pane *and* shows Agott in Finder,
+    /// ready to drag in or pick with the + button.
     static func openFullDiskAccess() {
         openPane("Privacy_AllFiles")
+        #if os(macOS)
+        NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL])
+        #endif
     }
 
     static func openPane(_ anchor: String) {

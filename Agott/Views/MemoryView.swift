@@ -172,6 +172,10 @@ private struct SourceTile: View {
             Text(detail).font(.caption).foregroundStyle(Ink.muted).lineLimit(2)
             HStack {
                 if indexer.states[source] == .needsPermission {
+                Text("Add Agott in System Settings → Full Disk Access, then come back. If it still can't read, quit and reopen Agott.")
+                    .font(.caption).foregroundStyle(Ink.muted).fixedSize(horizontal: false, vertical: true)
+            }
+            if indexer.states[source] == .needsPermission {
                     Button("Grant Full Disk Access") { Permissions.openFullDiskAccess() }
                         .buttonStyle(.candy(.primary, compact: true))
                 }

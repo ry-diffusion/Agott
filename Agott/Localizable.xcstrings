@@ -144,6 +144,16 @@
         }
       }
     },
+    "Add Agott in System Settings → Full Disk Access, then come back. If it still can't read, quit and reopen Agott.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adicione o Agott em Ajustes do Sistema → Acesso Total ao Disco e volte. Se ainda não conseguir ler, feche e abra o Agott de novo."
+          }
+        }
+      }
+    },
     "Add a task": {
       "localizations": {
         "pt-BR": {

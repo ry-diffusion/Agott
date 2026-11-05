@@ -81,6 +81,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidBecomeActive(_ notification: Notification) {
         // Accessibility is granted outside the app; pick it up when we return.
         if !LaunchOptions.isDemo, AppSettings.shared.hasOnboarded, !Copilot.shared.keys.isActive { Copilot.shared.start() }
+        // Coming back from System Settings with Full Disk Access granted:
+        // read the sources that were locked out, without waiting ten minutes.
+        if !LaunchOptions.isDemo, AppSettings.shared.hasOnboarded, !Indexer.shared.isRunning,
+           Indexer.shared.states.values.contains(.needsPermission), Permissions.isGranted(.fullDiskAccess)
+        {
+            Indexer.shared.run()
+        }
     }
 }
 
