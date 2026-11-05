@@ -10,7 +10,47 @@ import FoundationModels
 /// Both are translated to and from the same Foundation Models transcript as
 /// Chat Completions, so tools, steps, retries and guided generation behave
 /// identically whichever model answers.
+/// Where a reply's text goes. Free text streams straight through; a
+/// structured (JSON) answer is held until it is complete and then cleaned,
+/// because models like to wrap JSON in code fences or a friendly sentence,
+/// and Foundation Models parses the text exactly as given.
+nonisolated final class ResponseOut: @unchecked Sendable {
+    private let channel: LanguageModelExecutorGenerationChannel
+    private let entryID: String
+    private let structured: Bool
+    private var buffer = ""
+
+    init(_ channel: LanguageModelExecutorGenerationChannel, entryID: String, structured: Bool) {
+        self.channel = channel
+        self.entryID = entryID
+        self.structured = structured
+    }
+
+    func append(_ text: String) async {
+        if structured { buffer += text; return }
+        await channel.send(.response(entryID: entryID, action: .appendText(text, tokenCount: 1)))
+    }
+
+    func finish() async {
+        guard structured, !buffer.isEmpty else { return }
+        await channel.send(.response(entryID: entryID, action: .appendText(OpenCodeExecutor.cleanJSON(buffer), tokenCount: 1)))
+    }
+}
+
 extension OpenCodeExecutor {
+    /// The JSON object inside a model's answer: no fences, no prose.
+    static func cleanJSON(_ text: String) -> String {
+        var body = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if body.hasPrefix("```") {
+            body = body.split(separator: "\n", omittingEmptySubsequences: false).dropFirst().joined(separator: "\n")
+            if let fence = body.range(of: "```", options: .backwards) { body = String(body[..<fence.lowerBound]) }
+        }
+        guard let open = body.firstIndex(where: { $0 == "{" || $0 == "[" }) else { return body }
+        let closer: Character = body[open] == "{" ? "}" : "]"
+        guard let close = body.lastIndex(of: closer), close > open else { return String(body[open...]) }
+        return String(body[open...close])
+    }
+
     // MARK: Shared
 
     func makeRequest(path: String, body: [String: Any], for request: LanguageModelExecutorGenerationRequest,
@@ -119,6 +159,7 @@ extension OpenCodeExecutor {
 
         let bytes = try await Self.open(makeRequest(path: "/responses", body: body, for: request))
         let responseID = UUID().uuidString
+        let out = ResponseOut(channel, entryID: responseID, structured: request.schema != nil)
         let reasoningID = UUID().uuidString
         let toolsID = UUID().uuidString
         var calls: [(id: String, name: String, arguments: String)] = []
@@ -128,7 +169,7 @@ extension OpenCodeExecutor {
             switch event["type"] as? String {
             case "response.output_text.delta":
                 if let delta = event["delta"] as? String, !delta.isEmpty {
-                    await channel.send(.response(entryID: responseID, action: .appendText(delta, tokenCount: 1)))
+                    await out.append(delta)
                 }
             case "response.reasoning_summary_text.delta", "response.reasoning_text.delta":
                 if let delta = event["delta"] as? String, !delta.isEmpty {
@@ -147,6 +188,7 @@ extension OpenCodeExecutor {
                 continue
             }
         }
+        await out.finish()
         for call in calls {
             await channel.send(.toolCalls(entryID: toolsID, action: .toolCall(
                 id: call.id, name: call.name,
@@ -216,6 +258,7 @@ extension OpenCodeExecutor {
             path: "/messages", body: body, for: request,
             extraHeaders: ["x-api-key": configuration.apiKey, "anthropic-version": "2023-06-01"]))
         let responseID = UUID().uuidString
+        let out = ResponseOut(channel, entryID: responseID, structured: request.schema != nil)
         let reasoningID = UUID().uuidString
         let toolsID = UUID().uuidString
         var blocks: [Int: (type: String, id: String, name: String, json: String)] = [:]
@@ -233,7 +276,7 @@ extension OpenCodeExecutor {
                 switch delta["type"] as? String {
                 case "text_delta":
                     if let text = delta["text"] as? String, !text.isEmpty {
-                        await channel.send(.response(entryID: responseID, action: .appendText(text, tokenCount: 1)))
+                        await out.append(text)
                     }
                 case "thinking_delta":
                     if let thinking = delta["thinking"] as? String, !thinking.isEmpty {
@@ -251,6 +294,7 @@ extension OpenCodeExecutor {
                 continue
             }
         }
+        await out.finish()
         for index in blocks.keys.sorted() {
             guard let block = blocks[index], block.type == "tool_use", !block.name.isEmpty else { continue }
             await channel.send(.toolCalls(entryID: toolsID, action: .toolCall(

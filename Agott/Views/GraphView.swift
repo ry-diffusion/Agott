@@ -241,6 +241,10 @@ struct GraphView: View {
                 }
                 Text("\(entity.kind.label) · seen \(entity.mentions) times").font(.caption).foregroundStyle(Ink.muted)
 
+                if entity.kind == .person {
+                    PersonPanel(name: entity.name).id(entity.id)
+                }
+
                 if !facts.isEmpty {
                     VStack(alignment: .leading, spacing: 6) {
                         PanelTitle(title: "What Agott knows", symbol: "pin")
@@ -437,5 +441,84 @@ extension EntityKind {
         case .project: String(localized: "Project")
         case .thing: String(localized: "Thing")
         }
+    }
+}
+
+/// Who someone is, in the graph's side panel: counts right away, then a
+/// written portrait (cached after the first time).
+private struct PersonPanel: View {
+    var name: String
+    @State private var trace: MemoryStore.PersonTrace?
+    @State private var portrait: PersonPortrait?
+    @State private var writing = false
+    @State private var error: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let trace, trace.total > 0 {
+                VStack(alignment: .leading, spacing: 4) {
+                    Label("\(trace.total.formatted()) messages from them", systemImage: "text.bubble")
+                    if let last = trace.lastSeen {
+                        Label("Last time: \(last.formatted(.relative(presentation: .named)))", systemImage: "clock")
+                    }
+                    if !trace.groups.isEmpty {
+                        Label(trace.groups.prefix(3).map(\.name).joined(separator: ", "), systemImage: "person.3")
+                            .lineLimit(2)
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(Ink.muted)
+            }
+
+            if let portrait {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(portrait.toYou).font(.callout.weight(.semibold)).foregroundStyle(Ink.text)
+                    Text(portrait.summary).font(.callout).foregroundStyle(Ink.text).fixedSize(horizontal: false, vertical: true)
+                    if !portrait.vibe.isEmpty {
+                        Chip(text: portrait.vibe.capitalized, symbol: "heart", spot: true)
+                    }
+                    if !portrait.topics.isEmpty {
+                        FlowLayout(spacing: 6) {
+                            ForEach(portrait.topics, id: \.self) { Chip(text: $0) }
+                        }
+                    }
+                    Button {
+                        Task { await write() }
+                    } label: {
+                        Label("Write again", systemImage: "arrow.clockwise")
+                    }
+                    .buttonStyle(.plain)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Ink.muted)
+                }
+                .panel(padding: 12, toned: true)
+            } else if writing {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text("Writing who \(name) is…").font(.callout).foregroundStyle(Ink.muted)
+                }
+            } else if let error {
+                Text(error).font(.caption).foregroundStyle(Ink.muted)
+                Button("Try again") { Task { await write() } }.buttonStyle(.candy(.soft, compact: true))
+            }
+        }
+        .task {
+            trace = try? await MemoryStore.shared.trace(of: name)
+            portrait = await PersonSummary.cached(name)
+            if portrait == nil, (trace?.total ?? 0) > 0 || ModelHub.isAvailable(ModelHub.resolved()) {
+                await write()
+            }
+        }
+    }
+
+    private func write() async {
+        writing = true
+        error = nil
+        do {
+            portrait = try await PersonSummary.write(name)
+        } catch {
+            self.error = error.localizedDescription
+        }
+        writing = false
     }
 }

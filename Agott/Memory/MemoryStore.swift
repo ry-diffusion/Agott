@@ -50,6 +50,7 @@ actor MemoryStore {
         sender TEXT NOT NULL, is_me INTEGER NOT NULL, ts REAL NOT NULL, text TEXT NOT NULL,
         UNIQUE(source, ext_id));
     CREATE INDEX IF NOT EXISTS messages_chat_ts ON messages(source, chat_id, ts);
+    CREATE INDEX IF NOT EXISTS messages_by_sender ON messages(sender, ts);
 
     CREATE TABLE IF NOT EXISTS chunks(
         id INTEGER PRIMARY KEY,
@@ -795,6 +796,48 @@ actor MemoryStore {
 
     func deleteFact(id: Int64) throws {
         try open().run("DELETE FROM facts WHERE id = ?", [.int(id)])
+    }
+
+    // MARK: People
+
+    nonisolated struct PersonTrace: Sendable {
+        var total = 0
+        var inGroups = 0
+        var groups: [(name: String, count: Int)] = []
+        var lastSeen: Date?
+        var firstSeen: Date?
+    }
+
+    /// Everything one person has said that Agott remembers, counted.
+    func trace(of name: String) throws -> PersonTrace {
+        var trace = PersonTrace()
+        let db = try open()
+        try db.rows("SELECT COUNT(*), SUM(is_group), MIN(ts), MAX(ts) FROM messages WHERE sender = ? AND is_me = 0", [.text(name)]) { row in
+            trace.total = row.int(0)
+            trace.inGroups = row.int(1)
+            if !row.isNull(2) { trace.firstSeen = Date(timeIntervalSince1970: row.double(2)) }
+            if !row.isNull(3) { trace.lastSeen = Date(timeIntervalSince1970: row.double(3)) }
+        }
+        try db.rows(
+            """
+            SELECT MAX(chat_name), COUNT(*) FROM messages WHERE sender = ? AND is_me = 0 AND is_group = 1
+            GROUP BY chat_id ORDER BY COUNT(*) DESC LIMIT 8
+            """, [.text(name)]
+        ) { trace.groups.append(($0.text(0) ?? "", $0.int(1))) }
+        return trace
+    }
+
+    /// Their most recent messages, with where they said them.
+    func messages(by name: String, limit: Int) throws -> [(line: ChatLine, chat: String)] {
+        var result: [(ChatLine, String)] = []
+        try open().rows(
+            "SELECT id, sender, is_me, ts, text, chat_name FROM messages WHERE sender = ? AND is_me = 0 ORDER BY ts DESC LIMIT ?",
+            [.text(name), .of(limit)]
+        ) { row in
+            result.append((ChatLine(id: Int64(row.int(0)), sender: row.text(1) ?? "", isFromMe: false,
+                                    date: Date(timeIntervalSince1970: row.double(3)), text: row.text(4) ?? ""), row.text(5) ?? ""))
+        }
+        return result.reversed().map { (line: $0.0, chat: $0.1) }
     }
 
     // MARK: Music

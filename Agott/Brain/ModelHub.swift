@@ -59,7 +59,19 @@ enum ModelHub {
         modelName: String? = nil
     ) async throws -> T {
         let session = session(provider: provider, instructions: instructions, modelName: modelName)
-        return try await session.respond(to: prompt, generating: type).content
+        do {
+            return try await session.respond(to: prompt, generating: type).content
+        } catch where "\(error)".localizedCaseInsensitiveContains("pars") || "\(error)".localizedCaseInsensitiveContains("decod") {
+            // The model answered, but not in a shape that parsed. Ask once more
+            // for plain JSON and read it ourselves.
+            let schema = (try? JSONEncoder().encode(T.generationSchema)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
+            let retry = self.session(
+                provider: provider,
+                instructions: instructions + "\n\nAnswer with one JSON object and nothing else. It must match this JSON schema:\n\(schema)",
+                modelName: modelName)
+            let text = try await retry.respond(to: prompt).content
+            return try T(GeneratedContent(json: OpenCodeExecutor.cleanJSON(text)))
+        }
     }
 
     static func text(_ prompt: String, instructions: String, provider: ModelProvider? = nil) async throws -> String {

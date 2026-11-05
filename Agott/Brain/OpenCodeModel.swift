@@ -112,6 +112,7 @@ nonisolated struct OpenCodeExecutor: LanguageModelExecutor {
         let responseID = UUID().uuidString
         let reasoningID = UUID().uuidString
         let toolsID = UUID().uuidString
+        let out = ResponseOut(channel, entryID: responseID, structured: request.schema != nil)
         var pendingCalls: [Int: (id: String, name: String, arguments: String)] = [:]
 
         for try await line in bytes.lines {
@@ -129,7 +130,7 @@ nonisolated struct OpenCodeExecutor: LanguageModelExecutor {
                 await channel.send(.reasoning(entryID: reasoningID, action: .appendText(reasoning, tokenCount: 1)))
             }
             if let content = delta["content"] as? String, !content.isEmpty {
-                await channel.send(.response(entryID: responseID, action: .appendText(content, tokenCount: 1)))
+                await out.append(content)
             }
             for call in (delta["tool_calls"] as? [[String: Any]]) ?? [] {
                 let index = call["index"] as? Int ?? 0
@@ -143,6 +144,7 @@ nonisolated struct OpenCodeExecutor: LanguageModelExecutor {
             }
         }
 
+        await out.finish()
         // Tool calls are handed over whole: the framework parses arguments as
         // generated content, and half an argument object parses as nothing.
         for index in pendingCalls.keys.sorted() {

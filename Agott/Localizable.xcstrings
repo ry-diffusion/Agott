@@ -17,6 +17,16 @@
         }
       }
     },
+    "%@ messages from them": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ mensagens dessa pessoa"
+          }
+        }
+      }
+    },
     "%@ msgs": {
       "localizations": {
         "pt-BR": {
@@ -1512,6 +1522,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Últimos 30 dias"
+          }
+        }
+      }
+    },
+    "Last time: %@": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Última vez: %@"
           }
         }
       }
@@ -3396,6 +3416,16 @@
         }
       }
     },
+    "Try again": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tentar de novo"
+          }
+        }
+      }
+    },
     "Turn on": {
       "localizations": {
         "pt-BR": {
@@ -3736,12 +3766,32 @@
         }
       }
     },
+    "Write again": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escrever de novo"
+          }
+        }
+      }
+    },
     "Writing an explanation": {
       "localizations": {
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
             "value": "Escrevendo uma explicação"
+          }
+        }
+      }
+    },
+    "Writing who %@ is…": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escrevendo quem é %@…"
           }
         }
       }

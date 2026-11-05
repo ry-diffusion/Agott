@@ -81,6 +81,24 @@ struct MemoryStoreTests {
         #expect(a == b)
     }
 
+    @Test func tracesOnePerson() async throws {
+        let store = tempStore()
+        var group = message(1, chat: "g1", sender: "Erika", me: false, minutes: 0, "bora no projeto x")
+        group.isGroup = true
+        group.chatName = "PROJETO X"
+        try await store.ingest([
+            group,
+            message(2, sender: "Erika", me: false, minutes: 5, "oi sumido"),
+            message(3, sender: "Eu", me: true, minutes: 6, "oi!"),
+        ])
+        let trace = try await store.trace(of: "Erika")
+        #expect(trace.total == 2)
+        #expect(trace.inGroups == 1)
+        #expect(trace.groups.first?.name == "PROJETO X")
+        let said = try await store.messages(by: "Erika", limit: 10)
+        #expect(said.map(\.line.text) == ["bora no projeto x", "oi sumido"])
+    }
+
     @Test func graphLinksPeopleAndFacts() async throws {
         let store = tempStore()
         try await store.ingest([
@@ -332,6 +350,10 @@ final class FakeModelServer: URLProtocol {
                    #"{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\"query\":"}}"#,
                    #"{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"\"Floripa\"}"}}"#,
                    #"{"type":"message_stop"}"#]
+        } else if sent.contains("response_format") {
+            // A structured request answered the way models often do: fenced, with chatter.
+            events = [#"{"choices":[{"delta":{"content":"Claro! Aqui está:\n```json\n{\"closeness\": 80, "}}]}"#,
+                      #"{"choices":[{"delta":{"content":"\"vibe\": \"carinhosa\"}\n```"}}]}"#]
         } else {
             let hasToolResult = sent.contains(#""role":"tool""#)
             events = hasToolResult
@@ -391,6 +413,20 @@ struct StepsTests {
         let steps = StepTracker.steps(from: session.transcript, after: baseline, busy: false, clock: .init())
         #expect(steps.contains { $0.kind == .thinking && ($0.detail ?? "").contains("viagem") })
         #expect((steps.first { $0.kind == .tool }?.detail ?? "").contains("found Floripa"))
+    }
+
+    @Generable struct Mini { var closeness: Int; var vibe: String }
+
+    /// The "Failed to parse generated content" error: fenced JSON must parse.
+    @Test func fencedJSONParses() async throws {
+        URLProtocol.registerClass(FakeModelServer.self)
+        defer { URLProtocol.unregisterClass(FakeModelServer.self) }
+        let model = OpenCodeLanguageModel(configuration: .init(baseURL: "https://fake-model.test", model: "fake", apiKey: "k"))
+        let session = LanguageModelSession(model: model, instructions: "Read the relationship.")
+        let read = try await session.respond(to: "como estou com a Ana?", generating: Mini.self).content
+        #expect(read.closeness == 80)
+        #expect(read.vibe == "carinhosa")
+        #expect(OpenCodeExecutor.cleanJSON("ok: {\"a\": 1} bye") == "{\"a\": 1}")
     }
 
     @Test func busyModelShowsThinking() {
