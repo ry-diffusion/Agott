@@ -57,7 +57,8 @@ enum RelationshipAnalyzer {
     /// A new conversation starts after this much silence.
     nonisolated static let conversationGap: TimeInterval = 8 * 3600
 
-    nonisolated static func stats(for chat: ChatSummary, store: MemoryStore = .shared) async -> RelationshipStats {
+    /// Runs off the main actor: sentiment over thousands of lines is real work.
+    @concurrent nonisolated static func stats(for chat: ChatSummary, store: MemoryStore = .shared) async -> RelationshipStats {
         let lines = (try? await store.lines(source: chat.source, chatID: chat.chatID, limit: 8000)) ?? []
         return compute(lines)
     }

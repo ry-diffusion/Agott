@@ -93,12 +93,7 @@ nonisolated struct OpenCodeExecutor: LanguageModelExecutor {
         urlRequest.setValue("Agott/1.0 (macOS; Foundation Models)", forHTTPHeaderField: "User-Agent")
         urlRequest.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (bytes, response) = try await URLSession.shared.bytes(for: urlRequest)
-        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
-            var text = ""
-            for try await line in bytes.lines { text += line; if text.count > 2000 { break } }
-            throw ExecutorError.http(http.statusCode, String(text.prefix(400)))
-        }
+        let bytes = try await Self.open(urlRequest)
 
         let responseID = UUID().uuidString
         let reasoningID = UUID().uuidString
@@ -146,6 +141,53 @@ nonisolated struct OpenCodeExecutor: LanguageModelExecutor {
                     name: call.name,
                     action: .appendArguments(arguments.isEmpty ? "{}" : arguments, tokenCount: 1))))
         }
+    }
+
+    /// Statuses that mean "try again shortly": rate limits, an overloaded
+    /// upstream, and gateway hiccups. Anything else is a real answer.
+    static let retryable: Set<Int> = [408, 409, 425, 429, 500, 502, 503, 504, 520, 522, 524, 529]
+    static let maxAttempts = 5
+
+    /// Opens the stream, retrying transient failures with exponential backoff
+    /// and jitter, honouring Retry-After when the server sends one.
+    ///
+    /// Retrying is safe here because nothing has been streamed yet: a failure
+    /// at this point means the request never started generating, so sending
+    /// it again cannot duplicate any text or tool call.
+    static func open(_ request: URLRequest) async throws -> URLSession.AsyncBytes {
+        var attempt = 0
+        while true {
+            attempt += 1
+            do {
+                let (bytes, response) = try await URLSession.shared.bytes(for: request)
+                guard let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) else {
+                    return bytes
+                }
+                var text = ""
+                for try await line in bytes.lines { text += line; if text.count > 2000 { break } }
+                guard retryable.contains(http.statusCode), attempt < maxAttempts else {
+                    throw ExecutorError.http(http.statusCode, String(text.prefix(400)))
+                }
+                let hinted = (http.value(forHTTPHeaderField: "Retry-After")).flatMap(Double.init)
+                try await backoff(attempt: attempt, hinted: hinted, reason: http.statusCode)
+            } catch let error as URLError where attempt < maxAttempts && Self.isTransient(error) {
+                try await backoff(attempt: attempt, hinted: nil, reason: error.errorCode)
+            }
+        }
+    }
+
+    static func isTransient(_ error: URLError) -> Bool {
+        [.timedOut, .networkConnectionLost, .notConnectedToInternet, .cannotConnectToHost,
+         .dnsLookupFailed, .cannotFindHost, .secureConnectionFailed].contains(error.code)
+    }
+
+    private static func backoff(attempt: Int, hinted: Double?, reason: Int) async throws {
+        // 1s, 2s, 4s, 8s (capped at 20s), plus up to 30% jitter so parallel
+        // requests do not retry in lockstep.
+        let base = min(20, pow(2, Double(attempt - 1)))
+        let delay = min(30, hinted ?? base * Double.random(in: 1...1.3))
+        await CardBus.status(String(localized: "The model is busy, retrying in \(Int(delay.rounded(.up)))s…"))
+        try await Task.sleep(for: .seconds(delay))
     }
 
     static func sessionID(for request: LanguageModelExecutorGenerationRequest) -> String {

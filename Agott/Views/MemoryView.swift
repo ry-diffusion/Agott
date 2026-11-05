@@ -45,29 +45,37 @@ struct MemoryView: View {
             HStack(alignment: .top, spacing: 14) {
                 MuseFace(mood: indexer.isRunning ? .working : .happy, size: 56)
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(phaseText).font(Lettering.display(18, relativeTo: .title3)).foregroundStyle(Ink.text)
+                    Text(indexer.statusText).font(Lettering.display(18, relativeTo: .title3)).foregroundStyle(Ink.text)
+                    if indexer.isRunning {
+                        if let progress = indexer.progress {
+                            ProgressView(value: progress).tint(Ink.spot)
+                        } else {
+                            ProgressView().progressViewStyle(.linear).tint(Ink.spot)
+                        }
+                    }
                     Text("\(indexer.totals.messages) messages · \(indexer.totals.chunks) moments · \(indexer.totals.vectors) understood · \(indexer.totals.entities) things in the graph · \(indexer.totals.facts) facts")
                         .font(.callout).monospacedDigit().foregroundStyle(Ink.muted)
                     if let error = indexer.lastError { Text(error).font(.caption).foregroundStyle(Ink.text) }
                 }
                 Spacer()
             }
+            if indexer.totals.messages == 0 && !indexer.isRunning {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Agott hasn't read anything yet. Start indexing to let it remember your WhatsApp, iMessage and Claude history. It runs in the background; you can keep using the app.")
+                        .foregroundStyle(Ink.text)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack {
+                        Button { indexer.run() } label: { Label("Start indexing", systemImage: "play.fill") }
+                            .buttonStyle(.candy)
+                        if !Permissions.isGranted(.fullDiskAccess) {
+                            Button("Grant Full Disk Access") { Permissions.openFullDiskAccess() }
+                                .buttonStyle(.candy(.soft))
+                        }
+                    }
+                }
+            }
         }
         .panel(toned: indexer.isRunning)
-    }
-
-    private var phaseText: String {
-        switch indexer.phase {
-        case .idle:
-            if let last = indexer.lastRun {
-                return String(localized: "Up to date, \(last.formatted(.relative(presentation: .named)))")
-            }
-            return String(localized: "All caught up")
-        case .reading(let source): return String(localized: "Reading \(source.displayName)…")
-        case .linking: return String(localized: "Connecting the dots…")
-        case .embedding(let done, let total): return String(localized: "Understanding moments \(done) of \(total)…")
-        case .learning(let done, let total): return String(localized: "Learning about you \(done) of \(total)…")
-        }
     }
 
     private var sources: some View {

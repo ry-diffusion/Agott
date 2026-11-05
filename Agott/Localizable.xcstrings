@@ -204,6 +204,16 @@
         }
       }
     },
+    "Agott hasn't read anything yet. Start indexing to let it remember your WhatsApp, iMessage and Claude history. It runs in the background; you can keep using the app.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Agott ainda não leu nada. Comece a indexar para ele lembrar do seu histórico do WhatsApp, iMessage e Claude. Roda em segundo plano; você pode continuar usando o app."
+          }
+        }
+      }
+    },
     "Agott looked at this app": {
       "localizations": {
         "pt-BR": {
@@ -1514,6 +1524,16 @@
         }
       }
     },
+    "Nothing indexed yet": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nada indexado ainda"
+          }
+        }
+      }
+    },
     "Nothing yet. Let Agott read your Claude history and messages, or write about yourself here.": {
       "localizations": {
         "pt-BR": {
@@ -1580,6 +1600,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Abra o Agott no iPhone, escolha este Mac e digite o código. Seu celular conversa com o Agott daqui, com toda a sua memória e apps."
+          }
+        }
+      }
+    },
+    "Open Memory": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir Memória"
           }
         }
       }
@@ -1820,6 +1850,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Lendo %@…"
+          }
+        }
+      }
+    },
+    "Reading %@… %@ messages": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lendo %1$@… %2$@ mensagens"
           }
         }
       }
@@ -2154,6 +2194,16 @@
         }
       }
     },
+    "Start indexing": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Começar a indexar"
+          }
+        }
+      }
+    },
     "Start remembering": {
       "localizations": {
         "pt-BR": {
@@ -2180,6 +2230,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Parar"
+          }
+        }
+      }
+    },
+    "Stop indexing": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parar de indexar"
           }
         }
       }
@@ -2310,6 +2370,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "A URL do endpoint do modelo não é válida."
+          }
+        }
+      }
+    },
+    "The model is busy, retrying in %llds…": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O modelo está ocupado, tentando de novo em %llds…"
           }
         }
       }
@@ -2574,12 +2644,12 @@
         }
       }
     },
-    "Understanding moments %lld of %lld…": {
+    "Understanding moments %@ of %@…": {
       "localizations": {
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Entendendo momentos %1$lld de %2$lld…"
+            "value": "Entendendo momentos %1$@ de %2$@…"
           }
         }
       }

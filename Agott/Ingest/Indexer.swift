@@ -26,8 +26,37 @@ final class Indexer {
     private(set) var totals = (messages: 0, chunks: 0, vectors: 0, entities: 0, facts: 0)
     private(set) var lastRun: Date?
     private(set) var lastError: String?
+    /// Messages read from the current source in this run.
+    private(set) var readSoFar = 0
 
     var isRunning: Bool { phase != .idle }
+
+    /// One line for anywhere in the app: what memory is doing right now.
+    var statusText: String {
+        switch phase {
+        case .idle:
+            if let lastRun {
+                return String(localized: "Up to date, \(lastRun.formatted(.relative(presentation: .named)))")
+            }
+            return totals.messages == 0 ? String(localized: "Nothing indexed yet") : String(localized: "All caught up")
+        case .reading(let source):
+            return readSoFar > 0
+                ? String(localized: "Reading \(source.displayName)… \(readSoFar.formatted()) messages")
+                : String(localized: "Reading \(source.displayName)…")
+        case .linking: return String(localized: "Connecting the dots…")
+        case .embedding(let done, let total): return String(localized: "Understanding moments \(done.formatted()) of \(total.formatted())…")
+        case .learning(let done, let total): return String(localized: "Learning about you \(done) of \(total)…")
+        }
+    }
+
+    /// 0…1 when the current step can be measured, nil when it cannot.
+    var progress: Double? {
+        switch phase {
+        case .embedding(let done, let total), .learning(let done, let total):
+            total > 0 ? min(1, Double(done) / Double(total)) : nil
+        default: nil
+        }
+    }
 
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var timer: Task<Void, Never>?
@@ -92,6 +121,7 @@ final class Indexer {
     }
 
     private func read(_ source: any MessageSource) async {
+        readSoFar = 0
         guard source.isPresent else {
             states[source.kind] = .missing
             return
@@ -108,6 +138,7 @@ final class Indexer {
                 try await MemoryStore.shared.ingest(batch)
                 cursor = batch.map(\.date.timeIntervalSince1970).max() ?? cursor
                 try await MemoryStore.shared.setCursor(cursor, for: source.kind)
+                readSoFar += batch.count
                 counts = (try? await MemoryStore.shared.counts()) ?? counts
                 if batch.count < 5000 { break }
             }

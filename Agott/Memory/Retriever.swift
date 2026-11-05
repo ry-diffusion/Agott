@@ -46,7 +46,7 @@ nonisolated struct Retriever: Sendable {
         }
     }
 
-    func recall(_ query: String, filter: MemoryStore.Filter = .none, limit: Int = 8) async -> Recall {
+    @concurrent func recall(_ query: String, filter: MemoryStore.Filter = .none, limit: Int = 8) async -> Recall {
         let keyword = (try? await store.keywordSearch(query, filter: filter, limit: 40)) ?? []
 
         var meaning: [Int64] = []

@@ -40,6 +40,8 @@ enum Consistency {
         }
     }
 
+    @concurrent nonisolated static func toneOffMain(_ lines: [String]) async -> Double { tone(lines) }
+
     nonisolated static func tone(_ lines: [String]) -> Double {
         let tagger = NLTagger(tagSchemes: [.sentimentScore])
         var scores: [Double] = []
@@ -64,8 +66,8 @@ enum Consistency {
         let mineAbout = mentions.filter { $0.line.isFromMe }
         let othersAbout = mentions.filter { !$0.line.isFromMe && $0.line.sender.folded != chat.name.folded }
 
-        let toneTo = tone(mine.map(\.text))
-        let toneAbout = tone(mineAbout.map(\.line.text))
+        let toneTo = await toneOffMain(mine.map(\.text))
+        let toneAbout = await toneOffMain(mineAbout.map(\.line.text))
 
         let prompt = """
         Person: \(chat.name). The user is \(me).

@@ -56,6 +56,10 @@ struct RootView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .transition(.opacity)
             .id(section)
+            .overlay(alignment: .top) {
+                IndexingPill { section = .memory }
+                    .padding(.top, 10)
+            }
         }
         .background(Ink.canvas)
         .tint(Ink.spot)
@@ -158,6 +162,40 @@ private struct SidebarTile: View {
     }
 }
 #endif
+
+/// What memory is doing, visible from every screen. Tap to open Memory.
+struct IndexingPill: View {
+    var open: () -> Void
+    @State private var indexer = Indexer.shared
+
+    var body: some View {
+        if indexer.isRunning || indexer.isLearning {
+            Button(action: open) {
+                HStack(spacing: 8) {
+                    if let progress = indexer.progress {
+                        ProgressView(value: progress)
+                            .progressViewStyle(.circular)
+                            .controlSize(.small)
+                            .tint(Ink.spot)
+                    } else {
+                        ProgressView().controlSize(.small)
+                    }
+                    Text(indexer.statusText)
+                        .font(.callout.weight(.semibold))
+                        .foregroundStyle(Ink.text)
+                        .monospacedDigit()
+                        .contentTransition(.numericText())
+                }
+                .padding(.horizontal, 14).padding(.vertical, 7)
+                .glassEffect(.regular.interactive(), in: .capsule)
+            }
+            .buttonStyle(PressScale())
+            .help(Text("Open Memory"))
+            .transition(.move(edge: .top).combined(with: .opacity))
+            .animation(Motion.settle, value: indexer.statusText)
+        }
+    }
+}
 
 /// First run: who Agott is, the key, and the permissions it needs.
 struct OnboardingView: View {

@@ -90,8 +90,10 @@ private struct MenuBarContent: View {
 
     var body: some View {
         Button("Ask Agott…") { Copilot.shared.beginTyping() }
-        Button(indexer.isRunning ? "Updating memory…" : "Update Memory") { indexer.run() }
-            .disabled(indexer.isRunning)
+        Text(indexer.statusText)
+        Button(indexer.isRunning ? "Stop indexing" : "Update Memory") {
+            if indexer.isRunning { indexer.stop() } else { indexer.run() }
+        }
         Divider()
         Button("Open Agott") {
             NSApp.activate()

@@ -179,6 +179,59 @@ struct CirclesAndVoiceTests {
     }
 }
 
+/// Answers 429 "overloaded" a set number of times, then 200 with a stream.
+final class FlakyServer: URLProtocol {
+    nonisolated(unsafe) static var failuresLeft = 0
+    nonisolated(unsafe) static var requests = 0
+
+    override class func canInit(with request: URLRequest) -> Bool { request.url?.host == "flaky.test" }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        Self.requests += 1
+        let failing = Self.failuresLeft > 0
+        if failing { Self.failuresLeft -= 1 }
+        let status = failing ? 429 : 200
+        let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: "HTTP/1.1",
+                                       headerFields: failing ? ["Retry-After": "0.1"] : ["Content-Type": "text/event-stream"])!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        let body = failing
+            ? #"{"error":{"type":"server_error","message":"[overloaded] retry shortly"}}"#
+            : "data: {\"choices\":[{\"delta\":{\"content\":\"oi\"}}]}\n\ndata: [DONE]\n\n"
+        client?.urlProtocol(self, didLoad: Data(body.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
+@MainActor
+@Suite(.serialized)
+struct RetryTests {
+    @Test func overloadedIsRetried() async throws {
+        URLProtocol.registerClass(FlakyServer.self)
+        defer { URLProtocol.unregisterClass(FlakyServer.self) }
+        FlakyServer.failuresLeft = 2
+        FlakyServer.requests = 0
+        let bytes = try await OpenCodeExecutor.open(URLRequest(url: URL(string: "https://flaky.test/chat/completions")!))
+        var lines: [String] = []
+        for try await line in bytes.lines { lines.append(line) }
+        #expect(FlakyServer.requests == 3)
+        #expect(lines.contains { $0.contains("oi") })
+    }
+
+    @Test func giveUpAfterMaxAttempts() async throws {
+        URLProtocol.registerClass(FlakyServer.self)
+        defer { URLProtocol.unregisterClass(FlakyServer.self) }
+        FlakyServer.failuresLeft = 99
+        FlakyServer.requests = 0
+        await #expect(throws: OpenCodeExecutor.ExecutorError.self) {
+            _ = try await OpenCodeExecutor.open(URLRequest(url: URL(string: "https://flaky.test/chat/completions")!))
+        }
+        #expect(FlakyServer.requests == OpenCodeExecutor.maxAttempts)
+    }
+}
+
 /// Reads a little from the real sources on this Mac. Prints counts only.
 @MainActor
 struct LiveSourceSmokeTests {

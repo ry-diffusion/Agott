@@ -23,7 +23,7 @@ enum KnowledgeGraph {
     // MARK: Pass 1 + 2
 
     /// Structural and name edges for moments not yet in the graph.
-    nonisolated static func link(batch: Int = 400, store: MemoryStore = .shared) async throws -> Int {
+    @concurrent nonisolated static func link(batch: Int = 400, store: MemoryStore = .shared) async throws -> Int {
         let chunks = try await store.chunksNeedingGraph(limit: batch)
         guard !chunks.isEmpty else { return 0 }
         let me = AppSettings.myNameSnapshot

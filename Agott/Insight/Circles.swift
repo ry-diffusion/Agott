@@ -39,7 +39,7 @@ enum Circles {
 
     // MARK: Detection
 
-    nonisolated static func detect(store: MemoryStore = .shared, since: Date = Date().addingTimeInterval(-365 * 86400))
+    @concurrent nonisolated static func detect(store: MemoryStore = .shared, since: Date = Date().addingTimeInterval(-365 * 86400))
         async throws -> [Draft]
     {
         let membership = try await store.groupMembership(since: since)
