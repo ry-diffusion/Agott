@@ -19,6 +19,8 @@ nonisolated struct CatalogModel: Codable, Hashable, Sendable, Identifiable {
     var api: String?
     var vision: Bool
     var reasoning: Bool
+    /// Reasoning effort levels the model accepts, lowest first ("low", "high", "max").
+    var efforts: [String]?
     var tools: Bool
     var priceIn: Double?
     var priceOut: Double?
@@ -93,6 +95,7 @@ final class ModelCatalog {
                 api: format,
                 vision: inputs.contains { $0.hasPrefix("image") },
                 reasoning: ((caps["reasoning"] as? [String: Any])?["supported"] as? Bool) ?? false,
+                efforts: (caps["reasoning"] as? [String: Any])?["effort"] as? [String],
                 tools: ((caps["tools"] as? [String: Any])?["supported"] as? Bool) ?? false,
                 priceIn: price("input"), priceOut: price("output"),
                 released: item["release_date"] as? String)

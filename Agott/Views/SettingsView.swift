@@ -18,6 +18,7 @@ struct SettingsView: View {
                     Label("Not available right now. Agott will use \(ModelHub.resolved().title).", systemImage: "exclamationmark.triangle")
                         .foregroundStyle(.orange).font(.caption)
                 }
+                Toggle("Show how Agott got to each reply", isOn: $settings.showSteps)
                 HStack {
                     Button(testing ? "Testing…" : "Test") { Task { await test() } }.disabled(testing)
                     if let testResult { Text(testResult).font(.caption).foregroundStyle(Ink.muted).lineLimit(2) }
@@ -72,6 +73,25 @@ struct SettingsView: View {
                     Label("Agott will click, type, run scripts and send without confirmation.", systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange).font(.caption)
                 }
+            }
+
+            Section("TypeSafe") {
+                TypeSafeKeyField()
+            }
+
+            Section("Hooks") {
+                HooksEditor()
+            }
+
+            Section("Spotify") {
+                SpotifyConnect()
+            }
+
+            Section("Publishing") {
+                TextField("Site address", text: $settings.publishDomain)
+                TextField("Worker name", text: $settings.publishWorker)
+                Text("Published artifacts go to your Cloudflare account with wrangler, using its own login (run “npx wrangler login” once). Anyone with the link can open them.")
+                    .font(.caption).foregroundStyle(Ink.muted)
             }
 
             Section("iPhone") {

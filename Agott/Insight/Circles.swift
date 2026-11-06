@@ -140,6 +140,7 @@ enum Circles {
                 prompt: """
                 Group chats these people share: \(draft.groups.joined(separator: "; "))
                 People: \(draft.members.prefix(12).joined(separator: ", "))
+                \(circles.isEmpty ? "" : "Names already used for other circles, so pick a different, more specific one: " + circles.map(\.name).joined(separator: "; "))
                 """,
                 instructions: """
                 You name the social circles in the user's life from the group chats they share. Use the group \
@@ -148,7 +149,9 @@ enum Circles {
                 """,
                 provider: ModelHub.bulkProvider)
             {
-                circle.name = naming.name
+                // Two circles with the same name are useless as filters.
+                let taken = Set(circles.map(\.name.folded))
+                circle.name = taken.contains(naming.name.folded) ? fallback : naming.name
                 circle.why = naming.why
                 circle.kind = PeopleCircle.Kind(rawValue: "\(naming.kind)") ?? .other
             }

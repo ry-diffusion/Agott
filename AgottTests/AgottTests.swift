@@ -221,6 +221,8 @@ struct CirclesAndVoiceTests {
     @Test func repliesSplitIntoBubbles() {
         let parts = AssistantTurnView.bubbles("oi\n\nhere is how:\n\n1. first\n\n2. second\n\nmakes sense?")
         #expect(parts == ["oi", "here is how:\n1. first\n2. second", "makes sense?"])
+        // A reply that is only whitespace (the card said it all) is no bubble at all.
+        #expect(AssistantTurnView.bubbles("\n").isEmpty)
     }
 }
 
@@ -357,8 +359,11 @@ final class FakeModelServer: URLProtocol {
                    #"{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"\"Floripa\"}"}}"#,
                    #"{"type":"message_stop"}"#]
         } else if sent.contains("response_format") {
-            // A structured request answered the way models often do: fenced, with chatter.
-            events = [#"{"choices":[{"delta":{"content":"Claro! Aqui está:\n```json\n{\"closeness\": 80, "}}]}"#,
+            // A structured request answered the way models often do: fenced, with chatter;
+            // a thinking model reasons first.
+            let thinking = sent.contains("reasoning_effort")
+                ? [#"{"choices":[{"delta":{"reasoning_content":"vou ler a conversa"}}]}"#] : []
+            events = thinking + [#"{"choices":[{"delta":{"content":"Claro! Aqui está:\n```json\n{\"closeness\": 80, "}}]}"#,
                       #"{"choices":[{"delta":{"content":"\"vibe\": \"carinhosa\"}\n```"}}]}"#]
         } else {
             let hasToolResult = sent.contains(#""role":"tool""#)
@@ -435,6 +440,17 @@ struct StepsTests {
         #expect(OpenCodeExecutor.cleanJSON("ok: {\"a\": 1} bye") == "{\"a\": 1}")
     }
 
+    /// "Read again" with a thinking model: reasoning arrives before the JSON.
+    @Test func structuredAnswerAfterThinking() async throws {
+        URLProtocol.registerClass(FakeModelServer.self)
+        defer { URLProtocol.unregisterClass(FakeModelServer.self) }
+        let model = OpenCodeLanguageModel(configuration: .init(
+            baseURL: "https://fake-model.test", model: "fake", apiKey: "k", reasoningEffort: "low", family: "deepseek-flash"))
+        let session = LanguageModelSession(model: model, instructions: "Read the relationship.")
+        let read = try await session.respond(to: "como estou com a Ana?", generating: Mini.self).content
+        #expect(read.closeness == 80)
+    }
+
     /// GPT-6 Luna: JSON answers through the Responses API.
     @Test func responsesJSONAnswer() async throws {
         URLProtocol.registerClass(FakeModelServer.self)
@@ -450,6 +466,128 @@ struct StepsTests {
         let steps = StepTracker.steps(from: transcript, after: 0, busy: true, clock: .init())
         #expect(steps.last?.kind == .thinking)
         #expect(steps.last?.state == .running)
+    }
+}
+
+@MainActor
+struct HarnessTests {
+    @Test func markdownBecomesBlocks() {
+        let blocks = MarkdownBlock.parse("""
+        # Plano
+
+        oi, **isso** aqui:
+
+        - um
+        - dois
+          continua
+
+        1. primeiro
+        2. segundo
+
+        > citação
+
+        ```swift
+        let x = 1
+        ```
+
+        | a | b |
+        |---|---|
+        | 1 | 2 |
+        """)
+        #expect(blocks == [
+            .heading(1, "Plano"),
+            .paragraph("oi, **isso** aqui:"),
+            .list(ordered: false, items: [.init(text: "um", depth: 0), .init(text: "dois continua", depth: 0)]),
+            .list(ordered: true, items: [.init(text: "primeiro", depth: 0), .init(text: "segundo", depth: 0)]),
+            .quote("citação"),
+            .code(language: "swift", code: "let x = 1"),
+            .table(header: ["a", "b"], rows: [["1", "2"]]),
+        ])
+    }
+
+    @Test func memoryResultsBecomeItems() {
+        let output = """
+        Known facts:
+        - Ana likes surf
+
+        Relevant moments from memory:
+        ### WhatsApp · Ana · 2026-10-02 18:00
+        Ana: bora pra Floripa?
+        Me: bora
+        ### iMessage · Lucas · 2026-09-01 09:00
+        Lucas: oi
+        """
+        let items = StepTracker.items(in: output)
+        #expect(items.map(\.title) == ["Ana", "Lucas"])
+        #expect(items[0].subtitle == "WhatsApp · 2026-10-02 18:00")
+        #expect(items[0].snippet == "Ana: bora pra Floripa?\nMe: bora")
+        #expect(StepTracker.items(in: "No memories found.").isEmpty)
+    }
+
+    @Test func publishedPagesAreSafe() throws {
+        #expect(ArtifactPublisher.slug("Clara — perfil!") == "clara-perfil")
+        #expect(ArtifactPublisher.slug("Ação & Reação") == "acao-reacao")
+        #expect(ArtifactPublisher.slug("🙂") == "artifact")
+        // Content cannot close the script it is embedded in.
+        let js = SitePages.jsString("a </script><script>alert(1)</script> \"q\"")
+        #expect(!js.contains("</script"))
+        #expect(js.hasPrefix("\"") && js.hasSuffix("\""))
+        #expect(SitePages.escape("<b>\"x\" & y</b>") == "&lt;b&gt;&quot;x&quot; &amp; y&lt;/b&gt;")
+
+        let entry = ArtifactPublisher.Entry(key: "k", slug: "k", title: "<Plano>", kind: .document,
+                                            version: 2, versions: [1, 2], published: .now)
+        let index = SitePages.index([entry], domain: "artifacts.example.com")
+        #expect(index.contains("&lt;Plano&gt;"))
+        #expect(index.contains("/a/k/v2/"))
+        let doc = SitePages.artifact(.init(key: "k", title: "T", kind: .document, content: "# Oi"), entry: entry)
+        #expect(doc.contains("marked.parse"))
+
+        if let out = ProcessInfo.processInfo.environment["AGOTT_SITE_OUT"] {
+            try SitePages.index([], domain: "artifacts.grupomidas.com.br")
+                .write(toFile: out, atomically: true, encoding: .utf8)
+        }
+    }
+
+    @Test func jevAnswersParse() {
+        let body = """
+        {"model":"jev-latest","answers":{
+          "needs_reply":{"type":"noul","noul":0.91},
+          "kind":{"type":"choice","choice":"plan","confidence":0.7,"probabilities":{"plan":0.7,"question":0.3}},
+          "urgency":{"type":"score","score":1.4,"confidence":0.6,"legend":{"0":"a","1":"b"},"probabilities":{"0":0.1,"1":0.9}}
+        },"usage":{"input_tokens":10,"output_tokens":3}}
+        """
+        let answers = Jev.parse(Data(body.utf8))
+        #expect(answers["needs_reply"]?.probability == 0.91)
+        #expect(answers["kind"]?.choice == "plan")
+        #expect(answers["urgency"]?.score == 1.4)
+    }
+
+    @Test func spotifyPKCEChallenge() {
+        // Reference computed independently (Python hashlib + urlsafe base64).
+        #expect(SpotifyAccount.challenge(for: "dBjftJeZ4CVP-mJ92K27uhbUJU1p1r_wW1gFWFOEjXk")
+                == "ngF5GsXcbwljx6u133FFr3Xht9xooA_DuaX_3QwODtc")
+        let verifier = SpotifyAccount.randomVerifier()
+        #expect(verifier.count == 64)
+    }
+
+    @Test func smallTalkIsNotDeep() {
+        let chunk = { (text: String) in
+            MemoryChunk(id: 1, source: .whatsapp, chatID: "c", chatName: "Ana", start: .now, end: .now, text: text, participants: [])
+        }
+        #expect(Reflections.heuristicDepth(chunk("Ana: oi\nMe: oi")) < Reflections.deepEnough)
+        let long = (0..<30).map { i in (i % 2 == 0 ? "Ana: " : "Me: ") + String(repeating: "sinto que a gente precisa conversar sobre isso ", count: 3) }
+        #expect(Reflections.heuristicDepth(chunk(long.joined(separator: "\n"))) >= Reflections.deepEnough)
+    }
+
+    @Test func chatThinksAndReadingStaysCheap() {
+        let model = CatalogModel(id: "m", name: "M", summary: "", family: "deepseek-flash", context: 1, output: 1,
+                                 chatBaseURL: "x", api: "chat-completions", vision: false, reasoning: true,
+                                 efforts: ["low", "high", "max"], tools: true)
+        #expect(ModelHub.effort(for: model, thinking: true) == "high")
+        #expect(ModelHub.effort(for: model, thinking: false) == "low")
+        var messages = model
+        messages.api = "messages"
+        #expect(ModelHub.effort(for: messages, thinking: true) == nil)
     }
 }
 

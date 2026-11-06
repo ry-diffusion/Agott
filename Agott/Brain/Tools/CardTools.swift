@@ -118,3 +118,36 @@ nonisolated struct RelationshipReadTool: Tool {
         }
     }
 }
+
+nonisolated struct ArtifactTool: Tool {
+    let name = "artifact"
+    let description = """
+    Make or revise something the user will keep, copy or reuse: a document, a long message or email draft, a \
+    plan, a study guide, code, a small interactive web page, a table. It opens in a panel beside the chat. To \
+    revise one, call again with the same title and the full new content; it becomes the next version. Do not \
+    use it for short answers or anything under a few paragraphs.
+    """
+
+    @Generable
+    struct Arguments {
+        @Guide(description: "A short title; reuse the exact title to revise an existing artifact")
+        var title: String
+        @Guide(description: "document (Markdown), code, html (one self-contained page with inline CSS and JS), or table (a Markdown table)")
+        var kind: Kind
+        @Guide(description: "For code: the language, e.g. swift, python")
+        var language: String?
+        @Guide(description: "The complete content")
+        var content: String
+
+        @Generable
+        enum Kind { case document, code, html, table }
+    }
+
+    @concurrent func call(arguments: Arguments) async throws -> String {
+        let kind = Card.Artifact.Kind(rawValue: "\(arguments.kind)") ?? .document
+        await CardBus.post(.artifact(.init(
+            key: arguments.title.folded, title: arguments.title, kind: kind,
+            language: arguments.language, content: arguments.content)))
+        return "The artifact \"\(arguments.title)\" is open beside the chat. Say in one sentence what it is; do not repeat its content."
+    }
+}

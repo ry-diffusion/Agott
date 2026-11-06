@@ -22,7 +22,7 @@ enum ModelHub {
 
     /// An OpenCode model, by id. Each model's own endpoint comes from the
     /// catalogue, so models served from different paths just work.
-    static func openCodeModel(vision: Bool = false, modelName: String? = nil) -> OpenCodeLanguageModel {
+    static func openCodeModel(vision: Bool = false, modelName: String? = nil, thinking: Bool = false) -> OpenCodeLanguageModel {
         let id = modelName ?? (vision ? settings.visionModelName : settings.modelName)
         let entry = ModelCatalog.shared.model(id)
         return OpenCodeLanguageModel(configuration: .init(
@@ -30,7 +30,20 @@ enum ModelHub {
             model: id,
             apiKey: settings.apiKey,
             supportsVision: vision && (entry?.vision ?? true),
-            api: entry?.executorAPI ?? .chatCompletions))
+            api: entry?.executorAPI ?? .chatCompletions,
+            reasoningEffort: effort(for: entry, thinking: thinking),
+            family: entry?.family ?? ""))
+    }
+
+    /// Conversations think properly; background reading thinks as little as
+    /// the model allows, to stay fast and cheap.
+    static func effort(for entry: CatalogModel?, thinking: Bool) -> String? {
+        // Messages-format thinking needs its signed blocks replayed on every
+        // tool turn, which Agott does not keep yet; leave those models be.
+        guard let entry, entry.reasoning, entry.executorAPI != .messages,
+              let efforts = entry.efforts, !efforts.isEmpty else { return nil }
+        if thinking { return efforts.contains("high") ? "high" : efforts.last }
+        return efforts.first
     }
 
     static func session(
@@ -38,11 +51,48 @@ enum ModelHub {
         tools: [any Tool] = [],
         instructions: String,
         vision: Bool = false,
-        modelName: String? = nil
+        modelName: String? = nil,
+        thinking: Bool = false,
+        history: [Turn]
+    ) -> LanguageModelSession {
+        guard !history.isEmpty else {
+            return session(provider: provider, tools: tools, instructions: instructions, vision: vision,
+                           modelName: modelName, thinking: thinking)
+        }
+        // Rebuild the conversation as a transcript: instructions, then each
+        // turn as a prompt or a response.
+        var entries: [Transcript.Entry] = [
+            .instructions(.init(segments: [.text(.init(content: instructions))],
+                                toolDefinitions: tools.map { Transcript.ToolDefinition(tool: $0) }))
+        ]
+        for turn in history where !turn.text.isEmpty {
+            let segment = Transcript.Segment.text(.init(content: turn.text))
+            entries.append(turn.role == .user ? .prompt(.init(segments: [segment])) : .response(.init(assetIDs: [], segments: [segment])))
+        }
+        let transcript = Transcript(entries: entries)
+        switch resolved(provider) {
+        case .openCode:
+            return LanguageModelSession(model: openCodeModel(vision: vision, modelName: modelName, thinking: thinking),
+                                        tools: tools, transcript: transcript)
+        case .privateCloud:
+            return LanguageModelSession(model: PrivateCloudComputeLanguageModel(), tools: tools, transcript: transcript)
+        case .onDevice:
+            return LanguageModelSession(model: SystemLanguageModel.default, tools: tools, transcript: transcript)
+        }
+    }
+
+    static func session(
+        provider: ModelProvider? = nil,
+        tools: [any Tool] = [],
+        instructions: String,
+        vision: Bool = false,
+        modelName: String? = nil,
+        thinking: Bool = false
     ) -> LanguageModelSession {
         switch resolved(provider) {
         case .openCode:
-            LanguageModelSession(model: openCodeModel(vision: vision, modelName: modelName), tools: tools, instructions: instructions)
+            LanguageModelSession(model: openCodeModel(vision: vision, modelName: modelName, thinking: thinking),
+                                 tools: tools, instructions: instructions)
         case .privateCloud:
             LanguageModelSession(model: PrivateCloudComputeLanguageModel(), tools: tools, instructions: instructions)
         case .onDevice:

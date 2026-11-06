@@ -101,6 +101,20 @@ actor MemoryStore {
         ts REAL NOT NULL, track TEXT NOT NULL, artist TEXT NOT NULL, album TEXT NOT NULL, app TEXT NOT NULL,
         PRIMARY KEY(ts, track));
     CREATE INDEX IF NOT EXISTS plays_ts ON plays(ts);
+
+    CREATE TABLE IF NOT EXISTS reflections(
+        id INTEGER PRIMARY KEY, chunk_id INTEGER UNIQUE, source TEXT NOT NULL, chat TEXT NOT NULL,
+        title TEXT NOT NULL, summary TEXT NOT NULL, people TEXT NOT NULL, feeling TEXT NOT NULL,
+        depth REAL NOT NULL, ts REAL NOT NULL);
+    CREATE INDEX IF NOT EXISTS reflections_ts ON reflections(ts);
+    CREATE VIRTUAL TABLE IF NOT EXISTS reflections_fts USING fts5(
+        title, summary, people, chat, content='reflections', content_rowid='id',
+        tokenize='unicode61 remove_diacritics 2');
+    CREATE TRIGGER IF NOT EXISTS reflections_ai AFTER INSERT ON reflections BEGIN
+        INSERT INTO reflections_fts(rowid, title, summary, people, chat)
+        VALUES (new.id, new.title, new.summary, new.people, new.chat);
+    END;
+    CREATE TABLE IF NOT EXISTS reflected(chunk_id INTEGER PRIMARY KEY, depth REAL NOT NULL);
     """
 
     /// For one-time repairs that need raw SQL.
@@ -748,6 +762,14 @@ actor MemoryStore {
     func markLearned(_ ids: [Int64]) throws {
         guard !ids.isEmpty else { return }
         try open().execute("UPDATE chunks SET learned = 1 WHERE id IN (\(ids.map(String.init).joined(separator: ",")))")
+    }
+
+    /// Forgets which moments were already read for learning and reflection,
+    /// so they are read again. What was learned stays; duplicates are merged.
+    func resetLearning() throws {
+        let db = try open()
+        try db.execute("UPDATE chunks SET learned = 0 WHERE learned = 1")
+        try db.execute("DELETE FROM reflected")
     }
 
     func learnedCount() throws -> (done: Int, total: Int) {

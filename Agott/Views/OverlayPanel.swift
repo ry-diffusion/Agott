@@ -79,7 +79,7 @@ struct OverlayView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
-            MuseFace(mood: agent.mood, size: 54, level: dictation.level)
+            MascotFace(mood: agent.mood, size: 54, level: dictation.level)
                 .padding(.top, 2)
 
             VStack(alignment: .leading, spacing: 10) {

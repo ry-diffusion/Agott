@@ -38,6 +38,11 @@ nonisolated struct OpenCodeExecutor: LanguageModelExecutor {
         var supportsVision: Bool = false
         /// Which wire format the model is served in.
         var api: API = .chatCompletions
+        /// How hard to think before answering ("low", "high", "max"), or nil
+        /// to leave it to the model.
+        var reasoningEffort: String?
+        /// The model family, for vendor switches such as DeepSeek's thinking flag.
+        var family: String = ""
     }
 
     /// OpenCode Go serves models in different formats; Agott speaks three.
@@ -93,6 +98,10 @@ nonisolated struct OpenCodeExecutor: LanguageModelExecutor {
         if let temperature = request.generationOptions.temperature { body["temperature"] = temperature }
         if let maximum = request.generationOptions.maximumResponseTokens { body["max_tokens"] = maximum }
         if request.schema != nil { body["response_format"] = ["type": "json_object"] }
+        if let effort = configuration.reasoningEffort {
+            body["reasoning_effort"] = effort
+            if configuration.family.hasPrefix("deepseek") { body["thinking"] = ["type": "enabled"] }
+        }
 
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"

@@ -76,7 +76,15 @@ final class Agent {
     @ObservationIgnored private let log = Logger(subsystem: "br.com.zesmoi.Agott", category: "agent")
 
     private init() {
-        turns = LaunchOptions.isDemo ? DemoData.turns() : Self.load()
+        if LaunchOptions.isDemo {
+            turns = DemoData.turns()
+        } else {
+            conversations = Self.loadIndex()
+            if let latest = conversations.first {
+                currentID = latest.id
+                turns = Self.load(latest.id)
+            }
+        }
         CardBus.statusSink = { [weak self] text in
             self?.status = text
             self?.mood = .working
@@ -101,11 +109,78 @@ final class Agent {
         if let index = turns.indices.last, turns[index].isStreaming { turns[index].isStreaming = false }
     }
 
+    // MARK: Artifacts
+
+    /// The artifact open beside the chat, by its stable key.
+    var openArtifactKey: String?
+
+    /// Every version of every artifact in this conversation, oldest first.
+    var artifacts: [Card.Artifact] {
+        turns.flatMap(\.cards).compactMap { card in
+            if case .artifact(let artifact) = card { artifact } else { nil }
+        }
+    }
+
+    func versions(of key: String) -> [Card.Artifact] {
+        artifacts.filter { $0.key == key }
+    }
+
+    // MARK: Conversations
+
+    /// Every conversation, newest first.
+    private(set) var conversations: [ConversationInfo] = []
+    private(set) var currentID = UUID()
+
+    /// Recall, or nil when the store does not answer in time.
+    private static func recall(_ text: String, within limit: Duration) async -> Retriever.Recall? {
+        final class Once { var done = false }
+        let once = Once()
+        return await withCheckedContinuation { continuation in
+            Task {
+                let recall = await Retriever().recall(text, limit: 6)
+                guard !once.done else { return }
+                once.done = true
+                continuation.resume(returning: recall)
+            }
+            Task {
+                try? await Task.sleep(for: limit)
+                guard !once.done else { return }
+                once.done = true
+                continuation.resume(returning: nil)
+            }
+        }
+    }
+
+    /// Starts a fresh conversation; the current one stays in the list.
     func newConversation() {
+        openArtifactKey = nil
         cancel()
-        turns = []
-        session = nil
         save()
+        turns = []
+        currentID = UUID()
+        session = nil
+    }
+
+    func open(_ id: UUID) {
+        guard id != currentID else { return }
+        openArtifactKey = nil
+        cancel()
+        save()
+        currentID = id
+        turns = Self.load(id)
+        // The model gets this conversation's history back on the next message.
+        session = nil
+    }
+
+    func delete(_ id: UUID) {
+        conversations.removeAll { $0.id == id }
+        try? FileManager.default.removeItem(at: Self.fileURL(id))
+        Self.saveIndex(conversations)
+        if id == currentID {
+            turns = []
+            currentID = UUID()
+            session = nil
+        }
     }
 
     private func run(_ text: String, lookAtScreen: Bool) async {
@@ -120,6 +195,13 @@ final class Agent {
 
         CardBus.shared.sink = { [weak self] card in
             guard let self, let index = self.turns.firstIndex(where: { $0.id == replyID }) else { return }
+            var card = card
+            if case .artifact(var artifact) = card {
+                // Same title as an earlier one: this is its next version.
+                artifact.version = (self.versions(of: artifact.key).map(\.version).max() ?? 0) + 1
+                card = .artifact(artifact)
+                self.openArtifactKey = artifact.key
+            }
             self.turns[index].cards.append(card)
             if case .approval = card { self.mood = .surprised }
         }
@@ -159,16 +241,28 @@ final class Agent {
             show(step)
         }
         #endif
-        status = String(localized: "Remembering…")
-        var memoryStep = Step(id: "memory", kind: .context, title: String(localized: "Remembering"), symbol: "brain.head.profile",
+        status = String(localized: "Searching your memories…")
+        var memoryStep = Step(id: "memory", kind: .context, title: String(localized: "Searching your memories"), symbol: "brain.head.profile",
                               state: .running, started: .now)
         show(memoryStep)
-        let recall = await Retriever().recall(text, limit: 6)
-        if !recall.isEmpty {
+        // While a big read holds the store, memory may answer slowly; the
+        // reply should not wait on it for long.
+        let recall = await Self.recall(text, within: .seconds(10))
+        if let recall, !recall.isEmpty {
             context.append(recall.rendered(characterBudget: 7000))
             user.memoryCount = recall.hits.count + recall.facts.count
             memoryStep.title = String(localized: "Remembered \(user.memoryCount) things")
-            memoryStep.detail = recall.hits.prefix(5).map { "· \($0.chunk.chatName)" }.joined(separator: "\n")
+            memoryStep.items = recall.facts.prefix(4).map {
+                Step.Item(title: $0.sentence, subtitle: String(localized: "Something I know"), symbol: "pin")
+            } + recall.hits.prefix(8).map { hit in
+                Step.Item(
+                    title: hit.chunk.chatName,
+                    subtitle: hit.chunk.source.displayName + " · " + hit.chunk.start.formatted(date: .abbreviated, time: .shortened),
+                    snippet: String(hit.chunk.text.split(separator: "\n").suffix(3).joined(separator: "\n").prefix(220)),
+                    symbol: hit.chunk.source.symbol)
+            }
+        } else if recall == nil {
+            memoryStep.title = String(localized: "Memory is busy reading; answering without it")
         } else {
             memoryStep.title = String(localized: "Nothing in memory about this")
         }
@@ -195,14 +289,46 @@ final class Agent {
         CardBus.shared.sink = nil
         CardBus.shared.update = nil
         save()
+        nameConversation()
+    }
+
+    /// Gives the conversation a subject and its people after the first reply,
+    /// and again once it has grown (subjects drift).
+    private func nameConversation() {
+        guard !LaunchOptions.isDemo else { return }
+        let id = currentID
+        let count = turns.count
+        let written = conversations.first { $0.id == id }?.subjectTurns ?? 0
+        guard written == 0 || (written < 8 && count >= 8) else { return }
+        let transcript = turns.suffix(12).map {
+            ($0.role == .user ? "User: " : "Agott: ") + String($0.text.prefix(400))
+        }.joined(separator: "\n")
+        Task {
+            guard let subject = try? await ModelHub.generate(
+                ConversationSubject.self, prompt: transcript,
+                instructions: "Name this chat between the user and their assistant. Write the title in \(Persona.languageName).",
+                provider: ModelHub.bulkProvider) else { return }
+            guard let index = conversations.firstIndex(where: { $0.id == id }) else { return }
+            let me = AppSettings.shared.myName.folded
+            conversations[index].subject = subject.title.trimmingCharacters(in: .punctuationCharacters.union(.whitespaces))
+            conversations[index].people = subject.people.filter { !$0.isEmpty && $0.folded != me && $0.folded != "agott" }
+            conversations[index].subjectTurns = count
+            let snapshot = conversations
+            Task.detached(priority: .utility) { Self.saveIndex(snapshot) }
+        }
     }
 
     private func respond(to prompt: String, replyID: UUID, retry: Bool) async {
         let provider = ModelHub.resolved()
         if session == nil || sessionProvider != provider {
+            // Earlier turns of this conversation come back as history, so a
+            // reopened chat carries on instead of starting from nothing.
+            let earlier = turns.filter { !$0.isStreaming && $0.id != replyID }.dropLast()
             session = ModelHub.session(
                 provider: provider, tools: Persona.tools(for: provider),
-                instructions: Persona.instructions(provider: provider))
+                instructions: Persona.instructions(provider: provider),
+                thinking: true,
+                history: Array(earlier.suffix(30)))
             sessionProvider = provider
         }
         guard let session else { return }
@@ -288,25 +414,91 @@ final class Agent {
 
     // MARK: Persistence
 
-    nonisolated private static var fileURL: URL {
-        let folder = URL.applicationSupportDirectory.appending(path: "Agott", directoryHint: .isDirectory)
+    nonisolated private static var folder: URL {
+        let folder = URL.applicationSupportDirectory.appending(path: "Agott/Conversations", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        return folder.appending(path: "conversation.json")
+        return folder
     }
 
+    nonisolated private static func fileURL(_ id: UUID) -> URL { folder.appending(path: "\(id.uuidString).json") }
+    nonisolated private static var indexURL: URL { folder.appending(path: "index.json") }
+
     private func save() {
-        guard !LaunchOptions.isDemo else { return }
-        let recent = Array(turns.suffix(200))
+        guard !LaunchOptions.isDemo, !turns.isEmpty else { return }
+        let recent = Array(turns.suffix(400))
+        let id = currentID
+        let title = turns.first(where: { $0.role == .user })?.text ?? String(localized: "New conversation")
+        let previous = conversations.first { $0.id == id }
+        var info = ConversationInfo(
+            id: id, title: String(title.prefix(70)),
+            preview: String((turns.last { $0.role == .assistant }?.text ?? "").prefix(90)),
+            updated: turns.last?.date ?? .now)
+        info.subject = previous?.subject
+        info.people = previous?.people
+        info.subjectTurns = previous?.subjectTurns
+        conversations.removeAll { $0.id == id }
+        conversations.insert(info, at: 0)
+        conversations.sort { $0.updated > $1.updated }
+        let index = conversations
         Task.detached(priority: .utility) {
-            if let data = try? JSONEncoder().encode(recent) { try? data.write(to: Self.fileURL, options: .atomic) }
+            if let data = try? JSONEncoder().encode(recent) { try? data.write(to: Self.fileURL(id), options: .atomic) }
+            Self.saveIndex(index)
         }
     }
 
-    private static func load() -> [Turn] {
-        guard let data = try? Data(contentsOf: fileURL),
+    nonisolated private static func saveIndex(_ index: [ConversationInfo]) {
+        if let data = try? JSONEncoder().encode(index) { try? data.write(to: indexURL, options: .atomic) }
+    }
+
+    nonisolated private static func loadIndex() -> [ConversationInfo] {
+        if let data = try? Data(contentsOf: indexURL),
+           let index = try? JSONDecoder().decode([ConversationInfo].self, from: data) {
+            return index.sorted { $0.updated > $1.updated }
+        }
+        // The single conversation from before becomes the first in the list.
+        let old = URL.applicationSupportDirectory.appending(path: "Agott/conversation.json")
+        guard let data = try? Data(contentsOf: old),
+              let turns = try? JSONDecoder().decode([Turn].self, from: data), !turns.isEmpty else { return [] }
+        let id = UUID()
+        try? data.write(to: fileURL(id), options: .atomic)
+        let info = ConversationInfo(
+            id: id, title: String((turns.first { $0.role == .user }?.text ?? "Agott").prefix(70)),
+            preview: String((turns.last { $0.role == .assistant }?.text ?? "").prefix(90)),
+            updated: turns.last?.date ?? .now)
+        saveIndex([info])
+        try? FileManager.default.removeItem(at: old)
+        return [info]
+    }
+
+    nonisolated private static func load(_ id: UUID) -> [Turn] {
+        guard let data = try? Data(contentsOf: fileURL(id)),
               var turns = try? JSONDecoder().decode([Turn].self, from: data)
         else { return [] }
         for index in turns.indices { turns[index].isStreaming = false }
         return turns
     }
+}
+
+nonisolated struct ConversationInfo: Codable, Hashable, Identifiable, Sendable {
+    var id: UUID
+    var title: String
+    var preview: String
+    var updated: Date
+    /// What it is about, in a few words, written by Agott.
+    var subject: String?
+    /// The people it is about, by name.
+    var people: [String]?
+    /// How many turns the subject was written from.
+    var subjectTurns: Int?
+
+    var displayTitle: String { subject ?? title }
+}
+
+/// A conversation's subject and the people in it, written after it starts.
+@Generable
+struct ConversationSubject {
+    @Guide(description: "What the conversation is about, two to five words, like a chat title. No quotes, no emoji.")
+    var title: String
+    @Guide(description: "Real people the conversation is about, by the names used in it. Not the user, not Agott. Empty if none.", .maximumCount(4))
+    var people: [String]
 }

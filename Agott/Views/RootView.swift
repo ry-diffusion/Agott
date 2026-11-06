@@ -38,12 +38,13 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
 
 struct RootView: View {
     @State private var settings = AppSettings.shared
-    @State private var section: AppSection = LaunchOptions.section ?? .chat
+    @State private var navigator = Navigator.shared
+    private var section: AppSection { navigator.section }
 
     var body: some View {
         #if os(macOS)
         HStack(spacing: 0) {
-            CandySidebar(section: $section)
+            CandySidebar(section: $navigator.section)
             Group {
                 switch section {
                 case .chat: ChatView()
@@ -56,10 +57,6 @@ struct RootView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .transition(.opacity)
             .id(section)
-            .overlay(alignment: .top) {
-                IndexingPill { section = .memory }
-                    .padding(.top, 10)
-            }
         }
         .background(Ink.canvas)
         .tint(Ink.spot)
@@ -85,24 +82,20 @@ struct RootView: View {
 }
 
 #if os(macOS)
-/// A floating column of sweets: one per screen, the mascot on top.
+/// A slim column: Agott on top, one icon per screen, and at the bottom
+/// only what is happening now (music, memory) and Settings.
 private struct CandySidebar: View {
     @Binding var section: AppSection
     @State private var agent = Agent.shared
-    @State private var indexer = Indexer.shared
 
     var body: some View {
-        VStack(spacing: 10) {
-            ZStack(alignment: .bottomTrailing) {
-                MascotAvatar(size: 52)
-                MuseFace(mood: agent.mood, size: 22)
-                    .offset(x: 6, y: 4)
-            }
-            .padding(.bottom, 10)
-            .help(Text(agent.mood.accessibilityName))
+        VStack(spacing: 6) {
+            MascotFace(mood: agent.mood, size: 40)
+                .padding(.bottom, 12)
+                .help(Text(agent.mood.accessibilityName))
 
-            GlassEffectContainer(spacing: 10) {
-                VStack(spacing: 10) {
+            GlassEffectContainer(spacing: 6) {
+                VStack(spacing: 6) {
                     ForEach(AppSection.allCases) { item in
                         SidebarTile(item: item, selected: section == item) { section = item }
                     }
@@ -111,22 +104,21 @@ private struct CandySidebar: View {
 
             Spacer()
 
-            if indexer.isRunning {
-                ProgressView().controlSize(.small).help(Text("Updating memory…"))
+            VStack(spacing: 10) {
+                NowPlayingButton()
+                ActivityButton { section = .memory }
+                SettingsLink {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 16, weight: .medium))
+                        .frame(width: 36, height: 36)
+                }
+                .buttonStyle(HoverIconStyle(size: 36))
+                .help(Text("Settings"))
             }
-            SettingsLink {
-                Image(systemName: "gearshape.fill")
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(Ink.text)
-                    .frame(width: 40, height: 40)
-                    .glassEffect(.regular.interactive(), in: .circle)
-            }
-            .buttonStyle(PressScale())
-            .help(Text("Settings"))
         }
-        .padding(.vertical, 16)
-        .frame(width: 76)
-        .glassEffect(.regular, in: .rect(cornerRadius: 28))
+        .padding(.vertical, 14)
+        .frame(width: 60)
+        .glassEffect(.regular, in: .rect(cornerRadius: 24))
         .padding(.leading, 10)
         .padding(.vertical, 10)
         .padding(.top, 28)
@@ -141,26 +133,20 @@ private struct SidebarTile: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 4) {
-                Image(systemName: item.symbol)
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(selected ? AnyShapeStyle(.white) : AnyShapeStyle(Ink.text))
-                    .frame(width: 46, height: 46)
-                    // Not interactive glass: it handles presses itself and
-                    // could swallow the first click on a tab.
-                    .glassEffect(
-                        selected ? .regular.tint(Ink.spot) : (hovering ? .regular : .clear),
-                        in: .rect(cornerRadius: 14))
-                Text(item.title)
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(selected ? Ink.text : Ink.muted)
-            }
-            .frame(width: 66)
-            .padding(.vertical, 2)
-            // The whole tile is clickable, gaps included.
-            .contentShape(Rectangle())
+            Image(systemName: item.symbol)
+                .font(.system(size: 16, weight: selected ? .semibold : .medium))
+                .foregroundStyle(selected ? AnyShapeStyle(.white) : AnyShapeStyle(hovering ? Ink.text : Ink.muted))
+                .frame(width: 40, height: 40)
+                // Not interactive glass: it handles presses itself and
+                // could swallow the first click on a tab.
+                .glassEffect(
+                    selected ? .regular.tint(Ink.spot) : (hovering ? .regular : .clear),
+                    in: .rect(cornerRadius: 12))
+                .frame(width: 52, height: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(PressScale())
+        .help(Text(item.title))
         .accessibilityLabel(Text(item.title))
         .accessibilityAddTraits(selected ? .isSelected : [])
         .onHover { hovering = $0 }
@@ -168,63 +154,105 @@ private struct SidebarTile: View {
         .animation(.spring(duration: 0.2), value: hovering)
     }
 }
-#endif
 
-/// What memory is doing, visible from every screen. Tap to open Memory.
-struct IndexingPill: View {
-    var open: () -> Void
+/// Memory at work, as a small ring. Open it for what and how far, and to pause.
+private struct ActivityButton: View {
+    var openMemory: () -> Void
     @State private var indexer = Indexer.shared
+    @State private var repair = MemoryRepair.shared
+    @State private var showing = false
+
+    private var active: Bool { indexer.isRunning || indexer.isLearning || repair.note != nil }
 
     var body: some View {
-        if let note = MemoryRepair.shared.note {
-            HStack(spacing: 8) {
-                ProgressView().controlSize(.small)
-                Text(note).font(.callout.weight(.semibold)).foregroundStyle(Ink.text)
-            }
-            .padding(.horizontal, 14).padding(.vertical, 7)
-            .glassEffect(.regular, in: .capsule)
-            .transition(.move(edge: .top).combined(with: .opacity))
-        } else if indexer.isRunning || indexer.isLearning {
-            Button(action: open) {
-                HStack(spacing: 8) {
-                    if let progress = indexer.progress {
-                        ProgressView(value: progress)
-                            .progressViewStyle(.circular)
-                            .controlSize(.small)
-                            .tint(Ink.spot)
+        if active || indexer.isPaused {
+            Button { showing.toggle() } label: {
+                ZStack {
+                    Circle().stroke(Ink.muted.opacity(0.25), lineWidth: 2.5)
+                    if indexer.isPaused && !active {
+                        Image(systemName: "pause.fill").font(.system(size: 10, weight: .bold))
+                    } else if let progress = indexer.progress {
+                        Circle()
+                            .trim(from: 0, to: max(0.03, progress))
+                            .stroke(Ink.spot, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                            .rotationEffect(.degrees(-90))
+                            .animation(Motion.settle, value: progress)
                     } else {
-                        ProgressView().controlSize(.small)
+                        Spinner()
                     }
-                    Text(indexer.statusText)
-                        .font(.callout.weight(.semibold))
-                        .foregroundStyle(Ink.text)
-                        .monospacedDigit()
-                        .contentTransition(.numericText())
-                    if let progress = indexer.progress {
-                        Text(progress, format: .percent.precision(.fractionLength(0)))
-                            .font(.callout.weight(.bold))
-                            .foregroundStyle(Ink.spot)
-                            .monospacedDigit()
-                            .contentTransition(.numericText())
-                    }
-                    Button {
-                        indexer.pause()
-                    } label: {
-                        Image(systemName: "pause.fill").font(.caption.weight(.bold)).foregroundStyle(Ink.text)
-                    }
-                    .buttonStyle(.plain)
-                    .help(Text("Pause indexing"))
                 }
-                .padding(.horizontal, 14).padding(.vertical, 7)
-                .glassEffect(.regular.interactive(), in: .capsule)
+                .frame(width: 20, height: 20)
+                .frame(width: 36, height: 36)
             }
-            .buttonStyle(PressScale())
-            .help(Text("Open Memory"))
-            .transition(.move(edge: .top).combined(with: .opacity))
-            .animation(Motion.settle, value: indexer.statusText)
+            .buttonStyle(HoverIconStyle(size: 36))
+            .help(Text(repair.note ?? indexer.statusText))
+            .popover(isPresented: $showing, arrowEdge: .trailing) { details }
+            .transition(.opacity.combined(with: .scale(scale: 0.8)))
+        }
+    }
+
+    private var details: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(repair.note ?? indexer.statusText)
+                .font(.callout.weight(.semibold))
+                .foregroundStyle(Ink.text)
+                .monospacedDigit()
+            if let progress = indexer.progress {
+                ProgressView(value: progress).tint(Ink.spot)
+            }
+            HStack {
+                if indexer.isPaused {
+                    Button("Resume", systemImage: "play.fill") { indexer.resume() }
+                } else if indexer.isRunning || indexer.isLearning {
+                    Button("Pause", systemImage: "pause.fill") { indexer.pause() }
+                }
+                Spacer()
+                Button("Open Memory") { showing = false; openMemory() }
+            }
+            .buttonStyle(.candy(.soft, compact: true))
+        }
+        .padding(14)
+        .frame(width: 280)
+    }
+}
+
+/// An open arc that turns, for work that cannot say how far along it is.
+private struct Spinner: View {
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1 / 30)) { context in
+            let t = context.date.timeIntervalSinceReferenceDate
+            Circle()
+                .trim(from: 0, to: 0.3)
+                .stroke(Ink.spot, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                .rotationEffect(.degrees(t.truncatingRemainder(dividingBy: 1) * 360))
         }
     }
 }
+
+/// What is playing on Spotify or Apple Music: the cover, and the song on hover.
+private struct NowPlayingButton: View {
+    @State private var listener = MusicListener.shared
+    @State private var showing = false
+
+    var body: some View {
+        if let play = listener.nowPlaying {
+            Button { showing.toggle() } label: {
+                NowPlayingArt(url: listener.artwork, size: 30)
+                    .frame(width: 36, height: 36)
+            }
+            .buttonStyle(HoverIconStyle(size: 36))
+            .help(Text("Listening to \(play.track) · \(play.artist)"))
+            .popover(isPresented: $showing, arrowEdge: .trailing) {
+                NowPlayingCard(play: play, artwork: listener.artwork, mood: listener.nowMood)
+                    .padding(14)
+                    .frame(width: 300)
+            }
+            .transition(.opacity.combined(with: .scale(scale: 0.8)))
+        }
+    }
+}
+
+#endif
 
 /// First run: who Agott is, the key, and the permissions it needs.
 struct OnboardingView: View {

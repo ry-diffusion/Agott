@@ -189,10 +189,11 @@ struct Balloon: InsettableShape {
     var tail: Tail
     var radius: CGFloat = 18
     var inset: CGFloat = 0
+    static let tailSize: CGFloat = 10
 
     func path(in rect: CGRect) -> Path {
         let r = rect.insetBy(dx: inset, dy: inset)
-        let tailSize: CGFloat = 10
+        let tailSize = Self.tailSize
         var body = r
         switch tail {
         case .leading: body = r.divided(atDistance: tailSize, from: .minXEdge).remainder
@@ -461,5 +462,68 @@ struct FlowLayout: Layout {
             x += size.width + spacing
             row = max(row, size.height)
         }
+    }
+}
+
+// MARK: - Hover
+
+/// Small icon and text controls: muted at rest, a soft highlight and a
+/// pointing hand under the pointer, darker while pressed.
+struct HoverIconStyle: ButtonStyle {
+    var size: CGFloat = 28
+
+    func makeBody(configuration: Configuration) -> some View {
+        HoverLabel(configuration: configuration, size: size)
+    }
+
+    private struct HoverLabel: View {
+        let configuration: Configuration
+        var size: CGFloat
+        @State private var hovering = false
+        @Environment(\.isEnabled) private var enabled
+
+        var body: some View {
+            configuration.label
+                .foregroundStyle(hovering && enabled ? Ink.text : Ink.muted)
+                .frame(minWidth: size, minHeight: size)
+                .padding(.horizontal, 2)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Ink.text.opacity(configuration.isPressed ? 0.14 : hovering && enabled ? 0.08 : 0)))
+                .contentShape(Rectangle())
+                .opacity(enabled ? 1 : 0.4)
+                .onHover { hovering = $0 }
+                #if os(macOS)
+                .pointerStyle(.link)
+                #endif
+                .animation(.easeOut(duration: 0.12), value: hovering)
+        }
+    }
+}
+
+extension ButtonStyle where Self == HoverIconStyle {
+    static var hoverIcon: HoverIconStyle { HoverIconStyle() }
+}
+
+/// A soft background under the pointer, for rows and cards you can click.
+struct HoverHighlight: ViewModifier {
+    var cornerRadius: CGFloat = 10
+    var inset: CGFloat = -6
+    @State private var hovering = false
+
+    func body(content: Content) -> some View {
+        content
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(Ink.text.opacity(hovering ? 0.06 : 0))
+                    .padding(inset))
+            .onHover { hovering = $0 }
+            .animation(.easeOut(duration: 0.12), value: hovering)
+    }
+}
+
+extension View {
+    func hoverHighlight(cornerRadius: CGFloat = 10, inset: CGFloat = -6) -> some View {
+        modifier(HoverHighlight(cornerRadius: cornerRadius, inset: inset))
     }
 }

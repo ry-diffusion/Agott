@@ -19,13 +19,20 @@ nonisolated struct Retriever: Sendable {
         var anchors: [GraphEntity]
         var connections: [String]
         var facts: [MemoryFact]
+        /// Deep conversations remembered as a whole.
+        var reflections: [Reflection] = []
 
-        var isEmpty: Bool { hits.isEmpty && facts.isEmpty && connections.isEmpty }
+        var isEmpty: Bool { hits.isEmpty && facts.isEmpty && connections.isEmpty && reflections.isEmpty }
 
         /// Rendered for a model to read. Dated and attributed, so it can say
         /// where something came from instead of asserting it.
         func rendered(characterBudget: Int = 9000) -> String {
             var parts: [String] = []
+            if !reflections.isEmpty {
+                parts.append("Conversations that mattered, as you remember them:\n" + reflections.map {
+                    "- [\($0.chat) · \(MemoryStore.stamp($0.date.timeIntervalSince1970))] \($0.title): \($0.summary) (\($0.feeling))"
+                }.joined(separator: "\n"))
+            }
             if !facts.isEmpty {
                 parts.append("Known facts:\n" + facts.map { "- \($0.sentence) (confidence \(Int($0.confidence * 100))%)" }.joined(separator: "\n"))
             }
@@ -106,6 +113,15 @@ nonisolated struct Retriever: Sendable {
         var seen = Set<Int64>()
         facts = facts.filter { seen.insert($0.id).inserted }
 
-        return Recall(hits: hits, anchors: anchors, connections: Array(connections.prefix(16)), facts: Array(facts.prefix(16)))
+        // Deep moments: by the words of the question, and by the people in it.
+        var reflections = (try? await store.searchReflections(query, limit: 4)) ?? []
+        for anchor in anchors.prefix(2) {
+            reflections += (try? await store.searchReflections(anchor.name, limit: 2)) ?? []
+        }
+        var seenReflections = Set<Int64>()
+        reflections = reflections.filter { seenReflections.insert($0.id).inserted }
+
+        return Recall(hits: hits, anchors: anchors, connections: Array(connections.prefix(16)), facts: Array(facts.prefix(16)),
+                      reflections: Array(reflections.prefix(5)))
     }
 }

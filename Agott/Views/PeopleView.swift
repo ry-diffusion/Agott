@@ -18,6 +18,8 @@ struct PeopleView: View {
         var chat: ChatSummary
         var stats: RelationshipStats
         var id: String { chat.id }
+        /// How the message watcher names this chat.
+        var followUpKey: String { "\(chat.source.rawValue)|\(chat.chatID)" }
     }
 
     private var filtered: [Row] {
@@ -131,14 +133,23 @@ struct PeopleView: View {
             CandyField(placeholder: "Search people", text: $search, symbol: "magnifyingglass")
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 6) {
-                    let waiting = filtered.filter(\.stats.awaitingMyReply)
+                    let waiting = filtered.filter { $0.stats.awaitingMyReply || FollowUpCenter.shared.item(for: $0.followUpKey)?.matters == true }
                     if !waiting.isEmpty {
                         PanelTitle(title: "Waiting for you", symbol: "clock.badge.exclamationmark").padding(.top, 4)
                         ForEach(waiting) { row in rowButton(row) }
                     }
-                    PanelTitle(title: showGroups ? "Chats" : "People", symbol: "person.2").padding(.top, 10)
-                    ForEach(filtered.filter { !$0.stats.awaitingMyReply }) { row in rowButton(row) }
-                    if rows.isEmpty && !loading {
+                    let others = filtered.filter { row in !waiting.contains { $0.id == row.id } }
+                    if !others.isEmpty || waiting.isEmpty {
+                        PanelTitle(title: showGroups ? "Chats" : "People", symbol: "person.2").padding(.top, 10)
+                    }
+                    ForEach(others) { row in rowButton(row) }
+                    if rows.isEmpty && loading {
+                        HStack(spacing: 8) {
+                            ProgressView().controlSize(.small)
+                            Text("Reading your chats…").font(.callout).foregroundStyle(Ink.muted)
+                        }
+                        .frame(maxWidth: .infinity).padding(.top, 30)
+                    } else if rows.isEmpty && !loading {
                         VStack(spacing: 6) {
                             Text("No conversations yet").font(.headline).foregroundStyle(Ink.text)
                             Text("Turn on WhatsApp or iMessage in Memory and let Agott read them.")
@@ -162,17 +173,34 @@ struct PeopleView: View {
         .buttonStyle(PressScale())
     }
 
+    /// Read rows sorted by who needs you; rows not read yet in this pass
+    /// keep their place from the last one, so the list never empties.
+    private static func ordered(_ fresh: [Row], keeping previous: [Row]) -> [Row] {
+        let seen = Set(fresh.map(\.id))
+        return fresh.sorted { $0.stats.attention > $1.stats.attention } + previous.filter { !seen.contains($0.id) }
+    }
+
     private func load() async {
         lastLoad = .now
         loading = true
         defer { loading = false }
         let chats = (try? await MemoryStore.shared.chats(
             limit: 150, includeGroups: showGroups, since: Date().addingTimeInterval(-365 * 86400))) ?? []
+        // Reading every chat can take a while on a cold start, especially
+        // while Agott is learning; show people as they are read.
+        let current = Set(chats.map(\.id))
+        let before = rows.filter { current.contains($0.id) }
         var result: [Row] = []
+        var published = Date.distantPast
         for chat in chats where chat.messageCount >= 3 {
+            guard !Task.isCancelled else { break }
             result.append(Row(chat: chat, stats: await RelationshipAnalyzer.stats(for: chat)))
+            if Date().timeIntervalSince(published) > 0.4 {
+                published = .now
+                rows = Self.ordered(result, keeping: before)
+            }
         }
-        rows = result.sorted { $0.stats.attention > $1.stats.attention }
+        rows = Self.ordered(result, keeping: before)
         if selection == nil, LaunchOptions.selectFirst { selection = rows.first?.id }
     }
 }
@@ -180,6 +208,13 @@ struct PeopleView: View {
 private struct PersonRow: View {
     var row: PeopleView.Row
     var selected: Bool
+
+    /// What Jev thinks this chat needs from you, in a few words.
+    private func followUpHint(_ followUp: FollowUp) -> String {
+        if followUp.askAgain >= 0.6 && followUp.askAgain >= followUp.needsReply { return String(localized: "Ask again") }
+        if followUp.openQuestion >= 0.6 { return String(localized: "A question is waiting") }
+        return String(localized: "Needs a reply")
+    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -189,7 +224,14 @@ private struct PersonRow: View {
                     Text(row.chat.name).font(.body.weight(.bold)).foregroundStyle(Ink.text).lineLimit(1)
                     Image(systemName: row.chat.source.symbol).font(.caption2).foregroundStyle(Ink.muted)
                 }
-                Text(row.chat.lastText).font(.caption).foregroundStyle(Ink.muted).lineLimit(1)
+                if let followUp = FollowUpCenter.shared.item(for: row.followUpKey), followUp.matters {
+                    Label(followUpHint(followUp), systemImage: followUp.askAgain >= 0.6 ? "arrow.uturn.backward" : "bubble.left")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Ink.spot)
+                        .lineLimit(1)
+                } else {
+                    Text(row.chat.lastText).font(.caption).foregroundStyle(Ink.muted).lineLimit(1)
+                }
             }
             Spacer(minLength: 4)
             VStack(alignment: .trailing, spacing: 4) {
@@ -261,7 +303,7 @@ private struct PersonDetail: View {
                             .font(.callout).foregroundStyle(Ink.muted)
                     }
                     Spacer()
-                    MuseFace(mood: working != nil ? .thinking : (read.map { $0.closeness > 70 ? .love : .happy } ?? .idle), size: 54)
+                    MascotFace(mood: working != nil ? .thinking : (read.map { $0.closeness > 70 ? .love : .happy } ?? .idle), size: 54)
                 }
 
                 if row.stats.awaitingMyReply {
@@ -325,13 +367,16 @@ private struct PersonDetail: View {
                 if let error { Text(error).foregroundStyle(Ink.peach) }
             }
             .padding(.bottom, 30)
-            .frame(maxWidth: 720, alignment: .leading)
+            .frame(maxWidth: 820, alignment: .leading)
+            // Start right after the list instead of floating in the middle.
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollIndicators(.never)
         .disabled(working != nil)
         .task {
             if let (card, date) = await RelationshipAnalyzer.cachedRead(row.chat) { read = card; readDate = date }
             consistency = await Consistency.cached(row.chat)
+            if LaunchOptions.runRead { await runRead() }
         }
     }
 

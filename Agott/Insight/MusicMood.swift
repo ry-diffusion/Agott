@@ -36,6 +36,8 @@ final class MusicListener {
 
     private(set) var nowPlaying: Play?
     private(set) var nowMood: TrackMood?
+    /// The cover of what is playing, when the player shares one (Spotify does).
+    private(set) var artwork: URL?
     @ObservationIgnored private var timer: Task<Void, Never>?
 
     private init() {}
@@ -47,7 +49,9 @@ final class MusicListener {
         timer = Task(priority: .utility) {
             while !Task.isCancelled {
                 if isEnabled { await poll() }
-                try? await Task.sleep(for: .seconds(30))
+                // Often enough that "listening to" stays true; AppleScript
+                // only runs while a player is open.
+                try? await Task.sleep(for: .seconds(nowPlaying == nil ? 20 : 8))
             }
         }
     }
@@ -62,13 +66,30 @@ final class MusicListener {
         ("com.apple.Music", "Music"),
     ]
 
+    @ObservationIgnored private var lastHistorySync = Date.distantPast
+
     private func poll() async {
+        // Signed in to Spotify: any device counts, and history comes along.
+        let spotify = SpotifyAccount.shared
+        if spotify.isConnected {
+            if Date().timeIntervalSince(lastHistorySync) > 600 {
+                lastHistorySync = .now
+                await syncHistory(spotify)
+            }
+            if let current = try? await spotify.currentlyPlaying(), current.isPlaying, !current.play.track.isEmpty {
+                await show(current.play, artwork: current.artwork)
+                return
+            }
+        }
         let running = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
         for player in Self.players where running.contains(player.bundle) {
+            // Fields joined by the unit separator, written the AppleScript way.
+            let cover = player.app == "Spotify" ? " & sep & (artwork url of current track)" : ""
             let script = """
+            set sep to character id 31
             tell application "\(player.app)"
                 if player state is playing then
-                    return (name of current track) & "\\u001F" & (artist of current track) & "\\u001F" & (album of current track)
+                    return (name of current track) & sep & (artist of current track) & sep & (album of current track)\(cover)
                 end if
             end tell
             return ""
@@ -78,15 +99,30 @@ final class MusicListener {
             guard parts.count >= 3, !parts[0].isEmpty else { continue }
             let play = Play(date: .now, track: parts[0], artist: parts[1], album: parts[2],
                             app: player.app == "Music" ? "Apple Music" : player.app)
-            if play.track != nowPlaying?.track || play.artist != nowPlaying?.artist {
-                nowPlaying = play
-                try? await MemoryStore.shared.logPlay(play)
-                nowMood = await MusicMood.mood(of: play)
-            }
+            await show(play, artwork: parts.count > 3 ? URL(string: parts[3]) : nil)
             return
         }
         nowPlaying = nil
         nowMood = nil
+        artwork = nil
+    }
+
+    private func show(_ play: Play, artwork: URL?) async {
+        self.artwork = artwork
+        guard play.track != nowPlaying?.track || play.artist != nowPlaying?.artist else { return }
+        nowPlaying = play
+        try? await MemoryStore.shared.logPlay(play)
+        nowMood = await MusicMood.mood(of: play)
+    }
+
+    /// What you played on Spotify anywhere since the last sync.
+    private func syncHistory(_ spotify: SpotifyAccount) async {
+        let key = "spotify.history.after"
+        let saved = UserDefaults.standard.double(forKey: key)
+        let after = saved > 0 ? Date(timeIntervalSince1970: saved) : Date().addingTimeInterval(-86400)
+        guard let plays = try? await spotify.recentlyPlayed(after: after), !plays.isEmpty else { return }
+        for play in plays { try? await MemoryStore.shared.logPlay(play) }
+        if let newest = plays.last?.date { UserDefaults.standard.set(newest.timeIntervalSince1970 + 1, forKey: key) }
     }
 }
 

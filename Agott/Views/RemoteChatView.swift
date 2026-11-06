@@ -24,7 +24,7 @@ struct RemoteChatView: View {
         List {
             Section {
                 VStack(spacing: 12) {
-                    MuseFace(mood: remote.link == .connecting ? .thinking : .sleepy, size: 80)
+                    MascotFace(mood: remote.link == .connecting ? .thinking : .sleepy, size: 80)
                     Text("Talk to Agott on your Mac").font(.title3.weight(.semibold))
                     Text("Your Mac has your memory, your screen and your apps. Pair once with the code from Agott → Settings → iPhone.")
                         .multilineTextAlignment(.center).foregroundStyle(Ink.muted).font(.callout)
@@ -84,7 +84,7 @@ struct RemoteChatView: View {
                 .onChange(of: remote.turns.last?.text) { _, _ in proxy.scrollTo("bottom", anchor: .bottom) }
             }
             HStack(alignment: .bottom, spacing: 8) {
-                MuseFace(mood: remote.mood, size: 34, level: dictation.level)
+                MascotFace(mood: remote.mood, size: 34, level: dictation.level)
                 VStack(alignment: .leading, spacing: 2) {
                     if let status = remote.status { Text(status).font(.caption).foregroundStyle(Ink.muted) }
                     TextField(dictation.isRunning ? String(localized: "Listening…") : String(localized: "Ask your Mac"),
@@ -128,11 +128,8 @@ private struct RemoteTurnView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            StepsView(steps: turn.steps, isStreaming: turn.isStreaming)
-            if !turn.text.isEmpty {
-                Text(AssistantTurnView.markdown(turn.text)).textSelection(.enabled)
-            } else if turn.isStreaming && turn.cards.isEmpty && turn.steps.isEmpty {
-                TypingDots()
+            if AppSettings.shared.showSteps {
+                StepsView(steps: turn.steps, isStreaming: turn.isStreaming)
             }
             ForEach(turn.cards) { card in
                 if case .approval(let approval) = card {
@@ -140,6 +137,11 @@ private struct RemoteTurnView: View {
                 } else {
                     CardView(card: card)
                 }
+            }
+            if !turn.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                MarkdownView(text: turn.text)
+            } else if turn.isStreaming && turn.cards.isEmpty && (turn.steps.isEmpty || !AppSettings.shared.showSteps) {
+                TypingDots()
             }
             if let error = turn.error {
                 Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange).font(.callout)

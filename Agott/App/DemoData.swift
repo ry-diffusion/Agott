@@ -19,14 +19,26 @@ enum LaunchOptions {
     static var showOnboarding: Bool { arguments.contains("-AgottShowOnboarding") }
     static var showOverlay: Bool { arguments.contains("-AgottOverlay") }
     static var selectFirst: Bool { arguments.contains("-AgottSelectFirst") }
+    /// Demo only: read the selected person's story as soon as it opens.
+    static var runRead: Bool { isDemo && arguments.contains("-AgottRunRead") }
 }
 
 enum DemoData {
-    nonisolated static var databaseURL: URL {
-        let url = URL.cachesDirectory.appending(path: "AgottDemo", directoryHint: .isDirectory)
-        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-        return url.appending(path: "demo-\(ProcessInfo.processInfo.processIdentifier).sqlite")
-    }
+    /// One throwaway database per demo run; older runs' files are cleared
+    /// the first time it is asked for.
+    nonisolated static let databaseURL: URL = {
+        let folder = URL.cachesDirectory.appending(path: "AgottDemo", directoryHint: .isDirectory)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let mine = "demo-\(ProcessInfo.processInfo.processIdentifier)"
+        let hourAgo = Date().addingTimeInterval(-3600)
+        for file in (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+        where !file.lastPathComponent.hasPrefix(mine) {
+            // Leave runs from the last hour alone: they may still be open.
+            let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
+            if modified < hourAgo { try? FileManager.default.removeItem(at: file) }
+        }
+        return folder.appending(path: "\(mine).sqlite")
+    }()
 
     static func seed() async {
         let me = AppSettings.myNameSnapshot

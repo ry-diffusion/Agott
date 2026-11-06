@@ -12,30 +12,31 @@ struct AssistantTurnView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            StepsView(steps: turn.steps, isStreaming: turn.isStreaming)
-            if !turn.text.isEmpty {
+            if AppSettings.shared.showSteps {
+                StepsView(steps: turn.steps, isStreaming: turn.isStreaming)
+            }
+            // Cards come from tools, which run before the words that follow them.
+            ForEach(turn.cards) { card in
+                CardView(card: card)
+                    .transition(.asymmetric(insertion: .scale(scale: 0.97, anchor: .topLeading).combined(with: .opacity), removal: .opacity))
+            }
+            // A reply can be only whitespace when a card already said it all.
+            if !turn.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 if compact {
                     Text(Self.markdown(turn.text))
                         .textSelection(.enabled)
                         .foregroundStyle(Ink.text)
                 } else {
-                    // Agott texts in short bursts; each paragraph is a bubble.
-                    VStack(alignment: .leading, spacing: 5) {
-                        ForEach(Array(Self.bubbles(turn.text).enumerated()), id: \.offset) { index, part in
-                            Text(Self.markdown(part))
-                                .textSelection(.enabled)
-                                .foregroundStyle(Ink.text)
-                                .balloon(index == 0 ? .leading : .none)
-                                .padding(.leading, index == 0 ? 0 : 10)
-                        }
-                    }
+                    // Replies read as text on the page, not bubbles: long
+                    // answers, lists and tables need the whole column.
+                    MarkdownView(text: turn.text)
                 }
-            } else if turn.isStreaming && turn.cards.isEmpty && turn.steps.isEmpty {
-                TypingDots().balloon(.leading)
+            } else if turn.isStreaming && turn.cards.isEmpty && (turn.steps.isEmpty || !AppSettings.shared.showSteps) {
+                // Working, quietly: typing dots, nothing about how.
+                TypingDots()
             }
-            ForEach(turn.cards) { card in
-                CardView(card: card)
-                    .transition(.asymmetric(insertion: .scale(scale: 0.97, anchor: .topLeading).combined(with: .opacity), removal: .opacity))
+            if !compact, !turn.isStreaming, !turn.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                ReplyActions(text: turn.text, date: turn.date)
             }
             if let error = turn.error {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
@@ -70,7 +71,7 @@ struct AssistantTurnView: View {
                 merged.append(part)
             }
         }
-        return merged.isEmpty ? [text] : merged
+        return merged
     }
 
     static func markdown(_ text: String) -> AttributedString {
@@ -81,20 +82,64 @@ struct AssistantTurnView: View {
     }
 }
 
-struct TypingDots: View {
+/// Under a finished reply: copy it, and when it was said.
+private struct ReplyActions: View {
+    var text: String
+    var date: Date
+    @State private var copied = false
+
     var body: some View {
-        TimelineView(.animation) { context in
-            let t = context.date.timeIntervalSinceReferenceDate
-            HStack(spacing: 5) {
+        HStack(spacing: 12) {
+            Button {
+                Clipboard.copy(text)
+                copied = true
+                Task { try? await Task.sleep(for: .seconds(1.5)); copied = false }
+            } label: {
+                Image(systemName: copied ? "checkmark" : "doc.on.doc")
+            }
+            .buttonStyle(HoverIconStyle(size: 24))
+            .help(Text("Copy"))
+            Text(date, format: .dateTime.hour().minute())
+                .foregroundStyle(Ink.muted)
+        }
+        .font(.caption.weight(.semibold))
+        // The icon sits inside a hover box; pull it back onto the text's edge.
+        .padding(.leading, -8)
+    }
+}
+
+/// Someone is typing: three dots in a bubble, the way messengers do it.
+///
+/// Timing follows Signal's indicator: each dot swells from 6 to 8 pt and
+/// from 40% to full colour, one after another 0.15 s apart, then all rest
+/// until the 1.5 s cycle starts again. The pause is what makes it read as
+/// typing rather than loading.
+struct TypingDots: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion)) { context in
+            let t = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.5)
+            HStack(spacing: 3) {
                 ForEach(0..<3) { index in
+                    let p = reduceMotion ? 0.5 : Self.wave(t - Double(index) * 0.15)
                     Circle()
-                        .frame(width: 6, height: 6)
-                        .opacity(0.25 + 0.75 * max(0, sin(t * 5 - Double(index) * 0.8)))
+                        .fill(Ink.muted.opacity(0.4 + 0.6 * p))
+                        .frame(width: 6 + 2 * p, height: 6 + 2 * p)
+                        .frame(width: 8, height: 8)
                 }
             }
-            .foregroundStyle(Ink.text)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(Capsule().fill(Ink.surface))
         }
-        .accessibilityLabel(Text("Thinking"))
+        .accessibilityLabel(Text("Agott is typing"))
+    }
+
+    /// 0 → 1 → 0 over 0.6 s, then rest.
+    static func wave(_ x: Double) -> Double {
+        guard x > 0, x < 0.6 else { return 0 }
+        return 1 - abs(x - 0.3) / 0.3
     }
 }
 
@@ -111,6 +156,7 @@ struct CardView: View {
         case .note(let note): NoteCard(card: note)
         case .approval(let approval): ApprovalCard(card: approval)
         case .consistency(let consistency): ConsistencyCard(card: consistency)
+        case .artifact(let artifact): ArtifactCard(artifact: artifact)
         }
     }
 }

@@ -4,7 +4,9 @@ import FoundationModels
 
 nonisolated struct CalendarTool: Tool {
     let name = "calendar"
-    let description = "List the user's calendar events in a period."
+    let description = """
+    Read the user's calendar events in a period. Reading is silent; set show to true only when the user asked     to see their schedule ("what's on tomorrow?"), not when you just need it as context for another answer.
+    """
 
     @Generable
     struct Arguments {
@@ -12,6 +14,8 @@ nonisolated struct CalendarTool: Tool {
         var from: String?
         @Guide(description: "How many days to cover", .range(1...60))
         var days: Int
+        @Guide(description: "true only if the user asked to see their calendar; false when reading it for context")
+        var show: Bool
     }
 
     @concurrent func call(arguments: Arguments) async throws -> String {
@@ -20,16 +24,18 @@ nonisolated struct CalendarTool: Tool {
         let end = start.addingTimeInterval(Double(arguments.days) * 86400)
         let events = try await Organizer.shared.events(from: start, to: end)
         guard !events.isEmpty else { return "No events between \(ToolDates.format(start)) and \(ToolDates.format(end))." }
+        let list = events.prefix(30).map { event in
+            "- \(ToolDates.format(event.startDate))–\(ToolDates.format(event.endDate)) \(event.title ?? "")"
+                + (event.location.map { " @ \($0)" } ?? "")
+        }.joined(separator: "\n")
+        guard arguments.show else { return list + "\n(Not shown to the user; mention only what matters.)" }
         let items = events.prefix(30).map { event in
             Card.EventList.Item(
                 title: event.title ?? "", start: event.startDate, end: event.endDate,
                 detail: [event.location, event.calendar?.title].compactMap { $0 }.joined(separator: " · "))
         }
         await CardBus.post(.events(.init(title: String(localized: "Calendar"), items: Array(items))))
-        return events.prefix(30).map { event in
-            "- \(ToolDates.format(event.startDate))–\(ToolDates.format(event.endDate)) \(event.title ?? "")"
-                + (event.location.map { " @ \($0)" } ?? "")
-        }.joined(separator: "\n") + "\n(Shown to the user as a card.)"
+        return list + "\n(Shown to the user as a card; do not list the events again.)"
     }
 }
 

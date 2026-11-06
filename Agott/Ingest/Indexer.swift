@@ -14,6 +14,7 @@ final class Indexer {
         case linking
         case embedding(done: Int, total: Int)
         case learning(done: Int, total: Int)
+        case reflecting(done: Int, total: Int)
     }
 
     enum SourceState: Equatable {
@@ -54,13 +55,14 @@ final class Indexer {
         case .linking: return String(localized: "Connecting the dots…")
         case .embedding(let done, let total): return String(localized: "Understanding moments \(done.formatted()) of \(total.formatted())…")
         case .learning(let done, let total): return String(localized: "Learning about you \(done) of \(total)…")
+        case .reflecting(let done, let total): return String(localized: "Remembering conversations that mattered \(done) of \(total)…")
         }
     }
 
     /// 0…1 when the current step can be measured, nil when it cannot.
     var progress: Double? {
         switch phase {
-        case .embedding(let done, let total), .learning(let done, let total):
+        case .embedding(let done, let total), .learning(let done, let total), .reflecting(let done, let total):
             total > 0 ? min(1, Double(done) / Double(total)) : nil
         case .reading:
             readTotal.flatMap { $0 > 0 ? min(1, Double(readSoFar) / Double($0)) : nil }
@@ -139,7 +141,7 @@ final class Indexer {
         do {
             while !Task.isCancelled {
                 let batch = ContinuousClock.now
-                guard try await KnowledgeGraph.link() > 0 else { break }
+                guard try await KnowledgeGraph.link(batch: 150) > 0 else { break }
                 await Pace.rest(after: batch)
             }
         } catch {
@@ -260,16 +262,19 @@ final class Indexer {
     /// Saves a batch in slices and links each one into the graph right away,
     /// so People and Graph fill in while reading.
     private func ingestLive(_ batch: [RawMessage]) async throws {
-        for slice in stride(from: 0, to: batch.count, by: 5000) {
+        // Small slices keep each hold on the store short, so a question
+        // asked mid-read still gets its memories quickly.
+        let sliceSize = 1000
+        for slice in stride(from: 0, to: batch.count, by: sliceSize) {
             guard !Task.isCancelled else { return }
-            let part = Array(batch[slice..<min(slice + 5000, batch.count)])
+            let part = Array(batch[slice..<min(slice + sliceSize, batch.count)])
             let started = ContinuousClock.now
             try await MemoryStore.shared.ingest(part)
             readSoFar += part.count
             await Pace.rest(after: started)
             while !Task.isCancelled {
                 let batch = ContinuousClock.now
-                guard try await KnowledgeGraph.link() > 0 else { break }
+                guard try await KnowledgeGraph.link(batch: 150) > 0 else { break }
                 await Pace.rest(after: batch)
             }
             // Totals drive several screens; once a second is plenty.
@@ -340,10 +345,27 @@ final class Indexer {
                 }
                 let portrait = try await KnowledgeGraph.writePortrait()
                 if !portrait.isEmpty { AppSettings.shared.aboutMe = portrait }
+                // Then the conversations that went deep, condensed.
+                let reflectTotal = 120
+                phase = .reflecting(done: 0, total: reflectTotal)
+                _ = try await Reflections.run(limit: reflectTotal) { [weak self] count in
+                    self?.phase = .reflecting(done: count, total: reflectTotal)
+                }
             } catch {
                 lastError = error.localizedDescription
             }
             await refreshTotals()
+        }
+    }
+
+    /// Reads every message again: learning and deep memories start over,
+    /// keeping what is already known.
+    func reread() {
+        stopLearning()
+        Task {
+            try? await MemoryStore.shared.resetLearning()
+            await refreshTotals()
+            learn()
         }
     }
 

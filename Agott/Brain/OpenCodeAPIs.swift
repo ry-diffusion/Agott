@@ -164,7 +164,9 @@ extension OpenCodeExecutor {
            let object = try? JSONSerialization.jsonObject(with: data) {
             body["text"] = ["format": ["type": "json_schema", "name": "answer", "schema": object, "strict": false]]
         }
-        body["reasoning"] = ["summary": "auto"]
+        var reasoning: [String: Any] = ["summary": "auto"]
+        if let effort = configuration.reasoningEffort { reasoning["effort"] = effort }
+        body["reasoning"] = reasoning
 
         let bytes = try await Self.open(makeRequest(path: "/responses", body: body, for: request))
         let responseID = UUID().uuidString

@@ -12,7 +12,7 @@ struct YouView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 ScreenHeader(title: "You", subtitle: "Agott starts every conversation from this. Edit anything that's wrong.", symbol: "person") {
-                    MuseFace(mood: indexer.isLearning ? .thinking : .love, size: 54)
+                    MascotFace(mood: indexer.isLearning ? .thinking : .love, size: 54)
                 }
                 PanelTitle(title: "About you", symbol: "text.quote")
 

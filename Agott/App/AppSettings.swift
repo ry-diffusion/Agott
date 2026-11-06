@@ -74,6 +74,12 @@ final class AppSettings {
     var contextTokens: Int { didSet { save(contextTokens, "contextTokens") } }
     /// Read what Spotify or Apple Music is playing, to understand your mood.
     var listenToMusic: Bool { didSet { save(listenToMusic, "listenToMusic") } }
+    /// Show how each reply was made (thinking, memory, tools). Off: Agott
+    /// just talks, like a friend would.
+    var showSteps: Bool { didSet { save(showSteps, "showSteps") } }
+    /// Where published artifacts live, and the Worker that serves them.
+    var publishDomain: String { didSet { save(publishDomain, "publishDomain") } }
+    var publishWorker: String { didSet { save(publishWorker, "publishWorker") } }
     /// Let the model read new moments after every indexing run.
     var autoLearn: Bool { didSet { save(autoLearn, "autoLearn") } }
     /// How much of that window one learning batch may fill.
@@ -110,6 +116,9 @@ final class AppSettings {
         batchFill = defaults.object(forKey: "batchFill") as? Double ?? 0.5
         autoLearn = defaults.object(forKey: "autoLearn") as? Bool ?? true
         listenToMusic = defaults.object(forKey: "listenToMusic") as? Bool ?? true
+        showSteps = defaults.object(forKey: "showSteps") as? Bool ?? false
+        publishDomain = defaults.string(forKey: "publishDomain") ?? "artifacts.grupomidas.com.br"
+        publishWorker = defaults.string(forKey: "publishWorker") ?? "agott-artifacts"
         aboutMe = defaults.string(forKey: "aboutMe") ?? ""
         apiKey = Keychain.get("opencode-api-key") ?? ""
     }

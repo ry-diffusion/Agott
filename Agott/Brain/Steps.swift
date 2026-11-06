@@ -16,6 +16,29 @@ nonisolated struct Step: Identifiable, Codable, Hashable, Sendable {
     var detail: String?
     var started: Date
     var ended: Date?
+    /// What the step found, when it found things: remembered moments, chats.
+    var items: [Item]?
+
+    nonisolated struct Item: Codable, Hashable, Sendable, Identifiable {
+        var id: String { title + "|" + (subtitle ?? "") + "|" + (snippet ?? "") }
+        var title: String
+        var subtitle: String?
+        var snippet: String?
+        var symbol: String = "text.bubble"
+    }
+
+    init(id: String, kind: Kind, title: String, symbol: String, state: State, detail: String? = nil,
+         started: Date, ended: Date? = nil, items: [Item]? = nil) {
+        self.id = id
+        self.kind = kind
+        self.title = title
+        self.symbol = symbol
+        self.state = state
+        self.detail = detail
+        self.started = started
+        self.ended = ended
+        self.items = items
+    }
 
     var seconds: Int? {
         guard let ended else { return nil }
@@ -77,11 +100,13 @@ enum StepTracker {
                     let output = outputs[call.id]
                     let running = output == nil && busy
                     let started = clock.start(call.id)
+                    let found = output.map(items(in:)) ?? []
                     steps.append(Step(
                         id: call.id, kind: .tool, title: title, symbol: symbol,
                         state: running ? .running : (output?.hasPrefix("The user declined") == true ? .failed : .done),
-                        detail: output.map { String($0.prefix(600)) },
-                        started: started, ended: running ? nil : clock.end(call.id)))
+                        detail: found.isEmpty ? output.map { String($0.prefix(600)) } : nil,
+                        started: started, ended: running ? nil : clock.end(call.id),
+                        items: found.isEmpty ? nil : found))
                 }
             default:
                 continue
@@ -108,6 +133,31 @@ enum StepTracker {
                 state: .running, detail: nil, started: clock.start(id), ended: nil))
         }
         return steps
+    }
+
+    /// Memory results come back as "### Source · Chat · date" sections; each
+    /// becomes an item you can scan instead of a wall of text.
+    static func items(in output: String) -> [Step.Item] {
+        output.components(separatedBy: "\n### ").enumerated().compactMap { index, section -> Step.Item? in
+            var section = Substring(section)
+            if index == 0 {
+                guard section.hasPrefix("### ") else { return nil }
+                section = section.dropFirst(4)
+            }
+            let lines = section.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
+            let header = lines.first.map(String.init)?.components(separatedBy: " · ") ?? []
+            guard header.count >= 2 else { return nil }
+            let body = lines.count > 1 ? String(lines[1]) : ""
+            let snippet = body.split(separator: "\n").prefix(3).joined(separator: "\n")
+            return Step.Item(
+                title: header[1], subtitle: ([header[0]] + header.dropFirst(2)).joined(separator: " · "),
+                snippet: snippet.isEmpty ? nil : String(snippet.prefix(220)),
+                symbol: symbol(forSource: header[0]))
+        }
+    }
+
+    static func symbol(forSource name: String) -> String {
+        MemorySource.allCases.first { $0.displayName == name }?.symbol ?? "text.bubble"
     }
 
     static func text(_ segments: [Transcript.Segment]) -> String {
@@ -152,6 +202,8 @@ enum StepTracker {
         case "show_explanation": return (String(localized: "Writing an explanation"), "lightbulb")
         case "suggest_replies": return (String(localized: "Drafting replies"), "bubble.left.and.text.bubble.right")
         case "show_checklist": return (String(localized: "Making a checklist"), "checklist")
+        case "artifact": return (String(localized: "Writing “\(arg("title"))”"), "doc.richtext")
+        case "music_mood": return (String(localized: "Listening back to your music"), "music.note")
         default: return (tool.replacingOccurrences(of: "_", with: " "), "wrench.and.screwdriver")
         }
     }

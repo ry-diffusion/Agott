@@ -87,7 +87,8 @@ enum RelationshipAnalyzer {
         for line in lines {
             let age = now.timeIntervalSince(line.date)
             if age < 30 * day { stats.last30 += 1 } else if age < 60 * day { stats.prior30 += 1 }
-            let week = Int(age / (7 * day))
+            // A clock that was wrong can date a message in the future; count it as this week.
+            let week = max(0, Int(age / (7 * day)))
             if week < 12 { stats.weekly[11 - week] += 1 }
 
             if let previous {

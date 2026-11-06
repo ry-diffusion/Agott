@@ -16,6 +16,7 @@ nonisolated enum Card: Identifiable, Hashable, Sendable, Codable {
     case note(Note)
     case approval(Approval)
     case consistency(Consistency)
+    case artifact(Artifact)
 
     var id: UUID {
         switch self {
@@ -27,7 +28,42 @@ nonisolated enum Card: Identifiable, Hashable, Sendable, Codable {
         case .note(let c): c.id
         case .approval(let c): c.id
         case .consistency(let c): c.id
+        case .artifact(let c): c.id
         }
+    }
+
+    /// Something made to keep: a document, a message draft, code, a page, a
+    /// table. It opens beside the chat, and each revision is a new version.
+    struct Artifact: Hashable, Sendable, Codable {
+        enum Kind: String, Hashable, Sendable, Codable, CaseIterable {
+            case document, code, html, table
+
+            var symbol: String {
+                switch self {
+                case .document: "doc.richtext"
+                case .code: "chevron.left.forwardslash.chevron.right"
+                case .html: "safari"
+                case .table: "tablecells"
+                }
+            }
+
+            var fileExtension: String {
+                switch self {
+                case .document, .table: "md"
+                case .code: "txt"
+                case .html: "html"
+                }
+            }
+        }
+
+        var id = UUID()
+        /// Stable across versions: the same piece of work, revised.
+        var key: String
+        var title: String
+        var kind: Kind
+        var language: String?
+        var content: String
+        var version = 1
     }
 
     struct Explanation: Hashable, Sendable, Codable {

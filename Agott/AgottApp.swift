@@ -91,6 +91,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Indexer.shared.startAutomatic()
         }
         RemoteHost.shared.start()
+        // New messages within seconds: hooks, follow-ups, what to remember.
+        Notifier.start()
+        MessageWatcher.shared.start()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }

@@ -12,6 +12,7 @@ struct MemoryView: View {
     @State private var feedSource: MemorySource?
     @State private var feedLimit = 30
     @State private var lastFeed = Date.distantPast
+    @State private var confirmReread = false
 
     var body: some View {
         ScrollView {
@@ -24,12 +25,24 @@ struct MemoryView: View {
                         Button { indexer.pause() } label: { Label("Pause", systemImage: "pause.fill") }
                             .buttonStyle(.candy(.soft))
                     } else {
-                        Button { indexer.run() } label: { Label("Update memory", systemImage: "arrow.triangle.2.circlepath") }
-                            .buttonStyle(.candy)
+                        HStack(spacing: 8) {
+                            Button { confirmReread = true } label: { Label("Read everything again", systemImage: "arrow.counterclockwise") }
+                                .buttonStyle(.candy(.soft))
+                                .help(Text("Learn again from every message, with deeper memories"))
+                            Button { indexer.run() } label: { Label("Update memory", systemImage: "arrow.triangle.2.circlepath") }
+                                .buttonStyle(.candy)
+                        }
                     }
                 }
                 totals
+                    .confirmationDialog(Text("Read everything again?"), isPresented: $confirmReread) {
+                        Button("Read again") { indexer.reread() }
+                        Button("Cancel", role: .cancel) {}
+                    } message: {
+                        Text("Agott goes back over every message to learn and to remember the conversations that mattered. What it already knows stays. With OpenCode this uses tokens; it runs in the background.")
+                    }
                 MemoryDigest()
+                DeepMoments()
                 sources
                 search
                 if query.isEmpty || hits.isEmpty {
@@ -60,7 +73,7 @@ struct MemoryView: View {
     private var totals: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 14) {
-                MuseFace(mood: indexer.isRunning ? .working : .happy, size: 56)
+                MascotFace(mood: indexer.isRunning ? .working : .happy, size: 56)
                 VStack(alignment: .leading, spacing: 6) {
                     Text(indexer.statusText).font(Lettering.display(18, relativeTo: .title3)).foregroundStyle(Ink.text)
                     if indexer.isRunning {
@@ -354,7 +367,10 @@ private struct MemoryDigest: View {
                 Text("Agott is still reading. What it learns shows up here.")
                     .foregroundStyle(Ink.muted)
             } else {
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+                // Rows share their tallest card's height and every card starts
+                // at the top, so the two columns line up.
+                Grid(horizontalSpacing: 12, verticalSpacing: 12) {
+                    GridRow(alignment: .top) {
                     section("Closest to you", symbol: "heart") {
                         ForEach(Array(people.enumerated()), id: \.offset) { _, pair in
                             HStack(spacing: 10) {
@@ -371,6 +387,8 @@ private struct MemoryDigest: View {
                                 .font(.callout).foregroundStyle(Ink.text).lineLimit(2)
                         }
                     }
+                    }
+                    GridRow(alignment: .top) {
                     section("What you work on", symbol: "hammer") {
                         FlowLayout(spacing: 6) {
                             ForEach(projects) { Chip(text: $0.name, symbol: "folder") }
@@ -379,8 +397,9 @@ private struct MemoryDigest: View {
                     section("What you talk about", symbol: "bubble.left.and.bubble.right") {
                         FlowLayout(spacing: 6) {
                             ForEach(subjects) { Chip(text: $0.name, symbol: $0.kind.symbol) }
-                            ForEach(circles) { Chip(text: $0.name, symbol: $0.kind.symbol, spot: true) }
+                            ForEach(uniqueCircles) { Chip(text: $0.name, symbol: $0.kind.symbol, spot: true) }
                         }
+                    }
                     }
                 }
             }
@@ -394,8 +413,14 @@ private struct MemoryDigest: View {
             Label(title, systemImage: symbol).font(.caption.weight(.bold)).foregroundStyle(Ink.muted)
             content()
         }
-        .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: 120, maxHeight: .infinity, alignment: .topLeading)
         .panel(padding: 14)
+    }
+
+    /// Circles that share a name show once.
+    private var uniqueCircles: [PeopleCircle] {
+        var seen = Set<String>()
+        return circles.filter { seen.insert($0.name.folded).inserted }
     }
 
     private func load() async {
@@ -414,5 +439,56 @@ private struct MemoryDigest: View {
         subjects = ((try? await store.entities(limit: 120, kinds: [.topic, .organization, .place])) ?? [])
             .filter { $0.mentions >= 5 && KnowledgeGraph.isPlausibleName($0.name) }.prefix(10).map { $0 }
         circles = await Circles.cached()
+    }
+}
+
+/// Conversations that mattered, condensed: a diary, newest first.
+private struct DeepMoments: View {
+    @State private var reflections: [Reflection] = []
+    @State private var indexer = Indexer.shared
+    @State private var showAll = false
+
+    var body: some View {
+        // Always present, so it loads even while empty.
+        VStack(alignment: .leading, spacing: 12) {
+            if !reflections.isEmpty {
+                PanelTitle(title: "Conversations that mattered", symbol: "heart.text.square")
+                ForEach(showAll ? reflections : Array(reflections.prefix(4))) { item in
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(item.title).font(.headline).foregroundStyle(Ink.text)
+                            Spacer(minLength: 8)
+                            Text(item.date, format: .dateTime.day().month().year())
+                                .font(.caption).foregroundStyle(Ink.muted)
+                        }
+                        Text(item.summary)
+                            .foregroundStyle(Ink.text)
+                            .lineSpacing(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .textSelection(.enabled)
+                        HStack(spacing: 6) {
+                            Chip(text: item.feeling, symbol: "heart", spot: true)
+                            ForEach(item.people.prefix(4), id: \.self) { Chip(text: $0, symbol: "person") }
+                            Spacer()
+                            Text(item.chat).font(.caption).foregroundStyle(Ink.muted).lineLimit(1)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .panel(padding: 14)
+                }
+                if reflections.count > 4 {
+                    Button(showAll ? String(localized: "Show less") : String(localized: "Show \(reflections.count - 4) more")) {
+                        withAnimation(Motion.settle) { showAll.toggle() }
+                    }
+                    .buttonStyle(.candy(.soft, compact: true))
+                }
+            }
+        }
+        .task { await load() }
+            .onChange(of: indexer.isLearning) { _, learning in if !learning { Task { await load() } } }
+    }
+
+    private func load() async {
+        reflections = (try? await MemoryStore.shared.reflections(limit: 24)) ?? []
     }
 }
