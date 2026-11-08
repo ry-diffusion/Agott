@@ -7908,6 +7908,146 @@
           }
         }
       }
+    },
+    "1 new message" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 mensagem nova"
+          }
+        }
+      }
+    },
+    "%lld new messages" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld mensagens novas"
+          }
+        }
+      }
+    },
+    "1 voice note transcribed" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 áudio transcrito"
+          }
+        }
+      }
+    },
+    "%lld voice notes transcribed" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld áudios transcritos"
+          }
+        }
+      }
+    },
+    "1 photo read" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 foto lida"
+          }
+        }
+      }
+    },
+    "%lld photos read" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld fotos lidas"
+          }
+        }
+      }
+    },
+    "1 new person" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 pessoa nova"
+          }
+        }
+      }
+    },
+    "%lld new people" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld pessoas novas"
+          }
+        }
+      }
+    },
+    "1 fact learned" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 fato aprendido"
+          }
+        }
+      }
+    },
+    "%lld facts learned" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld fatos aprendidos"
+          }
+        }
+      }
+    },
+    "1 conversation remembered" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 conversa guardada"
+          }
+        }
+      }
+    },
+    "%lld conversations remembered" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld conversas guardadas"
+          }
+        }
+      }
+    },
+    "Last run found" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Na última leitura"
+          }
+        }
+      }
+    },
+    "Nothing new since the last run." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nada de novo desde a última leitura."
+          }
+        }
+      }
     }
   },
   "version" : "1.1"

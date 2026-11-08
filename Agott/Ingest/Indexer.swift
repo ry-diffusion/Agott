@@ -40,6 +40,37 @@ final class Indexer {
 
     var isRunning: Bool { phase != .idle }
 
+    /// What the latest run found: new messages, voice notes and photos read,
+    /// people met, facts learned, with a few of those facts as examples.
+    struct Findings: Equatable {
+        var messages = 0
+        var voiceNotes = 0
+        var photos = 0
+        var people = 0
+        var facts = 0
+        var memories = 0
+        var examples: [MemoryFact] = []
+
+        var isEmpty: Bool { messages + voiceNotes + photos + people + facts + memories == 0 }
+
+        /// "142 new messages · 3 voice notes transcribed · 12 facts learned"
+        var summary: String {
+            func part(_ n: Int, _ one: String, _ many: String) -> String? { n == 0 ? nil : (n == 1 ? one : many) }
+            return [
+                part(messages, String(localized: "1 new message"), String(localized: "\(messages) new messages")),
+                part(voiceNotes, String(localized: "1 voice note transcribed"), String(localized: "\(voiceNotes) voice notes transcribed")),
+                part(photos, String(localized: "1 photo read"), String(localized: "\(photos) photos read")),
+                part(people, String(localized: "1 new person"), String(localized: "\(people) new people")),
+                part(facts, String(localized: "1 fact learned"), String(localized: "\(facts) facts learned")),
+                part(memories, String(localized: "1 conversation remembered"), String(localized: "\(memories) conversations remembered")),
+            ].compactMap { $0 }.joined(separator: " · ")
+        }
+    }
+
+    private(set) var findings = Findings()
+    /// Where memory stood when the latest run began.
+    @ObservationIgnored private var mark: MemoryStore.Mark?
+
     /// One line for anywhere in the app: what memory is doing right now.
     var statusText: String {
         switch (phase, learnPhase) {
@@ -139,6 +170,8 @@ final class Indexer {
 
     private func index() async {
         lastError = nil
+        mark = try? await MemoryStore.shared.mark()
+        findings = Findings()
         // Understanding starts while reading: the newest moments land first,
         // and the model reads them as they arrive instead of after every
         // message of every source has been indexed.
@@ -167,7 +200,9 @@ final class Indexer {
             phase = .media(done: 0)
             while !Task.isCancelled, batches < MediaIngestor.batchesPerRun,
                   let added = await MediaIngestor.run(contacts: contacts) {
-                done += added
+                done += added.voice + added.photos
+                findings.voiceNotes += added.voice
+                findings.photos += added.photos
                 batches += 1
                 phase = .media(done: done)
                 await Task.yield()
@@ -362,8 +397,20 @@ final class Indexer {
     }
 
     func refreshTotals() async {
-        if let totals = try? await MemoryStore.shared.totals() { self.totals = totals }
-        if let counts = try? await MemoryStore.shared.counts() { self.counts = counts }
+        let store = MemoryStore.shared
+        if let totals = try? await store.totals() { self.totals = totals }
+        if let counts = try? await store.counts() { self.counts = counts }
+        guard let mark, let now = try? await store.mark() else { return }
+        var found = findings
+        // Voice notes and photos land as messages too; count them once.
+        found.messages = max(0, now.messages - mark.messages - found.voiceNotes - found.photos)
+        found.people = max(0, now.people - mark.people)
+        found.memories = max(0, now.reflections - mark.reflections)
+        if let learned = try? await store.factsLearned(after: mark.lastFact, examples: 4) {
+            found.facts = learned.count
+            found.examples = learned.examples
+        }
+        if found != findings { findings = found }
     }
 
     // MARK: Deep learning pass

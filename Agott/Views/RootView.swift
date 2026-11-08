@@ -231,6 +231,9 @@ struct ActivityButton: View {
             if let progress = indexer.progress {
                 ProgressView(value: progress).tint(Ink.spot)
             }
+            if !indexer.findings.isEmpty {
+                RunFindingsView(findings: indexer.findings, examples: 3)
+            }
             HStack {
                 if indexer.isPaused {
                     Button("Resume", systemImage: "play.fill") { indexer.resume() }

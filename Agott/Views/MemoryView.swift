@@ -120,6 +120,9 @@ struct MemoryView: View {
             if let error = indexer.lastError {
                 Label(error, systemImage: "exclamationmark.triangle").font(.callout).foregroundStyle(Ink.text)
             }
+            if !indexer.findings.isEmpty {
+                RunFindingsView(findings: indexer.findings)
+            }
             if indexer.totals.messages == 0 && !indexer.isRunning {
                 Text("Agott hasn't read anything yet. Start indexing to let it remember your WhatsApp, iMessage and Claude history. It runs in the background; you can keep using the app.")
                     .font(.callout)
@@ -495,5 +498,35 @@ private struct DeepMoments: View {
 
     private func load() async {
         reflections = (try? await MemoryStore.shared.reflections(limit: 24)) ?? []
+    }
+}
+
+/// What the latest indexing run found: one line of counts, then a few of the
+/// facts it learned, as examples.
+struct RunFindingsView: View {
+    var findings: Indexer.Findings
+    var examples = 4
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Rectangle().fill(Ink.hairline).frame(height: 1).padding(.bottom, 4)
+            Text("Last run found")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Ink.muted)
+            Text(findings.summary)
+                .font(.callout)
+                .monospacedDigit()
+                .foregroundStyle(Ink.text)
+                .fixedSize(horizontal: false, vertical: true)
+            ForEach(findings.examples.prefix(examples)) { fact in
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Circle().fill(Ink.spot).frame(width: 4, height: 4).alignmentGuide(.firstTextBaseline) { $0.height + 1 }
+                    Text("\(Text(EntityText.plain(fact.subject, hidden: AppSettings.shared.hideNames)).fontWeight(.medium)) \(fact.displayPredicate) \(Text(fact.object).foregroundStyle(Ink.spot))")
+                        .font(.callout)
+                        .foregroundStyle(Ink.text)
+                        .lineLimit(2)
+                }
+            }
+        }
     }
 }

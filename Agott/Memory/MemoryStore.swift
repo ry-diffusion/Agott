@@ -618,6 +618,34 @@ actor MemoryStore {
             .filter { $0.date >= since }
     }
 
+    /// Where memory stands, so a run can later say what it added.
+    struct Mark: Sendable {
+        var messages: Int
+        var lastFact: Int64
+        var people: Int
+        var reflections: Int
+    }
+
+    func mark() throws -> Mark {
+        let db = try open()
+        return Mark(
+            messages: try db.scalarInt("SELECT COUNT(*) FROM messages"),
+            lastFact: Int64(try db.scalarInt("SELECT COALESCE(MAX(id), 0) FROM facts")),
+            people: try db.scalarInt("SELECT COUNT(*) FROM people"),
+            reflections: try db.scalarInt("SELECT COUNT(*) FROM reflections"))
+    }
+
+    /// Facts learned after a mark: how many, and the best supported few
+    /// (never a sensitive one) to show as examples.
+    func factsLearned(after id: Int64, examples: Int) throws -> (count: Int, examples: [MemoryFact]) {
+        let db = try open()
+        let count = try db.scalarInt("SELECT COUNT(*) FROM facts WHERE id > \(id)")
+        var result: [MemoryFact] = []
+        try db.rows(Self.factColumnsSQL + " WHERE f.id > ? AND f.sensitive = 0 ORDER BY f.confidence DESC, f.id DESC LIMIT ?",
+                    [.int(id), .of(examples)]) { result.append(Self.factRow($0)) }
+        return (count, result)
+    }
+
     func counts() throws -> [MemorySource: Int] {
         var result: [MemorySource: Int] = [:]
         try open().rows("SELECT source, COUNT(*) FROM messages GROUP BY source") { row in

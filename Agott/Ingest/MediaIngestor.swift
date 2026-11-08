@@ -64,25 +64,27 @@ enum MediaIngestor {
         return items
     }
 
-    /// Reads one batch into memory. Returns how many were added, or nil when
-    /// there was nothing to read.
-    static func run(contacts: ContactBook, limit: Int = 30) async -> Int? {
+    /// Reads one batch into memory. Returns how many of each were added, or
+    /// nil when there was nothing to read.
+    static func run(contacts: ContactBook, limit: Int = 30) async -> (voice: Int, photos: Int)? {
         guard let items = try? pending(limit: limit, contacts: contacts), !items.isEmpty else { return nil }
         var messages: [RawMessage] = []
         var last = UserDefaults.standard.double(forKey: cursorKey)
+        var voice = 0, photos = 0
         for item in items {
             guard !Task.isCancelled else { break }
             if FileManager.default.fileExists(atPath: item.file.path), let text = await words(for: item) {
                 var message = item.message
                 message.text = text
                 messages.append(message)
+                if item.kind == .voice { voice += 1 } else { photos += 1 }
             }
             // Read or unreadable, it is not tried again.
             last = item.message.date.timeIntervalSince1970 - appleEpochOffset
         }
         if !messages.isEmpty { _ = try? await MemoryStore.shared.ingest(messages) }
         UserDefaults.standard.set(last, forKey: cursorKey)
-        return messages.count
+        return (voice, photos)
     }
 
     /// The words a voice note or a photo stands for.

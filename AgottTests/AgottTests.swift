@@ -1231,3 +1231,19 @@ struct ReviewFixTests {
         #expect(try await store.chunkIDs(all, matching: .none) == all)
     }
 }
+
+@Suite("Run findings")
+struct RunFindingsTests {
+    @Test @MainActor func summarySkipsZeroAndUsesSingular() {
+        var findings = Indexer.Findings()
+        #expect(findings.isEmpty)
+        findings.messages = 2
+        findings.voiceNotes = 1
+        findings.facts = 12
+        #expect(!findings.isEmpty)
+        let summary = findings.summary
+        #expect(summary.contains("2"))
+        #expect(summary.contains("12"))
+        #expect(summary.components(separatedBy: " · ").count == 3)
+    }
+}
