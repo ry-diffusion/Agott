@@ -37,8 +37,10 @@ struct HomeView: View {
             .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.never)
-        // Content slides under the bars and blurs softly, no line.
-        .scrollEdgeEffectStyle(.soft, for: .all)
+        // Content blurs softly under the top bar; at the bottom only the
+        // question box blurs what passes behind it.
+        .scrollEdgeEffectStyle(.soft, for: .top)
+        .scrollEdgeEffectHidden(true, for: .bottom)
         .safeAreaBar(edge: .top, spacing: 0) { topBar }
         .safeAreaBar(edge: .bottom, spacing: 0) {
             AskBox(suggestions: true) { text in
@@ -362,11 +364,11 @@ struct AskBox: View {
             .padding(.trailing, 6)
             .padding(.vertical, 6)
             .frame(minHeight: 52)
-            .quietSurface(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .frostedSurface(RoundedRectangle(cornerRadius: 22, style: .continuous))
         }
         .background {
             if suggestions {
-                RoundedRectangle(cornerRadius: 24, style: .continuous).fill(Ink.sidebar)
+                RoundedRectangle(cornerRadius: 24, style: .continuous).fill(.regularMaterial)
                     .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Ink.hairline, lineWidth: 1))
             }
         }

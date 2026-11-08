@@ -223,8 +223,10 @@ struct ChatView: View {
                     .padding(.top, 8)
                     .frame(maxWidth: .infinity)
             }
-            // Messages slide under the bars and blur softly, like Claude.
-            .scrollEdgeEffectStyle(.soft, for: .all)
+            // Messages blur softly under the top bar; at the bottom only the
+            // question box blurs what passes behind it.
+            .scrollEdgeEffectStyle(.soft, for: .top)
+            .scrollEdgeEffectHidden(true, for: .bottom)
             // While a reply streams in, the bottom anchor keeps it in view;
             // a scroll per token was more than once a frame.
             .onChange(of: agent.turns.last?.cards.count) { _, _ in
@@ -362,11 +364,14 @@ struct ChatView: View {
                 }
                 .padding(.trailing, 8)
             }
-            .quietSurface(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .frostedSurface(RoundedRectangle(cornerRadius: 22, style: .continuous))
             if !centered {
                 Text("Agott uses AI and can make mistakes.")
                     .font(.caption)
                     .foregroundStyle(Ink.muted)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .background(.regularMaterial, in: Capsule())
             }
         }
         .frame(maxWidth: Self.column)

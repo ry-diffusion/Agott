@@ -216,6 +216,16 @@ struct Panel: ViewModifier {
 extension View {
     /// A card the quiet way: a step lighter than what is under it, with a
     /// hairline around it. What glass used to do, without the glow.
+    /// A surface that blurs what scrolls behind it, for the one thing that
+    /// floats over content (the question box), instead of blurring a whole
+    /// strip of the window.
+    func frostedSurface<S: InsettableShape>(_ shape: S) -> some View {
+        background(shape.fill(.regularMaterial))
+            .background(shape.fill(Ink.surface.opacity(0.55)))
+            .overlay(shape.strokeBorder(Ink.hairline, lineWidth: 1))
+            .shadow(color: .black.opacity(0.06), radius: 12, y: 4)
+    }
+
     func quietSurface<S: InsettableShape>(_ shape: S, fill: Color = Ink.surface, line: Bool = true) -> some View {
         background(shape.fill(fill))
             .overlay(shape.strokeBorder(Ink.hairline.opacity(line ? 1 : 0), lineWidth: 1))
