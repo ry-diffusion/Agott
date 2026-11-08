@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 import Observation
 
 /// The "Muse" half of Agott: a face that appears over whatever you are doing.
@@ -28,6 +29,7 @@ final class Copilot {
 
     #if os(macOS)
     let keys = HoldKeyMonitor()
+    @ObservationIgnored private let log = Logger(subsystem: "br.com.zesmoi.Agott", category: "dictation")
     #endif
 
     private init() {}
@@ -72,6 +74,8 @@ final class Copilot {
                 return
             }
             let text = await Dictation.shared.stop()
+            // Lengths only, never the words.
+            log.notice("Dictation stopped after \(duration, format: .fixed(precision: 1))s: \(text.count) characters, problem: \(Dictation.shared.problem ?? "none", privacy: .public)")
             guard !text.isEmpty else {
                 notice = Dictation.shared.problem ?? String(localized: "I didn't catch that.")
                 Agent.shared.setMood(.confused)
@@ -88,8 +92,10 @@ final class Copilot {
                 let polished = await Rambler.polish(text)
                 do {
                     try TextInsertion.insert(polished)
+                    log.notice("Dictation typed \(polished.count) characters")
                     Agent.shared.setMood(.happy)
                 } catch {
+                    log.error("Dictation could not type: \(error.localizedDescription, privacy: .public)")
                     notice = error.localizedDescription
                     Agent.shared.setMood(.confused)
                 }
