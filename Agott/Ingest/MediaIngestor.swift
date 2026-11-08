@@ -114,7 +114,12 @@ enum MediaIngestor {
             return String(localized: "[voice note] \(transcript)")
         case .photo:
             var parts: [String] = []
-            if let labels = await MainActor.run(body: { ImageDescriber.labels(item.file) }) { parts.append(labels) }
+            // Vision on a background thread: on the main one every photo
+            // in a batch froze the window for a moment.
+            let file = item.file
+            if let labels = await Task.detached(priority: .utility, operation: { ImageDescriber.labels(file) }).value {
+                parts.append(labels)
+            }
             if let written = await AttachmentStore.recognizedText(in: item.file) {
                 parts.append(String(localized: "text in it: \(String(written.prefix(600)))"))
             }

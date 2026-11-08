@@ -166,11 +166,12 @@ enum ImageDescriber {
                 return answer
             }
         }
-        return labels(url)
+        return await Task.detached(priority: .userInitiated) { labels(url) }.value
     }
 
-    /// What Apple's on-device classifier sees, most likely first.
-    static func labels(_ url: URL) -> String? {
+    /// What Apple's on-device classifier sees, most likely first. Runs where
+    /// it is called: keep it off the main thread.
+    nonisolated static func labels(_ url: URL) -> String? {
         let request = VNClassifyImageRequest()
         let handler = VNImageRequestHandler(url: url)
         guard (try? handler.perform([request])) != nil,
