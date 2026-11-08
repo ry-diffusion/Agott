@@ -102,7 +102,8 @@ nonisolated struct SpotifyTopTool: Tool {
             subtitle: "Spotify · \(period)", style: .ranking, kind: artists ? "artist" : "song",
             items: top.map { .init(title: $0.title, subtitle: $0.subtitle.isEmpty ? nil : $0.subtitle, image: $0.image, link: $0.link) })))
         let lines = top.enumerated().map { "\($0.offset + 1). \($0.element.title)" + ($0.element.subtitle.isEmpty ? "" : " — \($0.element.subtitle)") }
-        return "The ranking is on screen with covers. For you to comment on (do not list it again):\n" + lines.joined(separator: "\n")
+        return "The ranking is already on screen with covers: do not call show_list for it and do not list it again. " +
+            "For you to comment on in a sentence or two:\n" + lines.joined(separator: "\n")
     }
 }
 

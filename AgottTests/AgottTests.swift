@@ -1289,3 +1289,17 @@ struct MediaTagTests {
         #expect(EntityText.markdown(text, hidden: false).contains("agott://media/song?title="))
     }
 }
+
+@Suite("Collections")
+struct CollectionTests {
+    @Test func spotsTheSameListTwice() {
+        let first = Card.Collection(title: "Your top songs", style: .ranking, kind: "song",
+                                    items: ["TEARS", "Bota Em Você Machuca", "Recollect", "Anjos"].map { .init(title: $0) })
+        let again = Card.Collection(title: "suas mais tocadas", style: .ranking, kind: "song",
+                                    items: ["TEARS", "Bota Em Você Machuca", "Recollect"].map { .init(title: $0) })
+        let other = Card.Collection(title: "Filmes", style: .grid, kind: "movie",
+                                    items: ["Duna", "Oppenheimer"].map { .init(title: $0) })
+        #expect(first.repeats(again))
+        #expect(!first.repeats(other))
+    }
+}

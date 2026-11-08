@@ -337,7 +337,15 @@ final class Agent {
                 card = .artifact(artifact)
                 if conversation == self.currentID { self.openArtifactKey = artifact.key }
             }
-            self.update(replyID) { $0.cards.append(card) }
+            self.update(replyID) { turn in
+                // The same list twice in one reply (a model that shows the
+                // ranking spotify_top already drew): keep the first.
+                if case .collection(let list) = card,
+                   turn.cards.contains(where: { if case .collection(let other) = $0 { other.repeats(list) } else { false } }) {
+                    return
+                }
+                turn.cards.append(card)
+            }
             if case .approval = card { self.mood = .surprised }
         }
         CardBus.shared.update = { [weak self] card in

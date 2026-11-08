@@ -59,6 +59,16 @@ nonisolated enum Card: Identifiable, Hashable, Sendable, Codable {
         /// what to draw while a picture is missing.
         var kind: String
         var items: [Item]
+
+        /// Whether another list shows mostly the same things (most of the
+        /// shorter list's titles appear in the other).
+        func repeats(_ other: Collection) -> Bool {
+            let mine = Set(items.map { $0.title.folded })
+            let theirs = Set(other.items.map { $0.title.folded })
+            let smaller = min(mine.count, theirs.count)
+            guard smaller > 0 else { return false }
+            return Double(mine.intersection(theirs).count) >= Double(smaller) * 0.7
+        }
     }
 
     struct ChartData: Hashable, Sendable, Codable {
