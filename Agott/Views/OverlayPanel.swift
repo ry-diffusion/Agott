@@ -79,8 +79,8 @@ struct OverlayView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
-            MascotFace(mood: agent.mood, size: 54, level: dictation.level)
-                .padding(.top, 2)
+            ThinkingOrb(mode: orbMode, size: 22, active: isListening || agent.isBusy)
+                .padding(.top, 1)
 
             VStack(alignment: .leading, spacing: 10) {
                 header
@@ -90,13 +90,21 @@ struct OverlayView: View {
         }
         .padding(16)
         .frame(width: 600)
-        .glassEffect(agent.isBusy || isListening ? .regular.tint(Ink.spot.opacity(0.25)) : .regular, in: .rect(cornerRadius: 26))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Ink.hairline, lineWidth: 1))
+        .shadow(color: .black.opacity(0.18), radius: 24, y: 8)
         .tint(Ink.spot)
         .padding(10)
         .onExitCommand { copilot.dismiss() }
         .onChange(of: copilot.mode) { _, mode in
             fieldFocused = mode == .typing
         }
+    }
+
+    private var orbMode: ThinkingOrb.Mode {
+        if isListening { return .wave }
+        if agent.isBusy || copilot.mode == .inserting { return .orbits }
+        return .ring
     }
 
     private var isListening: Bool {
@@ -109,16 +117,16 @@ struct OverlayView: View {
         HStack(spacing: 8) {
             switch copilot.mode {
             case .listening(let ask):
-                Text(ask ? "Listening…" : "Dictating…").font(Lettering.display(16, relativeTo: .headline))
+                Text(ask ? "Listening…" : "Dictating…").font(.headline)
             case .inserting:
-                Text("Typing it for you…").font(Lettering.display(16, relativeTo: .headline))
+                Text("Typing it for you…").font(.headline)
             case .typing:
-                Text("Ask Agott").font(Lettering.display(16, relativeTo: .headline))
+                Text("Ask Agott").font(.headline)
             default:
                 if let status = agent.status {
                     Text(status).font(.subheadline).foregroundStyle(Ink.muted)
                 } else {
-                    Text(verbatim: "Agott").font(Lettering.display(16, relativeTo: .headline))
+                    Text(verbatim: "Agott").font(.headline)
                 }
             }
             Spacer()
@@ -141,14 +149,14 @@ struct OverlayView: View {
         switch copilot.mode {
         case .listening:
             Text(dictation.transcript.isEmpty ? String(localized: "Say what you need. Let go when you're done.") : dictation.transcript)
-                .font(.title3)
+                .font(.system(size: 16))
                 .foregroundStyle(dictation.transcript.isEmpty ? .secondary : .primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .animation(Motion.arrive, value: dictation.transcript)
         case .typing:
             TextField("Ask about this screen, your chats, your day…", text: $copilot.draft, axis: .vertical)
                 .textFieldStyle(.plain)
-                .font(.title3)
+                .font(.system(size: 16))
                 .lineLimit(1...5)
                 .focused($fieldFocused)
                 .onSubmit { copilot.ask(copilot.draft) }

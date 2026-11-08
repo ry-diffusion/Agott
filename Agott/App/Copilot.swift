@@ -59,7 +59,8 @@ final class Copilot {
         Dictation.shared.start()
         mode = .listening(ask: purpose == .ask)
         Agent.shared.setMood(.listening)
-        OverlayController.shared.show(focus: false)
+        // Dictation shows at the text cursor, where the words will go.
+        if purpose == .dictate { DictationPillController.shared.show() } else { OverlayController.shared.show(focus: false) }
     }
 
     private func released(_ purpose: HoldKeyMonitor.Purpose, after duration: TimeInterval) {
@@ -74,7 +75,7 @@ final class Copilot {
             guard !text.isEmpty else {
                 notice = Dictation.shared.problem ?? String(localized: "I didn't catch that.")
                 Agent.shared.setMood(.confused)
-                OverlayController.shared.hide(after: 1.6)
+                if purpose == .dictate { DictationPillController.shared.hide(after: 1.6) } else { OverlayController.shared.hide(after: 1.6) }
                 mode = .hidden
                 return
             }
@@ -92,7 +93,7 @@ final class Copilot {
                     notice = error.localizedDescription
                     Agent.shared.setMood(.confused)
                 }
-                OverlayController.shared.hide(after: 0.9)
+                DictationPillController.shared.hide(after: notice == nil ? 0.3 : 1.6)
                 mode = .hidden
             }
         }
@@ -134,6 +135,7 @@ final class Copilot {
         Agent.shared.setMood(.idle)
         #if os(macOS)
         OverlayController.shared.hide(after: 0.2)
+        DictationPillController.shared.hide()
         #endif
     }
 
