@@ -2,6 +2,37 @@
 import AppKit
 import SwiftUI
 
+/// Empty space in a top bar that behaves like a title bar: drag to move the
+/// window, double-click to zoom it (or what System Settings says). Put it
+/// behind a top bar: its buttons keep their clicks, the gaps between them
+/// become title bar.
+struct TitleBarArea: NSViewRepresentable {
+    func makeNSView(context: Context) -> TitleBarView { TitleBarView() }
+    func updateNSView(_ view: TitleBarView, context: Context) {}
+}
+
+class TitleBarView: NSView {
+    override var mouseDownCanMoveWindow: Bool { false }
+
+    override func mouseDown(with event: NSEvent) {
+        guard let window else { return }
+        if event.clickCount == 2 {
+            switch UserDefaults.standard.string(forKey: "AppleActionOnDoubleClick") ?? "Maximize" {
+            case "Minimize": window.miniaturize(nil)
+            case "None": break
+            default: window.zoom(nil)
+            }
+        } else {
+            window.performDrag(with: event)
+        }
+    }
+}
+
+extension View {
+    /// Makes the empty parts of this top bar act as the window's title bar.
+    func titleBar() -> some View { background { TitleBarArea() } }
+}
+
 /// Empty space that behaves like a title bar: drag to move the window,
 /// double-click to zoom (or minimise, or nothing, following System Settings
 /// → Desktop & Dock → "Double-click a window's title bar").
@@ -12,9 +43,7 @@ struct WindowChromeArea: NSViewRepresentable {
     func makeNSView(context: Context) -> ChromeView { ChromeView() }
     func updateNSView(_ view: ChromeView, context: Context) {}
 
-    final class ChromeView: NSView {
-        override var mouseDownCanMoveWindow: Bool { false }
-
+    final class ChromeView: TitleBarView {
         /// A transparent title bar with no toolbar. An empty toolbar used to
         /// lower the window buttons, but its strip took every click across
         /// the top of the window (sidebar, search, History, New
@@ -69,18 +98,6 @@ struct WindowChromeArea: NSViewRepresentable {
             }
         }
 
-        override func mouseDown(with event: NSEvent) {
-            guard let window else { return }
-            if event.clickCount == 2 {
-                switch UserDefaults.standard.string(forKey: "AppleActionOnDoubleClick") ?? "Maximize" {
-                case "Minimize": window.miniaturize(nil)
-                case "None": break
-                default: window.zoom(nil)
-                }
-            } else {
-                window.performDrag(with: event)
-            }
-        }
     }
 }
 
@@ -96,5 +113,12 @@ struct SidebarMaterial: NSViewRepresentable {
     }
 
     func updateNSView(_ view: NSVisualEffectView, context: Context) {}
+}
+#else
+import SwiftUI
+
+extension View {
+    /// No title bar to stand in for on the iPhone.
+    func titleBar() -> some View { self }
 }
 #endif

@@ -69,6 +69,7 @@ struct HomeView: View {
         }
         .padding(.horizontal, 14)
         .frame(height: WindowBar.height)
+        .titleBar()
     }
 
     // MARK: Calendar

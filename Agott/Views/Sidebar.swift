@@ -33,6 +33,7 @@ struct Sidebar: View {
             }
             .font(.system(size: 14, weight: .regular))
             .frame(height: WindowBar.height)
+            .titleBar()
             .padding(.bottom, 12)
 
             ScrollView {
@@ -243,6 +244,7 @@ struct CollapsedChrome: View {
         .font(.system(size: 14))
         .padding(.leading, WindowBar.afterButtons)
         .frame(height: WindowBar.height)
+        .titleBar()
     }
 }
 #endif

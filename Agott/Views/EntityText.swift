@@ -13,7 +13,7 @@ enum EntityText {
            source.distance(from: start.lowerBound, to: source.endIndex) < 16 {
             source = String(source[..<start.lowerBound])
         }
-        return source.replacing(/<e id=(\d+)\s*\/>/) { match in
+        return source.replacing(/<e id="?(\d+)"?\s*\/?>/) { match in
             let id = Int64(match.1) ?? 0
             let label = escape(PeopleDirectory.shared.label(id, hidden: hidden))
             return "[\(label)](agott://person/\(id))"
@@ -23,7 +23,7 @@ enum EntityText {
     /// Tags as plain words, for one-line previews, titles and copying.
     static func plain(_ text: String, hidden: Bool) -> String {
         let source = hidden ? PeopleDirectory.shared.tagPlainNames(text) : text
-        return source.replacing(/<e id=(\d+)\s*\/>/) { match in
+        return source.replacing(/<e id="?(\d+)"?\s*\/?>/) { match in
             PeopleDirectory.shared.label(Int64(match.1) ?? 0, hidden: hidden)
         }
     }

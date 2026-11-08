@@ -537,7 +537,7 @@ final class PeopleDirectory {
 
     /// The tags in a text, in order.
     nonisolated static func tags(in text: String) -> [Int64] {
-        text.matches(of: /<e id=(\d+)\s*\/>/).compactMap { Int64($0.1) }
+        text.matches(of: /<e id="?(\d+)"?\s*\/?>/).compactMap { Int64($0.1) }
     }
 
     /// Writes tags in place of the names of `people`, for replies where the

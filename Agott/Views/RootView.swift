@@ -90,6 +90,12 @@ struct RootView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Ink.canvas)
+            // Pages without a top bar of their own still get a title bar strip.
+            .overlay(alignment: .top) {
+                if section != .home && section != .chat {
+                    TitleBarArea().frame(height: WindowBar.height)
+                }
+            }
             .id(section)
             }
         }

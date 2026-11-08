@@ -610,6 +610,7 @@ private struct ChatTopBar: View {
         }
         .padding(.horizontal, 14)
         .frame(height: WindowBar.height)
+        .titleBar()
         .animation(.easeOut(duration: 0.2), value: agent.isBusyHere)
     }
 }
