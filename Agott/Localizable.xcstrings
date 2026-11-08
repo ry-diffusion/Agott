@@ -7808,6 +7808,106 @@
           }
         }
       }
+    },
+    "How can I help you today?" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Como posso ajudar você hoje?"
+          }
+        }
+      }
+    },
+    "Drag to capture part of the screen" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arraste para capturar uma parte da tela"
+          }
+        }
+      }
+    },
+    "Drag to capture part of the screen, or send a window" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arraste para capturar uma parte da tela, ou envie uma janela"
+          }
+        }
+      }
+    },
+    "Send a screenshot of %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar uma captura de tela de %@"
+          }
+        }
+      }
+    },
+    "Continue the current one" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continuar a atual"
+          }
+        }
+      }
+    },
+    "Current conversation" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conversa atual"
+          }
+        }
+      }
+    },
+    "this window" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "esta janela"
+          }
+        }
+      }
+    },
+    "Shortcut to type" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atalho para escrever"
+          }
+        }
+      }
+    },
+    "Opens Agott over any app: type a question, send a screenshot of a window or part of the screen." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre o Agott sobre qualquer app: escreva uma pergunta, envie a captura de uma janela ou de parte da tela."
+          }
+        }
+      }
+    },
+    "Hold, speak, let go: Agott answers over what you are doing. Tap it to type and send screenshots instead." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Segure, fale, solte: o Agott responde por cima do que você está fazendo. Toque para escrever e enviar capturas de tela."
+          }
+        }
+      }
     }
   },
   "version" : "1.1"

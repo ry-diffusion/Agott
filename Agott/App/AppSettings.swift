@@ -59,6 +59,15 @@ final class AppSettings {
     var myName: String { didSet { save(myName, "myName") } }
     var speechLocale: String { didSet { save(speechLocale, "speechLocale") } }
     var askKey: HoldKey { didSet { save(askKey.rawValue, "askKey") } }
+    /// The key combination that opens quick entry to type (a TextShortcut raw value).
+    var textShortcut: String {
+        didSet {
+            save(textShortcut, "textShortcut")
+            #if os(macOS)
+            Copilot.shared.registerTextShortcut()
+            #endif
+        }
+    }
     var dictateKey: HoldKey { didSet { save(dictateKey.rawValue, "dictateKey") } }
     var autopilot: Bool { didSet { save(autopilot, "autopilot") } }
     var useScreenContext: Bool { didSet { save(useScreenContext, "useScreenContext") } }
@@ -113,6 +122,7 @@ final class AppSettings {
         speechLocale = defaults.string(forKey: "speechLocale")
             ?? (Locale.preferredLanguages.first?.hasPrefix("pt") == true ? "pt-BR" : "en-US")
         askKey = HoldKey(rawValue: defaults.string(forKey: "askKey") ?? "") ?? .rightOption
+        textShortcut = defaults.string(forKey: "textShortcut") ?? "optionSpace"
         dictateKey = HoldKey(rawValue: defaults.string(forKey: "dictateKey") ?? "") ?? .off
         autopilot = defaults.bool(forKey: "autopilot")
         useScreenContext = defaults.object(forKey: "useScreenContext") as? Bool ?? true

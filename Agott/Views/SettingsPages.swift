@@ -191,9 +191,15 @@ struct SettingsPageView: View {
             }
         case .voice:
             SettingsCard {
-                SettingsRow(symbol: "waveform", title: "Hold to ask", detail: "Hold, speak, let go: Agott answers over what you are doing. Tap to type instead.") {
+                SettingsRow(symbol: "waveform", title: "Hold to ask", detail: "Hold, speak, let go: Agott answers over what you are doing. Tap it to type and send screenshots instead.") {
                     Picker("", selection: $settings.askKey) { ForEach(HoldKey.allCases) { Text($0.title).tag($0) } }
                         .labelsHidden().fixedSize()
+                }
+                SettingsRow(symbol: "text.cursor", title: "Shortcut to type", detail: "Opens Agott over any app: type a question, send a screenshot of a window or part of the screen.") {
+                    Picker("", selection: $settings.textShortcut) {
+                        ForEach(TextShortcut.allCases) { Text($0.title).tag($0.rawValue) }
+                    }
+                    .labelsHidden().fixedSize()
                 }
                 SettingsRow(symbol: "keyboard", title: "Hold to dictate", detail: "What you say is cleaned up and typed where your cursor is.") {
                     Picker("", selection: $settings.dictateKey) { ForEach(HoldKey.allCases) { Text($0.title).tag($0) } }

@@ -38,8 +38,19 @@ final class Copilot {
         keys.onRelease = { [weak self] purpose, duration in self?.released(purpose, after: duration) }
         keys.onCancel = { [weak self] _ in self?.abandon() }
         keys.enable()
+        registerTextShortcut()
         #endif
     }
+
+    #if os(macOS)
+    /// The text shortcut from Settings opens (or closes) quick entry.
+    func registerTextShortcut() {
+        let shortcut = TextShortcut(rawValue: AppSettings.shared.textShortcut) ?? .optionSpace
+        GlobalHotKey.shared.register(shortcut) {
+            if QuickEntryController.shared.isShown { QuickEntryController.shared.hide() } else { Copilot.shared.beginTyping() }
+        }
+    }
+    #endif
 
     #if os(macOS)
     private func pressed(_ purpose: HoldKeyMonitor.Purpose) {
@@ -88,22 +99,30 @@ final class Copilot {
     }
     #endif
 
+    /// A tap of the ask key, the text shortcut or "Ask Agott…": quick entry
+    /// over the screen, to type and to send screenshots.
     func beginTyping() {
-        mode = .typing
         Agent.shared.setMood(.idle)
         #if os(macOS)
-        OverlayController.shared.show(focus: true)
+        QuickEntryController.shared.show()
+        #else
+        mode = .typing
         #endif
     }
 
-    func ask(_ text: String) {
+    func ask(_ text: String, attachments: [FileAttachment] = [], newChat: Bool = false) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+        guard !trimmed.isEmpty || !attachments.isEmpty else { return }
         draft = ""
         mode = .answering
+        if newChat { Agent.shared.newConversation() }
         let before = Agent.shared.turns.count
-        Agent.shared.send(trimmed, lookAtScreen: true)
+        // Screenshots sent along say what is on screen; otherwise Agott looks.
+        Agent.shared.send(trimmed, lookAtScreen: attachments.isEmpty, attachments: attachments)
         if Agent.shared.turns.count > before { sinceTurn = Agent.shared.turns[before].id }
+        #if os(macOS)
+        OverlayController.shared.show(focus: false)
+        #endif
     }
 
     func abandon() {
