@@ -2104,6 +2104,47 @@
         }
       }
     },
+    "Download" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Baixar"
+          }
+        }
+      }
+    },
+    "Download (~600 MB)" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Baixar (~600 MB)"
+          }
+        }
+      }
+    },
+    "Downloading the fast transcription model… %lld%%" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Baixando o modelo de transcrição rápida… %lld%%"
+          }
+        }
+      }
+    },
+    "Downloads Parakeet from Hugging Face, once." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Baixa o Parakeet do Hugging Face, uma vez só."
+          }
+        }
+      }
+    },
     "Draft an email" : {
       "localizations" : {
         "pt-BR" : {
@@ -4622,6 +4663,38 @@
         }
       }
     },
+    "Parakeet is much faster and better with Portuguese and English mixed. Used for dictation and voice notes." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Parakeet é muito mais rápido e melhor com português e inglês misturados. Usado na ditação e nos áudios."
+          }
+        }
+      }
+    },
+    "Parakeet is much faster and better with Portuguese and English mixed. Voice notes are only read with it; until it is downloaded, dictation uses Apple's engine." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Parakeet é muito mais rápido e melhor com português e inglês misturados. Os áudios só são lidos com ele; até ele ser baixado, a ditação usa o motor da Apple."
+          }
+        }
+      }
+    },
+    "Parakeet is not on this Mac yet: Apple's engine is used until it is downloaded." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Parakeet ainda não está neste Mac: o motor da Apple é usado até ele ser baixado."
+          }
+        }
+      }
+    },
     "Pause" : {
       "localizations" : {
         "pt-BR" : {
@@ -5173,6 +5246,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lendo momento %1$lld de %2$lld…"
+          }
+        }
+      }
+    },
+    "Reading what it found" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lendo o que encontrou"
           }
         }
       }
@@ -6185,6 +6268,16 @@
         }
       }
     },
+    "Speech engine" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Motor de fala"
+          }
+        }
+      }
+    },
     "Speech language" : {
       "localizations" : {
         "pt-BR" : {
@@ -6516,6 +6609,16 @@
         }
       }
     },
+    "The download finished incomplete." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O download terminou incompleto."
+          }
+        }
+      }
+    },
     "The embedding model could not be downloaded." : {
       "localizations" : {
         "pt-BR" : {
@@ -6692,6 +6795,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pensando no que dizer…"
+          }
+        }
+      }
+    },
+    "Thinking about your question" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pensando na sua pergunta"
           }
         }
       }
@@ -7787,6 +7900,16 @@
         }
       }
     },
+    "Writing the answer" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escrevendo a resposta"
+          }
+        }
+      }
+    },
     "Writing who %@ is…" : {
       "localizations" : {
         "pt-BR" : {
@@ -8058,122 +8181,32 @@
         }
       }
     },
-    "Speech engine" : {
+    "Clean up dictation" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Motor de fala"
+            "value" : "Limpar a ditação"
           }
         }
       }
     },
-    "Parakeet is much faster and better with Portuguese and English mixed. Used for dictation and voice notes." : {
+    "On this Mac" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Parakeet é muito mais rápido e melhor com português e inglês misturados. Usado na ditação e nos áudios."
+            "value" : "Neste Mac"
           }
         }
       }
     },
-    "Parakeet is not on this Mac yet: Apple's engine is used until it is downloaded." : {
+    "Removes filler words and false starts and applies your own corrections before typing. Off types exactly what was heard." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Parakeet ainda não está neste Mac: o motor da Apple é usado até ele ser baixado."
-          }
-        }
-      }
-    },
-    "Download (~600 MB)" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Baixar (~600 MB)"
-          }
-        }
-      }
-    },
-    "Downloads Parakeet from Hugging Face, once." : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Baixa o Parakeet do Hugging Face, uma vez só."
-          }
-        }
-      }
-    },
-    "Reading what it found" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lendo o que encontrou"
-          }
-        }
-      }
-    },
-    "Thinking about your question" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pensando na sua pergunta"
-          }
-        }
-      }
-    },
-    "Writing the answer" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Escrevendo a resposta"
-          }
-        }
-      }
-    },
-    "Downloading the fast transcription model… %lld%%" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Baixando o modelo de transcrição rápida… %lld%%"
-          }
-        }
-      }
-    },
-    "Download" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Baixar"
-          }
-        }
-      }
-    },
-    "The download finished incomplete." : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O download terminou incompleto."
-          }
-        }
-      }
-    },
-    "Parakeet is much faster and better with Portuguese and English mixed. Voice notes are only read with it; until it is downloaded, dictation uses Apple's engine." : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O Parakeet é muito mais rápido e melhor com português e inglês misturados. Os áudios só são lidos com ele; até ele ser baixado, a ditação usa o motor da Apple."
+            "value" : "Tira vícios de fala e começos em falso e aplica suas próprias correções antes de digitar. Desligado digita exatamente o que foi ouvido."
           }
         }
       }

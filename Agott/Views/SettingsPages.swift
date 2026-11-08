@@ -217,6 +217,24 @@ struct SettingsPageView: View {
                         .labelsHidden().fixedSize()
                     }
                 }
+                SettingsRow(symbol: "wand.and.stars", title: "Clean up dictation",
+                            detail: "Removes filler words and false starts and applies your own corrections before typing. Off types exactly what was heard.") {
+                    Picker("", selection: $settings.dictationCleanup) {
+                        Text("Off").tag("off")
+                        Text("On this Mac").tag("apple")
+                        let models = ModelCatalog.shared.models.filter(\.isSupported).sorted { $0.name < $1.name }
+                        if !models.isEmpty {
+                            Divider()
+                            ForEach(models) { Text(verbatim: $0.name).tag($0.id) }
+                        }
+                        // A model chosen before the catalog loaded stays selectable.
+                        if !["off", "apple"].contains(settings.dictationCleanup),
+                           !models.contains(where: { $0.id == settings.dictationCleanup }) {
+                            Text(verbatim: settings.dictationCleanup).tag(settings.dictationCleanup)
+                        }
+                    }
+                    .labelsHidden().fixedSize()
+                }
                 SettingsRow(symbol: "globe", title: "Speech language", detail: "The language you speak to Agott in.") {
                     Picker("", selection: $settings.speechLocale) {
                         Text(verbatim: "Português (Brasil)").tag("pt-BR")

@@ -58,6 +58,9 @@ final class AppSettings {
     var lookWithVision: Bool { didSet { save(lookWithVision, "lookWithVision") } }
     var myName: String { didSet { save(myName, "myName") } }
     var speechLocale: String { didSet { save(speechLocale, "speechLocale") } }
+    /// What tidies dictation before it is typed: "off", "apple" (the model on
+    /// this Mac) or a chat model's id (DeepSeek and the like).
+    var dictationCleanup: String { didSet { save(dictationCleanup, "dictationCleanup") } }
     /// The speech engine on the Mac (a SpeechEngine raw value).
     var speechEngine: String {
         didSet {
@@ -128,6 +131,7 @@ final class AppSettings {
         visionModelName = defaults.string(forKey: "visionModelName") ?? Self.defaultModel
         lookWithVision = defaults.object(forKey: "lookWithVision") as? Bool ?? false
         myName = defaults.string(forKey: "myName") ?? Self.defaultName
+        dictationCleanup = defaults.string(forKey: "dictationCleanup") ?? "apple"
         speechEngine = defaults.string(forKey: "speechEngine") ?? "parakeet"
         speechLocale = defaults.string(forKey: "speechLocale")
             ?? (Locale.preferredLanguages.first?.hasPrefix("pt") == true ? "pt-BR" : "en-US")

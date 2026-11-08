@@ -91,10 +91,10 @@ final class Copilot {
             case .dictate:
                 mode = .inserting
                 Agent.shared.setMood(.working)
-                // The clean-up is a nicety: never worth more than two seconds
-                // of "Typing it for you…". Parakeet already punctuates.
+                // The clean-up is a nicety, chosen in Settings: never worth
+                // more than a few seconds of "Typing it for you…".
                 let started = ContinuousClock.now
-                let polished = await Rambler.polish(text, within: .seconds(2))
+                let polished = await Rambler.polish(text, within: Rambler.limit)
                 do {
                     try TextInsertion.insert(polished)
                     log.notice("Dictation typed \(polished.count) characters, cleaned up in \((ContinuousClock.now - started).description, privacy: .public)")

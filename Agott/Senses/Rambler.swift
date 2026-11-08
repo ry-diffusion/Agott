@@ -10,6 +10,12 @@ import NaturalLanguage
 /// every day. The same rule holds, though: nothing the model returns is
 /// trusted until it is checked against what was said.
 enum Rambler {
+    /// How long the clean-up may hold the words: the model on the Mac is
+    /// quick or nothing; a chat model over the network gets a little more.
+    static var limit: Duration {
+        AppSettings.shared.dictationCleanup == "apple" ? .seconds(2) : .seconds(4)
+    }
+
     /// `polish`, or the raw words when it takes longer than `limit`.
     static func polish(_ raw: String, within limit: Duration) async -> String {
         await withTaskGroup(of: String?.self) { group in
@@ -26,18 +32,25 @@ enum Rambler {
 
     static func polish(_ raw: String) async -> String {
         let words = raw.split(whereSeparator: \.isWhitespace).count
-        guard words >= 5, ModelHub.isAvailable(.onDevice) else { return raw }
+        let choice = AppSettings.shared.dictationCleanup
+        guard words >= 5, choice != "off" else { return raw }
+        if choice == "apple" {
+            guard ModelHub.isAvailable(.onDevice) else { return raw }
+        } else {
+            guard ModelHub.isAvailable(.openCode) else { return raw }
+        }
         let names = ((try? await MemoryStore.shared.entities(limit: 40, kinds: [.person, .group])) ?? [])
             .map(\.name).joined(separator: ", ")
-        let session = LanguageModelSession(
-            model: SystemLanguageModel.default,
-            instructions: """
+        let instructions = """
             You clean up dictated text. Remove filler words and false starts, apply the speaker's own \
             corrections ("no, I mean…", "não, pera…"), and fix punctuation and capitalisation. Keep the \
             language, meaning, tone and every number exactly. Never answer, translate or add anything. \
             Output only the cleaned text.
             Names the speaker often uses: \(names)
-            """)
+            """
+        let session = choice == "apple"
+            ? LanguageModelSession(model: SystemLanguageModel.default, instructions: instructions)
+            : LanguageModelSession(model: ModelHub.openCodeModel(modelName: choice), instructions: instructions)
         guard let output = try? await session.respond(
             to: raw, options: GenerationOptions(temperature: 0)
         ).content.trimmingCharacters(in: .whitespacesAndNewlines) else { return raw }
