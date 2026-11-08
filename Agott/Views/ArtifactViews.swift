@@ -23,27 +23,12 @@ struct ArtifactCard: View {
             sheet = true
             #endif
         } label: {
-            HStack(spacing: 12) {
-                Image(systemName: artifact.kind.symbol)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Ink.spot)
-                    .frame(width: 40, height: 40)
-                    .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Ink.spot.opacity(0.14)))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(artifact.title).font(.body.weight(.semibold)).foregroundStyle(Ink.text).lineLimit(1)
-                    Text(subtitle).font(.caption).foregroundStyle(Ink.muted)
-                }
-                Spacer(minLength: 8)
-                Text(isOpen ? "Close" : "Open")
-                    .font(.callout.weight(.semibold))
-                    .foregroundStyle(Ink.muted)
+            // A document in the conversation, the way Telegram shows a file.
+            MessageBubble(outgoing: false) {
+                DocumentRow(symbol: artifact.kind.symbol, title: artifact.title, detail: detail,
+                            highlighted: hovering)
             }
-            .padding(10)
             .frame(maxWidth: 420, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Ink.surface))
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(Ink.spot.opacity(hovering || isOpen ? 0.55 : 0), lineWidth: 1))
             .contentShape(Rectangle())
         }
         .buttonStyle(PressScale())
@@ -53,6 +38,26 @@ struct ArtifactCard: View {
         #endif
         .animation(.easeOut(duration: 0.12), value: hovering)
         .sheet(isPresented: $sheet) { ArtifactPanel(key: artifact.key, fallback: artifact) }
+    }
+
+    /// Kind, version, and how long it takes to read.
+    private var detail: String {
+        let words = artifact.content.split(whereSeparator: \.isWhitespace).count
+        var parts = [subtitle]
+        if artifact.kind == .document || artifact.kind == .table {
+            parts.append(String(localized: "\(max(1, words / 200)) min read"))
+        }
+        if isOpen { parts.append(String(localized: "Open")) }
+        return parts.joined(separator: " · ")
+    }
+
+    private var badge: String {
+        switch artifact.kind {
+        case .document: "DOC"
+        case .table: "TAB"
+        case .html: "WEB"
+        case .code: String((artifact.language ?? "code").uppercased().prefix(4))
+        }
     }
 
     private var subtitle: String {
@@ -93,7 +98,7 @@ struct ArtifactPanel: View {
                 Divider().opacity(0.5)
                 content(artifact)
             }
-            .background(Ink.canvas)
+            .background(Ink.surface)
             .onChange(of: versions.count) { _, _ in version = nil }
         }
     }
@@ -122,7 +127,7 @@ struct ArtifactPanel: View {
                 .buttonStyle(.hoverIcon)
                 .menuIndicator(.hidden)
                 .fixedSize()
-                .help(Text("Versions"))
+                .tip("Versions")
             }
             Spacer(minLength: 8)
             if artifact.kind == .html || artifact.kind == .document {
@@ -131,19 +136,19 @@ struct ArtifactPanel: View {
                 } label: {
                     Image(systemName: showSource ? "eye" : "chevron.left.forwardslash.chevron.right")
                 }
-                .help(Text(showSource ? "Preview" : "Source"))
+                .tip(showSource ? "Preview" : "Source")
             }
             Button {
-                Clipboard.copy(artifact.content)
+                Clipboard.copy(artifact.exportText)
                 copied = true
                 Task { try? await Task.sleep(for: .seconds(1.5)); copied = false }
             } label: {
                 Image(systemName: copied ? "checkmark" : "doc.on.doc")
             }
-            .help(Text("Copy"))
+            .tip("Copy")
             #if os(macOS)
             Button { save(artifact) } label: { Image(systemName: "square.and.arrow.down") }
-                .help(Text("Save…"))
+                .tip("Save…")
             PublishButton(artifact: artifact)
             #else
             ShareLink(item: artifact.content) { Image(systemName: "square.and.arrow.up") }
@@ -157,7 +162,7 @@ struct ArtifactPanel: View {
                 Image(systemName: "xmark")
             }
             .keyboardShortcut(.cancelAction)
-            .help(Text("Close"))
+            .tip("Close")
         }
         .buttonStyle(.hoverIcon)
         .font(.system(size: 14, weight: .semibold))
@@ -198,7 +203,7 @@ struct ArtifactPanel: View {
         panel.nameFieldStringValue = "\(safe).\(artifact.kind.fileExtension)"
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
-            try? artifact.content.write(to: url, atomically: true, encoding: .utf8)
+            try? artifact.exportText.write(to: url, atomically: true, encoding: .utf8)
         }
     }
     #endif
@@ -255,10 +260,10 @@ private struct PublishButton: View {
                 .menuStyle(.button)
                 .menuIndicator(.hidden)
                 .fixedSize()
-                .help(Text(upToDate ? "Published" : "Published, with a newer version here"))
+                .tip(upToDate ? "Published" : "Published, with a newer version here")
             } else {
                 Button { confirming = true } label: { Image(systemName: "globe") }
-                    .help(Text("Publish to \(publisher.domain)"))
+                    .tip("Publish to \(publisher.domain)")
             }
         }
         .confirmationDialog(

@@ -84,7 +84,12 @@ nonisolated struct ReadChatTool: Tool {
         guard let chat = try await MemoryStore.shared.findChats(named: arguments.person, limit: 1).first else {
             return "No chat found with \(arguments.person). The messages may not be indexed yet."
         }
-        let lines = try await MemoryStore.shared.lines(source: chat.source, chatID: chat.chatID, limit: arguments.count)
+        return try await Self.read(chat, count: arguments.count)
+    }
+
+    /// The end of one known chat as a transcript.
+    static func read(_ chat: ChatSummary, count: Int) async throws -> String {
+        let lines = try await MemoryStore.shared.lines(source: chat.source, chatID: chat.chatID, limit: count)
         let me = AppSettings.myNameSnapshot
         return "\(chat.source.displayName) chat \"\(chat.name)\" (\(chat.messageCount) messages total):\n"
             + RelationshipAnalyzer.transcript(lines, me: me)
@@ -109,6 +114,11 @@ nonisolated struct PersonInsightTool: Tool {
         guard let chat = try await MemoryStore.shared.findChats(named: arguments.person, limit: 1).first else {
             return "No chat found with \(arguments.person)."
         }
+        return await Self.insight(chat)
+    }
+
+    /// How things stand in one known chat.
+    static func insight(_ chat: ChatSummary) async -> String {
         let stats = await RelationshipAnalyzer.stats(for: chat)
         let facts = (try? await MemoryStore.shared.facts(matching: chat.name, limit: 12)) ?? []
         var text = "\(chat.name) (\(chat.source.displayName)): " + RelationshipAnalyzer.statsLine(stats)
@@ -152,7 +162,7 @@ nonisolated struct RememberTool: Tool {
     struct Arguments {
         @Guide(description: "Who the fact is about. Use \"me\" for the user.")
         var subject: String
-        @Guide(description: "The relation, short, e.g. works at, likes, birthday is, is dating")
+        @Guide(description: "The relation, short, in the user's language, e.g. trabalha em, gosta de, faz aniversário em, namora")
         var predicate: String
         @Guide(description: "The value")
         var object: String

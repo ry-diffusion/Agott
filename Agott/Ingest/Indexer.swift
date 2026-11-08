@@ -11,6 +11,8 @@ final class Indexer {
     enum Phase: Equatable {
         case idle
         case reading(MemorySource)
+        /// Voice notes and photos becoming words.
+        case media(done: Int)
         case linking
         case embedding(done: Int, total: Int)
         case learning(done: Int, total: Int)
@@ -22,6 +24,8 @@ final class Indexer {
     }
 
     private(set) var phase: Phase = .idle
+    /// What the model is learning, which runs alongside reading.
+    private(set) var learnPhase: Phase = .idle
     private(set) var states: [MemorySource: SourceState] = [:]
     private(set) var counts: [MemorySource: Int] = [:]
     private(set) var totals = (messages: 0, chunks: 0, vectors: 0, entities: 0, facts: 0)
@@ -38,6 +42,15 @@ final class Indexer {
 
     /// One line for anywhere in the app: what memory is doing right now.
     var statusText: String {
+        switch (phase, learnPhase) {
+        case (.idle, .idle): return describe(.idle)
+        case (.idle, let learning): return describe(learning)
+        case (let reading, .idle): return describe(reading)
+        case (let reading, let learning): return describe(reading) + " · " + describe(learning)
+        }
+    }
+
+    private func describe(_ phase: Phase) -> String {
         switch phase {
         case .idle:
             if isPaused { return String(localized: "Indexing paused") }
@@ -52,6 +65,9 @@ final class Indexer {
             return readSoFar > 0
                 ? String(localized: "Reading \(source.displayName)… \(readSoFar.formatted()) messages")
                 : String(localized: "Reading \(source.displayName)…")
+        case .media(let done):
+            return done > 0 ? String(localized: "Listening to voice notes and looking at photos… \(done.formatted())")
+                            : String(localized: "Listening to voice notes and looking at photos…")
         case .linking: return String(localized: "Connecting the dots…")
         case .embedding(let done, let total): return String(localized: "Understanding moments \(done.formatted()) of \(total.formatted())…")
         case .learning(let done, let total): return String(localized: "Learning about you \(done) of \(total)…")
@@ -61,7 +77,7 @@ final class Indexer {
 
     /// 0…1 when the current step can be measured, nil when it cannot.
     var progress: Double? {
-        switch phase {
+        switch phase == .idle ? learnPhase : phase {
         case .embedding(let done, let total), .learning(let done, let total), .reflecting(let done, let total):
             total > 0 ? min(1, Double(done) / Double(total)) : nil
         case .reading:
@@ -123,6 +139,12 @@ final class Indexer {
 
     private func index() async {
         lastError = nil
+        // Understanding starts while reading: the newest moments land first,
+        // and the model reads them as they arrive instead of after every
+        // message of every source has been indexed.
+        if AppSettings.shared.autoLearn, ModelHub.isAvailable(AppSettings.shared.learningProvider) {
+            learn(untilDone: true)
+        }
         #if os(macOS)
         if !contacts.isLoaded {
             let contacts = self.contacts
@@ -134,6 +156,17 @@ final class Indexer {
             phase = .reading(source.kind)
             await read(source)
         }
+        // WhatsApp voice notes and photos, as words, in their conversations.
+        if AppSettings.shared.enabledSources.contains(.whatsapp),
+           AppSettings.shared.transcribeVoiceNotes || AppSettings.shared.describePhotos {
+            var done = 0
+            phase = .media(done: 0)
+            while !Task.isCancelled, let added = await MediaIngestor.run(contacts: contacts) {
+                done += added
+                phase = .media(done: done)
+                await Task.yield()
+            }
+        }
         #endif
 
         guard !Task.isCancelled else { phase = .idle; return }
@@ -144,6 +177,9 @@ final class Indexer {
                 guard try await KnowledgeGraph.link(batch: 150) > 0 else { break }
                 await Pace.rest(after: batch)
             }
+            // Who is who, by id: people, groups and their members.
+            if (try? await MemoryStore.shared.syncPeople()) ?? 0 > 0 { await PeopleDirectory.shared.refresh() }
+            await ContactPhotos.shared.refresh()
         } catch {
             lastError = error.localizedDescription
         }
@@ -277,6 +313,8 @@ final class Indexer {
                 guard try await KnowledgeGraph.link(batch: 150) > 0 else { break }
                 await Pace.rest(after: batch)
             }
+            // Who is who, by id: people, groups and their members.
+            if (try? await MemoryStore.shared.syncPeople()) ?? 0 > 0 { await PeopleDirectory.shared.refresh() }
             // Totals drive several screens; once a second is plenty.
             if Date().timeIntervalSince(lastTotals) > 1 {
                 lastTotals = .now
@@ -329,28 +367,44 @@ final class Indexer {
 
     /// Reads your own words with the on-device model and extracts facts,
     /// then rewrites the portrait.
-    func learn(moments: Int = 400) {
+    /// Learns from the next moments. `untilDone` keeps going until every
+    /// moment has been read (a re-read), instead of one batch per run.
+    func learn(moments: Int = 400, untilDone: Bool = false) {
         guard learnTask == nil, !isPaused else { return }
         isLearning = true
         learnTask = Task(priority: .utility) {
             defer {
                 isLearning = false
                 learnTask = nil
-                phase = .idle
+                learnPhase = .idle
             }
-            phase = .learning(done: 0, total: moments)
+            learnPhase = .learning(done: 0, total: moments)
             do {
-                _ = try await KnowledgeGraph.learn(maxMoments: moments) { [weak self] count in
-                    self?.phase = .learning(done: count, total: moments)
-                }
+                var read = 0
+                var last = 0
+                repeat {
+                    let before = read
+                    last = try await KnowledgeGraph.learn(maxMoments: moments) { [weak self] count in
+                        self?.learnPhase = .learning(done: before + count, total: before + moments)
+                    }
+                    read += last
+                    if untilDone { await refreshTotals() }
+                    // A short batch means nothing is left to read.
+                } while untilDone && last >= moments && !Task.isCancelled
                 let portrait = try await KnowledgeGraph.writePortrait()
                 if !portrait.isEmpty { AppSettings.shared.aboutMe = portrait }
                 // Then the conversations that went deep, condensed.
                 let reflectTotal = 120
-                phase = .reflecting(done: 0, total: reflectTotal)
-                _ = try await Reflections.run(limit: reflectTotal) { [weak self] count in
-                    self?.phase = .reflecting(done: count, total: reflectTotal)
-                }
+                learnPhase = .reflecting(done: 0, total: reflectTotal)
+                var reflected = 0
+                repeat {
+                    let before = reflected
+                    let count = try await Reflections.run(limit: reflectTotal) { [weak self] count in
+                        self?.learnPhase = .reflecting(done: before + count, total: reflectTotal)
+                    }
+                    reflected += count
+                    if count == 0 { break }
+                } while untilDone && !Task.isCancelled
             } catch {
                 lastError = error.localizedDescription
             }
@@ -367,6 +421,33 @@ final class Indexer {
             await refreshTotals()
             learn()
         }
+    }
+
+    /// Reads your conversations with people again, until done: facts with
+    /// proof, nicknames, who is linked to whom, and the deep conversations.
+    func rereadPeople() {
+        stopLearning()
+        Task {
+            try? await MemoryStore.shared.resetPeopleLearning()
+            await refreshTotals()
+            learn(untilDone: true)
+        }
+    }
+
+    /// What a people re-read costs, roughly: moments, tokens and, when the
+    /// catalogue knows the price, dollars.
+    func peopleRelearnEstimate() async -> (moments: Int, tokens: Int, dollars: Double?) {
+        let size = (try? await MemoryStore.shared.peopleRelearnSize()) ?? (moments: 0, characters: 0)
+        // Instructions and schema per batch, the deep conversations again,
+        // and what comes back.
+        let input = Double(size.characters) * 1.25 / KnowledgeGraph.Budget.charactersPerToken
+        let output = input * 0.12
+        let model = ModelCatalog.shared.model(ModelHub.learningModel ?? AppSettings.shared.modelName)
+        var dollars: Double?
+        if let priceIn = model?.priceIn, let priceOut = model?.priceOut {
+            dollars = (input * priceIn + output * priceOut) / 1_000_000
+        }
+        return (size.moments, Int(input + output), dollars)
     }
 
     func stopLearning() {
@@ -392,6 +473,13 @@ final class Indexer {
         if source == .claude { ClaudeHistorySource.resetProgress() }
         #endif
         try? await MemoryStore.shared.forget(source: source)
+        // Rebuild who is who from what is left, and drop forgotten names from
+        // tags and photos.
+        _ = try? await MemoryStore.shared.syncPeople()
+        await PeopleDirectory.shared.refresh()
+        #if os(macOS)
+        await ContactPhotos.shared.refresh()
+        #endif
         await refreshTotals()
     }
 }

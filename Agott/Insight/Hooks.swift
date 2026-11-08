@@ -112,5 +112,11 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
 @Observable
 final class Navigator {
     static let shared = Navigator()
-    var section: AppSection = LaunchOptions.section ?? .chat
+    var section: AppSection = LaunchOptions.section ?? .home
+    /// The sidebar tucked away: only the page.
+    var zen = LaunchOptions.arguments.contains("-AgottZen")
+    #if os(macOS)
+    /// Settings open in the window, on this page; nil when they are closed.
+    var settingsPage: SettingsPage?
+    #endif
 }

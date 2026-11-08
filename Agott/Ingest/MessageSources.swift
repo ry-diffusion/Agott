@@ -187,11 +187,14 @@ nonisolated struct WhatsAppSource: MessageSource {
             """
             SELECT m.Z_PK, COALESCE(m.ZSTANZAID, m.Z_PK), m.ZTEXT, m.ZMESSAGEDATE, m.ZISFROMME,
                    s.Z_PK, COALESCE(s.ZPARTNERNAME, ''), COALESCE(s.ZCONTACTJID, ''), s.ZSESSIONTYPE,
-                   COALESCE(g.ZCONTACTNAME, g.ZFIRSTNAME, p.ZPUSHNAME, m.ZPUSHNAME, ''), COALESCE(g.ZMEMBERJID, m.ZFROMJID, '')
+                   \(Self.memberNameSQL), COALESCE(g.ZMEMBERJID, m.ZFROMJID, ''),
+                   COALESCE(cs.ZPARTNERNAME, ''), COALESCE(sp.ZPUSHNAME, '')
             FROM ZWAMESSAGE m
             JOIN ZWACHATSESSION s ON s.Z_PK = m.ZCHATSESSION
             LEFT JOIN ZWAGROUPMEMBER g ON g.Z_PK = m.ZGROUPMEMBER
             LEFT JOIN ZWAPROFILEPUSHNAME p ON p.ZJID = COALESCE(g.ZMEMBERJID, m.ZFROMJID)
+            LEFT JOIN ZWACHATSESSION cs ON cs.ZCONTACTJID = COALESCE(g.ZMEMBERJID, m.ZFROMJID) AND cs.ZSESSIONTYPE = 0
+            LEFT JOIN ZWAPROFILEPUSHNAME sp ON sp.ZJID = s.ZCONTACTJID
             WHERE m.ZMESSAGEDATE > ? AND m.ZMESSAGEDATE < ? AND m.ZTEXT IS NOT NULL AND m.ZTEXT != ''
               AND COALESCE(s.ZCONTACTJID, '') NOT LIKE '%status%'
               AND COALESCE(s.ZREMOVED, 0) = 0
@@ -199,45 +202,106 @@ nonisolated struct WhatsAppSource: MessageSource {
             """,
             [.double(afterApple), .double(beforeApple), .of(limit)]
         ) { row in
-            let text = row.text(2) ?? ""
-            let date = Date(timeIntervalSince1970: row.double(3) + appleEpochOffset)
-            let isFromMe = row.int(4) != 0
-            let jid = row.text(7) ?? ""
-            let isGroup = row.int(8) == 1 || jid.hasSuffix("@g.us")
-            let partner = row.text(6) ?? ""
-            let chatName = !partner.isEmpty ? partner : contacts.display(jid)
-
-            let sender: String
-            if isFromMe {
-                sender = AppSettings.myNameSnapshot
-            } else if isGroup {
-                let memberName = row.text(9) ?? ""
-                let memberJID = row.text(10) ?? ""
-                sender = contacts.name(forHandle: memberJID) ?? (memberName.isEmpty ? contacts.display(memberJID) : memberName)
-            } else {
-                sender = chatName
-            }
-
-            result.append(RawMessage(
-                source: .whatsapp, externalID: row.text(1) ?? String(row.int(0)),
-                chatID: jid.isEmpty ? String(row.int(5)) : jid, chatName: chatName, isGroup: isGroup,
-                sender: sender, isFromMe: isFromMe, date: date, text: text))
+            result.append(Self.message(from: row, text: row.text(2) ?? "", contacts: contacts))
         }
         return result
     }
 }
 
 extension WhatsAppSource {
-    /// Display names WhatsApp knows for people who are not in your contacts,
-    /// keyed by the name Agott used before it knew them: the id as digits.
+    /// The columns every message query selects, in this order, so one
+    /// function turns any of them into a message with the right names.
+    static let messageColumnsSQL = """
+    m.Z_PK, COALESCE(m.ZSTANZAID, m.Z_PK), m.ZTEXT, m.ZMESSAGEDATE, m.ZISFROMME,
+    s.Z_PK, COALESCE(s.ZPARTNERNAME, ''), COALESCE(s.ZCONTACTJID, ''), s.ZSESSIONTYPE,
+    \(memberNameSQL), COALESCE(g.ZMEMBERJID, m.ZFROMJID, ''),
+    COALESCE(cs.ZPARTNERNAME, ''), COALESCE(sp.ZPUSHNAME, '')
+    """
+
+    /// The joins those columns need.
+    static let messageJoinsSQL = """
+    FROM ZWAMESSAGE m
+    JOIN ZWACHATSESSION s ON s.Z_PK = m.ZCHATSESSION
+    LEFT JOIN ZWAGROUPMEMBER g ON g.Z_PK = m.ZGROUPMEMBER
+    LEFT JOIN ZWAPROFILEPUSHNAME p ON p.ZJID = COALESCE(g.ZMEMBERJID, m.ZFROMJID)
+    LEFT JOIN ZWACHATSESSION cs ON cs.ZCONTACTJID = COALESCE(g.ZMEMBERJID, m.ZFROMJID) AND cs.ZSESSIONTYPE = 0
+    LEFT JOIN ZWAPROFILEPUSHNAME sp ON sp.ZJID = s.ZCONTACTJID
+    """
+
+    /// A row of `messageColumnsSQL` as a message: who wrote it, in which
+    /// chat, named the way the rest of Agott names them.
+    static func message(from row: SQLiteDB.Statement, text: String, contacts: ContactBook,
+                        externalPrefix: String = "") -> RawMessage {
+        let date = Date(timeIntervalSince1970: row.double(3) + appleEpochOffset)
+        let isFromMe = row.int(4) != 0
+        let jid = row.text(7) ?? ""
+        let isGroup = row.int(8) == 1 || jid.hasSuffix("@g.us")
+        let partner = row.text(6) ?? ""
+        let chatPush = row.text(12) ?? ""
+        let chatName = isName(partner) ? partner
+            : contacts.name(forHandle: jid) ?? (isName(chatPush) ? chatPush : contacts.display(jid))
+
+        let sender: String
+        if isFromMe {
+            sender = AppSettings.myNameSnapshot
+        } else if isGroup {
+            // Whoever also has a chat of their own with you goes by the name
+            // that chat has, so they are one person in groups and alone.
+            let memberName = row.text(9) ?? ""
+            let memberJID = row.text(10) ?? ""
+            let ownChat = row.text(11) ?? ""
+            sender = contacts.name(forHandle: memberJID)
+                ?? (isName(ownChat) ? ownChat : isName(memberName) ? memberName : contacts.display(memberJID))
+        } else {
+            sender = chatName
+        }
+        return RawMessage(
+            source: .whatsapp, externalID: externalPrefix + (row.text(1) ?? String(row.int(0))),
+            chatID: jid.isEmpty ? String(row.int(5)) : jid, chatName: chatName, isGroup: isGroup,
+            sender: sender, isFromMe: isFromMe, date: date, text: text)
+    }
+
+    /// A group member's own name. WhatsApp leaves the contact name as an
+    /// empty string rather than null, so each one is skipped when empty.
+    static let memberNameSQL = """
+    COALESCE(NULLIF(g.ZCONTACTNAME, ''), NULLIF(p.ZPUSHNAME, ''), NULLIF(m.ZPUSHNAME, ''), NULLIF(g.ZFIRSTNAME, ''), '')
+    """
+
+    /// A name rather than a number written out ("+55 11 9…").
+    nonisolated static func isName(_ text: String) -> Bool {
+        text.contains(where: \.isLetter)
+    }
+
+    /// Names WhatsApp knows for people Agott only had as an id, keyed by the
+    /// name Agott used before: the id as digits ("+224064970952769"). The name
+    /// of their own chat with you comes first, then the name they gave
+    /// WhatsApp, then the one a message of theirs carried.
     static func profileNames() -> [String: String] {
         guard let db = try? SQLiteDB(path: path, readOnly: true) else { return [:] }
         var names: [String: String] = [:]
-        try? db.rows("SELECT ZJID, ZPUSHNAME FROM ZWAPROFILEPUSHNAME WHERE ZPUSHNAME IS NOT NULL AND ZPUSHNAME != ''") { row in
-            guard let jid = row.text(0), let name = row.text(1) else { return }
+        func add(_ jid: String?, _ name: String?, replacing: Bool) {
+            guard let jid, !jid.hasSuffix("@g.us"), let name = name?.trimmingCharacters(in: .whitespaces), isName(name) else { return }
             let bare = jid.components(separatedBy: "@").first ?? jid
             guard bare.allSatisfy(\.isNumber), bare.count > 6 else { return }
-            names["+" + bare] = name.trimmingCharacters(in: .whitespaces)
+            if replacing || names["+" + bare] == nil { names["+" + bare] = name }
+        }
+        // In a group a message's ZFROMJID is the group; the sender is the member.
+        try? db.rows("""
+            SELECT COALESCE(g.ZMEMBERJID, m.ZFROMJID), m.ZPUSHNAME FROM ZWAMESSAGE m
+            LEFT JOIN ZWAGROUPMEMBER g ON g.Z_PK = m.ZGROUPMEMBER
+            WHERE m.ZISFROMME = 0 AND m.ZPUSHNAME IS NOT NULL AND m.ZPUSHNAME != ''
+            GROUP BY COALESCE(g.ZMEMBERJID, m.ZFROMJID)
+            """) { row in
+            add(row.text(0), row.text(1), replacing: false)
+        }
+        try? db.rows("SELECT ZMEMBERJID, ZFIRSTNAME FROM ZWAGROUPMEMBER WHERE ZFIRSTNAME IS NOT NULL AND ZFIRSTNAME != ''") { row in
+            add(row.text(0), row.text(1), replacing: false)
+        }
+        try? db.rows("SELECT ZJID, ZPUSHNAME FROM ZWAPROFILEPUSHNAME WHERE ZPUSHNAME IS NOT NULL AND ZPUSHNAME != ''") { row in
+            add(row.text(0), row.text(1), replacing: true)
+        }
+        try? db.rows("SELECT ZCONTACTJID, ZPARTNERNAME FROM ZWACHATSESSION WHERE ZSESSIONTYPE = 0 AND ZPARTNERNAME IS NOT NULL") { row in
+            add(row.text(0), row.text(1), replacing: true)
         }
         return names
     }

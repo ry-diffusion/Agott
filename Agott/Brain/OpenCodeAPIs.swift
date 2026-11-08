@@ -59,7 +59,9 @@ extension OpenCodeExecutor {
         guard let url = URL(string: base + path) else { throw ExecutorError.badURL }
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
-        urlRequest.timeoutInterval = 300
+        // Seconds of silence before giving up. Thinking models stream their
+        // reasoning, so a quiet connection is a dead one, not a slow answer.
+        urlRequest.timeoutInterval = 120
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         urlRequest.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         urlRequest.setValue("Bearer \(configuration.apiKey)", forHTTPHeaderField: "Authorization")
@@ -194,7 +196,7 @@ extension OpenCodeExecutor {
             case "response.failed", "error":
                 let message = ((event["response"] as? [String: Any])?["error"] as? [String: Any])?["message"] as? String
                     ?? (event["message"] as? String) ?? "The model failed."
-                throw ExecutorError.http(500, message)
+                throw ExecutorError.streamFailed(message)
             default:
                 continue
             }
@@ -300,7 +302,7 @@ extension OpenCodeExecutor {
                 }
             case "error":
                 let message = (event["error"] as? [String: Any])?["message"] as? String ?? "The model failed."
-                throw ExecutorError.http(500, message)
+                throw ExecutorError.streamFailed(message)
             default:
                 continue
             }

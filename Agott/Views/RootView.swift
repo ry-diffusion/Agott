@@ -1,36 +1,41 @@
 import SwiftUI
 
 enum AppSection: String, CaseIterable, Identifiable, Hashable {
-    case chat, people, memory, graph, you
+    case home, chat, people, memory, graph, library, you
 
     var id: String { rawValue }
 
     var title: LocalizedStringKey {
         switch self {
+        case .home: "Home"
         case .chat: "Chat"
         case .people: "People"
         case .memory: "Memory"
         case .graph: "Graph"
+        case .library: "Artifacts"
         case .you: "You"
         }
     }
 
     var symbol: String {
         switch self {
-        case .chat: "bubble.left.and.bubble.right.fill"
-        case .people: "heart.fill"
-        case .memory: "brain.head.profile.fill"
-        case .graph: "point.3.filled.connected.trianglepath.dotted"
-        case .you: "sparkles"
+        case .home: "house"
+        case .chat: "bubble.left"
+        case .people: "person.2"
+        case .memory: "brain.head.profile"
+        case .graph: "point.3.connected.trianglepath.dotted"
+        case .library: "doc.on.doc"
+        case .you: "person.crop.circle"
         }
     }
 
     var tint: Color {
         switch self {
+        case .home: Ink.text
         case .chat: Ink.pink
         case .people: Color(.sRGB, red: 1.0, green: 0.38, blue: 0.48)
         case .memory: Ink.violet
-        case .graph: Ink.sky
+        case .graph, .library: Ink.sky
         case .you: Ink.mint
         }
     }
@@ -39,28 +44,68 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
 struct RootView: View {
     @State private var settings = AppSettings.shared
     @State private var navigator = Navigator.shared
+    @State private var agent = Agent.shared
+    @Environment(\.colorScheme) private var scheme
+    #if os(macOS)
+    @State private var windowWidth: CGFloat = 1200
+    #endif
     private var section: AppSection { navigator.section }
+    /// Every screen is one page now: People is a table, chats are reached
+    /// from the sidebar and History. The list column stays for nothing.
+    private var hasList: Bool { false }
 
     var body: some View {
         #if os(macOS)
+        // A notebook's layout: a fixed sidebar a shade darker than the page,
+        // then the page. People keeps its list beside it.
         HStack(spacing: 0) {
-            CandySidebar(section: $navigator.section)
+            if let page = navigator.settingsPage {
+                SettingsSidebar()
+                    .frame(width: Sidebar.width)
+                Rectangle().fill(Ink.hairline).frame(width: 1)
+                SettingsPageView(page: page)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .id(page)
+            } else {
+            if !navigator.zen {
+                Sidebar()
+                    .frame(width: Sidebar.width)
+                    .transition(.move(edge: .leading).combined(with: .opacity))
+                Rectangle().fill(Ink.hairline).frame(width: 1)
+            }
+            if showsList && !navigator.zen {
+                ListPanel()
+                    .transition(.move(edge: .leading).combined(with: .opacity))
+                Rectangle().fill(Ink.hairline).frame(width: 1)
+            }
             Group {
                 switch section {
+                case .home: HomeView()
                 case .chat: ChatView()
                 case .people: PeopleView()
                 case .memory: MemoryView()
                 case .graph: GraphView()
+                case .library: ArtifactLibraryView()
                 case .you: YouView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .transition(.opacity)
+            .background(Ink.canvas)
             .id(section)
+            }
         }
-        .background(Ink.canvas)
+        .animation(.easeInOut(duration: 0.3), value: navigator.zen)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { windowWidth = $0 }
+        // Empty space moves the window; double-click zooms it. No page colour
+        // behind everything: the sidebar shows the desktop through its material.
+        .background { WindowChromeArea() }
+        .background {
+            // Esc brings the sidebar back.
+            Button("") { navigator.zen = false }.keyboardShortcut(.cancelAction).hidden()
+        }
+        .ignoresSafeArea(.container, edges: .top)
         .tint(Ink.spot)
-        .animation(Motion.settle, value: section)
+        .animation(Motion.settle, value: showsList)
         .sheet(isPresented: Binding(get: { LaunchOptions.isDemo ? LaunchOptions.showOnboarding : !settings.hasOnboarded }, set: { _ in })) {
             OnboardingView()
         }
@@ -79,84 +124,60 @@ struct RootView: View {
         .tint(Ink.spot)
         #endif
     }
+
+    #if os(macOS)
+    /// With a document open in a narrow window, the list steps aside so the
+    /// conversation keeps its width; it comes back when there is room.
+    private var showsList: Bool {
+        guard hasList else { return false }
+        return agent.openArtifactKey == nil
+            || windowWidth >= Sidebar.width + ListPanel.width + ChatView.chatMinWidth + ChatView.panelMinWidth + 40
+    }
+    #endif
 }
 
 #if os(macOS)
-/// A slim column: Agott on top, one icon per screen, and at the bottom
-/// only what is happening now (music, memory) and Settings.
-private struct CandySidebar: View {
-    @Binding var section: AppSection
+/// People's list, as a plain column between the sidebar and the page.
+struct ListPanel: View {
+    static let width: CGFloat = 320
+    @State private var navigator = Navigator.shared
     @State private var agent = Agent.shared
 
     var body: some View {
-        VStack(spacing: 6) {
-            MascotFace(mood: agent.mood, size: 40)
-                .padding(.bottom, 12)
-                .help(Text(agent.mood.accessibilityName))
-
-            GlassEffectContainer(spacing: 6) {
-                VStack(spacing: 6) {
-                    ForEach(AppSection.allCases) { item in
-                        SidebarTile(item: item, selected: section == item) { section = item }
+        VStack(spacing: 8) {
+            ZStack {
+                Text(navigator.section.title)
+                    .font(.headline)
+                    .foregroundStyle(Ink.text)
+                HStack {
+                    Spacer()
+                    if navigator.section == .chat {
+                        Button {
+                            withAnimation(Motion.settle) { agent.newConversation() }
+                        } label: {
+                            Image(systemName: "square.and.pencil").font(.system(size: 16, weight: .medium))
+                        }
+                        .buttonStyle(HoverIconStyle(size: 30))
+                        .tip("New conversation")
                     }
                 }
             }
+            .frame(height: 30)
+            .padding(.horizontal, 12)
+            .padding(.top, 12)
 
-            Spacer()
-
-            VStack(spacing: 10) {
-                NowPlayingButton()
-                ActivityButton { section = .memory }
-                SettingsLink {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 16, weight: .medium))
-                        .frame(width: 36, height: 36)
-                }
-                .buttonStyle(HoverIconStyle(size: 36))
-                .help(Text("Settings"))
+            switch navigator.section {
+            case .people: PeopleList().padding(.leading, 8)
+            default: ConversationSidebar().padding(.leading, 8)
             }
         }
-        .padding(.vertical, 14)
-        .frame(width: 60)
-        .glassEffect(.regular, in: .rect(cornerRadius: 24))
-        .padding(.leading, 10)
-        .padding(.vertical, 10)
-        .padding(.top, 28)
-    }
-}
-
-private struct SidebarTile: View {
-    var item: AppSection
-    var selected: Bool
-    var action: () -> Void
-    @State private var hovering = false
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: item.symbol)
-                .font(.system(size: 16, weight: selected ? .semibold : .medium))
-                .foregroundStyle(selected ? AnyShapeStyle(.white) : AnyShapeStyle(hovering ? Ink.text : Ink.muted))
-                .frame(width: 40, height: 40)
-                // Not interactive glass: it handles presses itself and
-                // could swallow the first click on a tab.
-                .glassEffect(
-                    selected ? .regular.tint(Ink.spot) : (hovering ? .regular : .clear),
-                    in: .rect(cornerRadius: 12))
-                .frame(width: 52, height: 44)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(PressScale())
-        .help(Text(item.title))
-        .accessibilityLabel(Text(item.title))
-        .accessibilityAddTraits(selected ? .isSelected : [])
-        .onHover { hovering = $0 }
-        .animation(Motion.bouncy, value: selected)
-        .animation(.spring(duration: 0.2), value: hovering)
+        .frame(width: Self.width)
+        .background(Ink.canvas)
     }
 }
 
 /// Memory at work, as a small ring. Open it for what and how far, and to pause.
-private struct ActivityButton: View {
+struct ActivityButton: View {
     var openMemory: () -> Void
     @State private var indexer = Indexer.shared
     @State private var repair = MemoryRepair.shared
@@ -262,19 +283,15 @@ struct OnboardingView: View {
 
     var body: some View {
         HStack(spacing: 0) {
+            // The app's character on a plain sidebar-toned panel.
             ZStack(alignment: .bottom) {
-                Ink.paper
-                Screentone(color: Ink.spot.opacity(0.7), spacing: 7, from: 0.95, to: 0)
+                Ink.sidebar
                 Image("Mascot")
                     .resizable()
                     .interpolation(.high)
                     .scaledToFit()
-                    .padding(.horizontal, 6)
-                VStack {
-                    SpeechBubble(text: "Oi!")
-                        .padding(.top, 40)
-                    Spacer()
-                }
+                    .padding(.horizontal, 18)
+                    .padding(.bottom, 12)
             }
             .frame(width: 250)
 

@@ -13,6 +13,7 @@ struct MemoryView: View {
     @State private var feedLimit = 30
     @State private var lastFeed = Date.distantPast
     @State private var confirmReread = false
+    @State private var estimate: (moments: Int, tokens: Int, dollars: Double?)?
 
     var body: some View {
         ScrollView {
@@ -26,20 +27,26 @@ struct MemoryView: View {
                             .buttonStyle(.candy(.soft))
                     } else {
                         HStack(spacing: 8) {
-                            Button { confirmReread = true } label: { Label("Read everything again", systemImage: "arrow.counterclockwise") }
+                            Button {
+                                Task {
+                                    estimate = await indexer.peopleRelearnEstimate()
+                                    confirmReread = true
+                                }
+                            } label: { Label("Read again", systemImage: "arrow.counterclockwise") }
                                 .buttonStyle(.candy(.soft))
-                                .help(Text("Learn again from every message, with deeper memories"))
+                                .help(Text("Learn again from your conversations: who is who, nicknames, links between people"))
                             Button { indexer.run() } label: { Label("Update memory", systemImage: "arrow.triangle.2.circlepath") }
                                 .buttonStyle(.candy)
                         }
                     }
                 }
                 totals
-                    .confirmationDialog(Text("Read everything again?"), isPresented: $confirmReread) {
-                        Button("Read again") { indexer.reread() }
+                    .confirmationDialog(Text("Read your conversations again?"), isPresented: $confirmReread) {
+                        Button("Reread people") { indexer.rereadPeople() }
+                        Button("Read everything, Claude too") { indexer.reread() }
                         Button("Cancel", role: .cancel) {}
                     } message: {
-                        Text("Agott goes back over every message to learn and to remember the conversations that mattered. What it already knows stays. With OpenCode this uses tokens; it runs in the background.")
+                        Text(rereadMessage)
                     }
                 MemoryDigest()
                 DeepMoments()
@@ -70,83 +77,109 @@ struct MemoryView: View {
         #endif
     }
 
+    /// What a people re-read reads and roughly costs.
+    private var rereadMessage: String {
+        var text = String(localized: "Agott reads your WhatsApp and iMessage conversations again, groups you only read included, starting with the people you talk to most. It learns facts with proof, nicknames, who is linked to whom, and rewrites the conversations that mattered. What it already knows stays.")
+        if let estimate {
+            let tokens = estimate.tokens.formatted(.number.notation(.compactName))
+            text += "\n\n" + String(localized: "\(estimate.moments) moments, about \(tokens) tokens")
+            if let dollars = estimate.dollars {
+                text += " · " + String(localized: "about \(dollars.formatted(.currency(code: "USD")))")
+            }
+            text += ". " + String(localized: "It runs in the background; you can pause it.")
+        }
+        return text
+    }
+
+    /// Where memory stands: one quiet line, the orb while it reads.
     private var totals: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 14) {
-                MascotFace(mood: indexer.isRunning ? .working : .happy, size: 56)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(indexer.statusText).font(Lettering.display(18, relativeTo: .title3)).foregroundStyle(Ink.text)
-                    if indexer.isRunning {
-                        if let progress = indexer.progress {
-                            HStack(spacing: 10) {
-                                ProgressView(value: progress).tint(Ink.spot)
-                                Text(progress, format: .percent.precision(.fractionLength(0)))
-                                    .font(.callout.weight(.bold)).monospacedDigit().foregroundStyle(Ink.text)
-                            }
-                        } else {
-                            ProgressView().progressViewStyle(.linear).tint(Ink.spot)
-                        }
-                    }
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 12) {
+                if indexer.isRunning || indexer.isLearning {
+                    ThinkingOrb(mode: .globe, size: 22)
+                } else {
+                    Image(systemName: "checkmark.circle").font(.system(size: 18)).foregroundStyle(Ink.muted)
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(indexer.statusText).font(.body.weight(.medium)).foregroundStyle(Ink.text)
                     Text("\(indexer.totals.messages) messages · \(indexer.totals.chunks) moments · \(indexer.totals.vectors) understood · \(indexer.totals.entities) things in the graph · \(indexer.totals.facts) facts")
                         .font(.callout).monospacedDigit().foregroundStyle(Ink.muted)
-                    if let error = indexer.lastError { Text(error).font(.caption).foregroundStyle(Ink.text) }
                 }
                 Spacer()
+                if indexer.isRunning, let progress = indexer.progress {
+                    Text(progress, format: .percent.precision(.fractionLength(0)))
+                        .font(.callout).monospacedDigit().foregroundStyle(Ink.text)
+                }
+            }
+            if indexer.isRunning {
+                ProgressView(value: indexer.progress ?? 0)
+                    .progressViewStyle(.linear)
+                    .tint(Ink.spot)
+                    .opacity(indexer.progress == nil ? 0 : 1)
+            }
+            if let error = indexer.lastError {
+                Label(error, systemImage: "exclamationmark.triangle").font(.callout).foregroundStyle(Ink.text)
             }
             if indexer.totals.messages == 0 && !indexer.isRunning {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Agott hasn't read anything yet. Start indexing to let it remember your WhatsApp, iMessage and Claude history. It runs in the background; you can keep using the app.")
-                        .foregroundStyle(Ink.text)
-                        .fixedSize(horizontal: false, vertical: true)
-                    HStack {
-                        Button { indexer.run() } label: { Label("Start indexing", systemImage: "play.fill") }
-                            .buttonStyle(.candy)
-                        if !Permissions.isGranted(.fullDiskAccess) {
-                            Button("Grant Full Disk Access") { Permissions.openFullDiskAccess() }
-                                .buttonStyle(.candy(.soft))
-                        }
+                Text("Agott hasn't read anything yet. Start indexing to let it remember your WhatsApp, iMessage and Claude history. It runs in the background; you can keep using the app.")
+                    .font(.callout)
+                    .foregroundStyle(Ink.text)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    Button { indexer.run() } label: { Label("Start indexing", systemImage: "play.fill") }
+                        .buttonStyle(.candy(.primary, compact: true))
+                    if !Permissions.isGranted(.fullDiskAccess) {
+                        Button("Grant Full Disk Access") { Permissions.openFullDiskAccess() }
+                            .buttonStyle(.candy(.soft, compact: true))
                     }
                 }
             }
         }
-        .panel(toned: indexer.isRunning)
+        .padding(16)
+        .quietSurface(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
+    /// Where memories come from, as rows like Settings.
     private var sources: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            PanelTitle(title: "Sources", symbol: "tray.and.arrow.down")
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3), spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionHeading(title: "Sources")
+            SettingsCard {
                 ForEach([MemorySource.whatsapp, .imessage, .claude], id: \.self) { source in
-                    SourceTile(source: source)
+                    SourceRow(source: source)
                 }
-            }
-            #if os(macOS)
-            HStack {
-                Button { importing = true } label: {
-                    Label("Import a claude.ai export…", systemImage: "square.and.arrow.down")
+                #if os(macOS)
+                SettingsRow(symbol: "square.and.arrow.down", title: "Import a claude.ai export…",
+                            detail: "conversations.json from Settings → Privacy → Export data") {
+                    Button("Import") { importing = true }
+                        .buttonStyle(.candy(.soft, compact: true))
                 }
-                .buttonStyle(.candy(.soft, compact: true))
-                Text("conversations.json from Settings → Privacy → Export data").font(.caption).foregroundStyle(Ink.muted)
+                #endif
             }
-            #endif
         }
     }
 
     private var search: some View {
         VStack(alignment: .leading, spacing: 12) {
-            PanelTitle(title: "Search your memory", symbol: "magnifyingglass")
-            HStack {
-                CandyField(placeholder: "Anything: a name, a plan, a feeling…", text: $query, symbol: "magnifyingglass") {
-                    Task { await runSearch() }
-                }
+            SectionHeading(title: "Search your memory")
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass").foregroundStyle(Ink.muted)
+                TextField(String(localized: "Anything: a name, a plan, a feeling…"), text: $query)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 15))
+                    .onSubmit { Task { await runSearch() } }
+                if searching { ProgressView().controlSize(.small) }
                 Button("Search") { Task { await runSearch() } }
-                    .buttonStyle(.candy)
+                    .buttonStyle(.candy(.soft, compact: true))
                     .disabled(query.isEmpty || searching)
             }
+            .padding(.leading, 16)
+            .padding(.trailing, 8)
+            .frame(minHeight: 50)
+            .quietSurface(RoundedRectangle(cornerRadius: 22, style: .continuous))
             ForEach(hits) { hit in
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 6) {
-                        Image(systemName: hit.chunk.source.symbol).foregroundStyle(Ink.violet)
+                        Image(systemName: hit.chunk.source.symbol).foregroundStyle(Ink.muted)
                         Text(hit.chunk.chatName).font(.headline).foregroundStyle(Ink.text).lineLimit(1)
                         Spacer()
                         ForEach(Array(hit.matchedBy).sorted(by: { $0.rawValue < $1.rawValue }), id: \.self) { signal in
@@ -166,13 +199,14 @@ struct MemoryView: View {
     private var feed: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                PanelTitle(title: "Recent memories", symbol: "clock.arrow.circlepath")
+                SectionHeading(title: "Recent memories")
                 Spacer()
-                GlassEffectContainer(spacing: 6) {
-                    HStack(spacing: 6) {
-                        feedChip(nil, title: String(localized: "All"), symbol: "tray.full")
-                        ForEach([MemorySource.whatsapp, .imessage, .claude], id: \.self) { source in
-                            feedChip(source, title: source.displayName, symbol: source.symbol)
+                HStack(spacing: 6) {
+                    FilterChip(title: "All", selected: feedSource == nil) { feedLimit = 30; feedSource = nil }
+                    ForEach([MemorySource.whatsapp, .imessage, .claude], id: \.self) { source in
+                        FilterChip(title: LocalizedStringKey(source.displayName), selected: feedSource == source) {
+                            feedLimit = 30
+                            feedSource = source
                         }
                     }
                 }
@@ -193,26 +227,10 @@ struct MemoryView: View {
                 } label: {
                     Label("Show more", systemImage: "arrow.down")
                 }
-                .buttonStyle(.candy(.soft))
+                .buttonStyle(.candy(.soft, compact: true))
                 .frame(maxWidth: .infinity)
             }
         }
-    }
-
-    private func feedChip(_ source: MemorySource?, title: String, symbol: String) -> some View {
-        let selected = feedSource == source
-        return Button {
-            feedLimit = 30
-            feedSource = source
-        } label: {
-            Label(title, systemImage: symbol)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(selected ? AnyShapeStyle(.white) : AnyShapeStyle(Ink.text))
-                .padding(.horizontal, 10).padding(.vertical, 5)
-                .glassEffect(selected ? .regular.tint(Ink.spot).interactive() : .regular.interactive(), in: .capsule)
-            .contentShape(Capsule())
-        }
-        .buttonStyle(PressScale())
     }
 
     private func loadFeed() async {
@@ -241,20 +259,19 @@ extension MemoryHit.Signal {
 
 }
 
-private struct SourceTile: View {
+/// A source as a settings row: what it is, how much is remembered, on/off.
+private struct SourceRow: View {
     var source: MemorySource
     @State private var settings = AppSettings.shared
     @State private var indexer = Indexer.shared
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Image(systemName: source.symbol)
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(Ink.text)
-                    .frame(width: 40, height: 40)
-                    .background(Circle().fill(Ink.raised))
-                Spacer()
+        SettingsRow(symbol: source.symbol, title: LocalizedStringKey(source.displayName), verbatim: detail) {
+            HStack(spacing: 8) {
+                if indexer.states[source] == .needsPermission {
+                    Button("Grant Full Disk Access") { Permissions.openFullDiskAccess() }
+                        .buttonStyle(.candy(.soft, compact: true))
+                }
                 Toggle("", isOn: Binding(
                     get: { settings.enabledSources.contains(source) },
                     set: { on in
@@ -263,36 +280,23 @@ private struct SourceTile: View {
                 .labelsHidden()
                 .toggleStyle(.switch)
                 .tint(Ink.spot)
-            }
-            Text(source.displayName).font(Lettering.display(15, relativeTo: .headline)).foregroundStyle(Ink.text)
-            Text(detail).font(.caption).foregroundStyle(Ink.muted).lineLimit(2)
-            HStack {
-                if indexer.states[source] == .needsPermission {
-                Text("Add Agott in System Settings → Full Disk Access, then come back. If it still can't read, quit and reopen Agott.")
-                    .font(.caption).foregroundStyle(Ink.muted).fixedSize(horizontal: false, vertical: true)
-            }
-            if indexer.states[source] == .needsPermission {
-                    Button("Grant Full Disk Access") { Permissions.openFullDiskAccess() }
-                        .buttonStyle(.candy(.primary, compact: true))
-                }
-                Spacer()
                 Menu {
                     Button("Forget everything from \(source.displayName)", role: .destructive) {
                         Task { await indexer.forget(source) }
                     }
-                } label: { Image(systemName: "ellipsis.circle.fill").foregroundStyle(Ink.muted) }
-                .menuStyle(.borderlessButton)
+                } label: { Image(systemName: "ellipsis") }
+                .menuStyle(.button)
+                .buttonStyle(HoverIconStyle(size: 28))
                 .menuIndicator(.hidden)
                 .fixedSize()
             }
         }
-        .panel(padding: 14, toned: settings.enabledSources.contains(source))
     }
 
     private var detail: String {
         let count = indexer.counts[source] ?? 0
         switch indexer.states[source] {
-        case .needsPermission: return String(localized: "Needs Full Disk Access to read")
+        case .needsPermission: return String(localized: "Add Agott in System Settings → Full Disk Access, then come back. If it still can't read, quit and reopen Agott.")
         case .missing: return String(localized: "Not found on this Mac")
         case .failed(let message): return message
         default: return String(localized: "\(count) messages remembered")
@@ -379,6 +383,7 @@ private struct MemoryDigest: View {
                                 Spacer()
                                 Text("\(Int(pair.1).formatted()) msgs").font(.caption).monospacedDigit().foregroundStyle(Ink.muted)
                             }
+                            .personHover(pair.0.name)
                         }
                     }
                     section("About you", symbol: "person.text.rectangle") {
@@ -429,7 +434,7 @@ private struct MemoryDigest: View {
         if let meID = try? await KnowledgeGraph.meID() {
             let neighbors = (try? await store.neighbors(of: meID, limit: 80)) ?? []
             people = neighbors
-                .filter { $0.1.relation == "talks with" && $0.0.kind == .person && !GraphView.isPhoneOnly($0.0.name) }
+                .filter { $0.1.relation == GraphRelation.talksWith.rawValue && $0.0.kind == .person && !GraphView.isPhoneOnly($0.0.name) }
                 .prefix(7)
                 .map { ($0.0, $0.1.weight) }
         }

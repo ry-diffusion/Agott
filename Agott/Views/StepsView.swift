@@ -1,60 +1,80 @@
 import SwiftUI
 
-/// What Agott did on the way to a reply, the way the best assistants show it.
-///
-/// While it works, the activity is open: a timeline of what it is doing, its
-/// thinking streaming in as it thinks, and what each memory search found.
-/// When the reply lands, it folds into one quiet line ("Thought for 6s ·
-/// remembered 10 things") that opens again with a click.
+/// What Agott is doing, and later what it did, in one line the way Claude
+/// shows it: an orb for the kind of work, the step it is on, the seconds so
+/// far, and a chevron that opens the steps. Before the first word of the
+/// reply this line is all there is; once the answer is in, it folds into
+/// "Thought for 6s · 3 steps" and opens on the thinking and every step.
 struct StepsView: View {
     var steps: [Step]
     var isStreaming: Bool
+    /// When the reply started, for the running clock.
+    var started: Date = .now
+    /// What the agent says it is doing right now (a retry, a wait), which
+    /// wins over the running step's title.
+    var status: String?
     @State private var expanded = false
 
+    private var running: Step? { steps.last(where: { $0.state == .running }) }
+
     var body: some View {
-        if !steps.isEmpty {
+        if isStreaming || !steps.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
                 header
-                if isStreaming || expanded {
+                if expanded && !steps.isEmpty {
                     Timeline(steps: steps)
+                        .padding(.leading, 4)
                         .transition(.opacity.combined(with: .offset(y: -4)))
                 }
             }
             .animation(Motion.settle, value: expanded)
-            .animation(Motion.settle, value: isStreaming)
         }
     }
 
     private var header: some View {
         Button {
-            if !isStreaming { expanded.toggle() }
+            if !steps.isEmpty { expanded.toggle() }
         } label: {
             HStack(spacing: 8) {
-                MascotFace(mood: isStreaming ? .thinking : .idle, size: 20)
-                    .frame(width: Timeline.rail, height: Timeline.rail)
+                ThinkingOrb(mode: isStreaming ? ThinkingOrb.Mode(step: running) : .ring, size: 18, active: isStreaming)
+                    .opacity(isStreaming ? 1 : 0.55)
                 Text(headerText)
-                    .font(.callout.weight(.medium))
+                    .font(.callout)
                     .foregroundStyle(isStreaming ? Ink.text : Ink.muted)
                     .lineLimit(1)
                     .modifier(Shimmer(active: isStreaming))
-                if !isStreaming {
+                    .id(headerText)
+                    .transition(.opacity.combined(with: .offset(y: 3)))
+                if isStreaming {
+                    // Seconds since the reply started, ticking like Claude's.
+                    TimelineView(.periodic(from: started, by: 1)) { context in
+                        Text("\(max(0, Int(context.date.timeIntervalSince(started))))s")
+                            .font(.callout)
+                            .monospacedDigit()
+                            .foregroundStyle(Ink.muted)
+                    }
+                }
+                if !steps.isEmpty {
                     Image(systemName: "chevron.right")
                         .font(.caption2.weight(.bold))
                         .foregroundStyle(Ink.muted)
                         .rotationEffect(.degrees(expanded ? 90 : 0))
                 }
             }
+            .padding(.vertical, 2)
             .contentShape(Rectangle())
             .hoverHighlight(cornerRadius: 8, inset: -4)
         }
         .buttonStyle(.plain)
-        .help(Text(expanded ? "Hide steps" : "Show steps"))
+        .animation(.easeInOut(duration: 0.3), value: headerText)
+        .accessibilityLabel(Text(headerText))
+        .accessibilityHint(Text(expanded ? "Hide steps" : "Show steps"))
     }
 
     /// While working: what it is doing now. Afterwards: what it did.
     private var headerText: String {
         if isStreaming {
-            return steps.last(where: { $0.state == .running })?.title ?? String(localized: "Working")
+            return status ?? running?.title ?? String(localized: "Thinking…")
         }
         let thought = steps.filter { $0.kind == .thinking }.compactMap(\.seconds).reduce(0, +)
         let remembered = steps.compactMap(\.items).map(\.count).reduce(0, +)
@@ -85,7 +105,14 @@ private struct Timeline: View {
 private struct StepRow: View {
     var step: Step
     var last: Bool
-    @State private var open = false
+    /// The thinking is the point of opening the steps: it starts open.
+    @State private var open: Bool
+
+    init(step: Step, last: Bool) {
+        self.step = step
+        self.last = last
+        _open = State(initialValue: step.kind == .thinking)
+    }
     @State private var showAll = false
 
     private var hasDetail: Bool { !(step.detail ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -138,7 +165,17 @@ private struct StepRow: View {
                     if !items.isEmpty {
                         FoundList(items: items, showAll: $showAll)
                     } else if let detail = step.detail {
-                        DetailText(text: detail, thinking: step.kind == .thinking, live: step.state == .running)
+                        if step.kind == .thinking {
+                            // The thinking block: the model's own reasoning,
+                            // set off by a rule like a quote.
+                            DetailText(text: detail, thinking: true, live: step.state == .running)
+                                .padding(.leading, 10)
+                                .overlay(alignment: .leading) {
+                                    Rectangle().fill(Ink.hairline).frame(width: 2)
+                                }
+                        } else {
+                            DetailText(text: detail, thinking: false, live: step.state == .running)
+                        }
                     }
                 }
             }
@@ -277,7 +314,7 @@ struct Shimmer: ViewModifier {
                 content.overlay {
                     GeometryReader { proxy in
                         LinearGradient(
-                            colors: [.clear, Ink.spot.opacity(0.55), .clear],
+                            colors: [.clear, Ink.text.opacity(0.5), .clear],
                             startPoint: .leading, endPoint: .trailing)
                             .frame(width: proxy.size.width * 0.5)
                             .offset(x: proxy.size.width * (CGFloat(t) * 1.6 - 0.5))

@@ -220,8 +220,16 @@ final class RemoteHost {
 
     private func push(to connection: NWConnection) {
         let agent = Agent.shared
+        // The phone has no people directory: names are filled in here (or
+        // hidden as "Person 12"), so it never shows a raw <e id=…/> tag.
+        let hidden = AppSettings.shared.hideNames
+        let turns = agent.turns.suffix(40).map { turn -> Turn in
+            var turn = turn
+            turn.text = EntityText.plain(turn.text, hidden: hidden)
+            return turn
+        }
         RemoteWire.send(
-            .state(turns: Array(agent.turns.suffix(40)), mood: agent.mood, status: agent.status, busy: agent.isBusy),
+            .state(turns: turns, mood: agent.mood, status: agent.status, busy: agent.isBusy),
             on: connection)
     }
 }

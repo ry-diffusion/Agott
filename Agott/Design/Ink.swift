@@ -6,32 +6,33 @@ import AppKit
 import UIKit
 #endif
 
-/// Agott's visual world: Liquid Glass with a manga heart.
+/// Agott's visual world: a quiet notebook.
 ///
-/// The structure is the system's: controls and navigation float on Liquid
-/// Glass above plain content, so Agott sits naturally beside every other app
-/// on macOS 26 and later. The personality is the mascot's: speech balloons,
-/// screentone dots instead of grey fills, lettered titles, an ink face, and
-/// exactly one spot colour, a riso pink, the way a manga cover gets a second
-/// ink. Content has no borders; it is separated by tone and space, and the
-/// glass layer carries the depth.
+/// Neutral greys, near-white type, a serif for page headlines and the
+/// system face for everything else. Surfaces are a step lighter than the
+/// page with a hairline around them; nothing floats, nothing glows. One
+/// muted rose is the only colour, kept for what is selected or live.
 enum Ink {
     // MARK: Colour
 
-    /// The page. Newsprint grey-white, not cream.
-    static let canvas = dynamic(dark: (0.071, 0.068, 0.082), light: (0.953, 0.949, 0.937))
-    /// Inside a panel.
-    static let surface = dynamic(dark: (0.112, 0.107, 0.126), light: (1.0, 1.0, 1.0))
-    /// A field or well inside a panel.
-    static let raised = dynamic(dark: (0.150, 0.144, 0.168), light: (0.965, 0.961, 0.950))
-    /// Linework and text.
-    static let text = dynamic(dark: (0.930, 0.918, 0.900), light: (0.078, 0.070, 0.098))
-    static let muted = dynamic(dark: (0.690, 0.672, 0.710), light: (0.380, 0.360, 0.410))
-    static let hairline = dynamic(dark: (0.240, 0.232, 0.262), light: (0.860, 0.852, 0.838))
-    /// The spot colour.
-    static let spot = dynamic(dark: (1.0, 0.43, 0.71), light: (1.0, 0.29, 0.62))
+    /// The page.
+    static let canvas = dynamic(dark: (0.149, 0.149, 0.149), light: (0.988, 0.988, 0.984))
+    /// The sidebar: a shade darker than the page.
+    static let sidebar = dynamic(dark: (0.118, 0.118, 0.118), light: (0.953, 0.953, 0.945))
+    /// Inside a panel or card.
+    static let surface = dynamic(dark: (0.180, 0.180, 0.180), light: (1.0, 1.0, 1.0))
+    /// A field, a chip, a hovered row.
+    static let raised = dynamic(dark: (0.212, 0.212, 0.212), light: (0.945, 0.945, 0.937))
+    /// Your messages: a soft grey pill.
+    static let bubble = dynamic(dark: (0.235, 0.235, 0.235), light: (0.929, 0.929, 0.922))
+    /// Text.
+    static let text = dynamic(dark: (0.925, 0.925, 0.910), light: (0.110, 0.110, 0.106))
+    static let muted = dynamic(dark: (0.600, 0.600, 0.588), light: (0.455, 0.455, 0.443))
+    static let hairline = dynamic(dark: (0.262, 0.262, 0.262), light: (0.878, 0.878, 0.867))
+    /// The one colour: a muted rose, for what is selected or live.
+    static let spot = dynamic(dark: (0.871, 0.596, 0.671), light: (0.659, 0.306, 0.420))
     /// Text that sits on the spot colour.
-    static let onSpot = Color(.sRGB, red: 0.078, green: 0.070, blue: 0.098)
+    static let onSpot = Color.white
     /// Paper that stays paper in dark mode, under the black-ink mascot.
     static let paper = Color(.sRGB, red: 0.985, green: 0.982, blue: 0.972)
     /// Ink that stays ink in dark mode, on paper.
@@ -73,6 +74,12 @@ enum Ink {
     static let heavyLine: CGFloat = 2.25
 }
 
+/// The strip across the top of the window: as tall as the line the window
+/// buttons sit on, so every top bar lines up with them.
+enum WindowBar {
+    static let height: CGFloat = 30
+}
+
 enum Radius {
     static let surface: CGFloat = 14
     static let control: CGFloat = 10
@@ -95,9 +102,11 @@ enum Lettering {
         CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
     }
 
-    /// Display lettering: titles, names, balloon shouts. Scales with Dynamic Type.
+    /// Display type. Page headlines (20 pt and up) are set in the system
+    /// serif, like a notebook's title; anything smaller is the system face,
+    /// semibold, so labels and names stay plain.
     static func display(_ size: CGFloat, relativeTo style: Font.TextStyle = .title) -> Font {
-        .custom(family, size: size, relativeTo: style)
+        size >= 20 ? .system(size: size, weight: .regular, design: .serif) : .system(size: size, weight: .semibold)
     }
 }
 
@@ -150,26 +159,56 @@ extension View {
     }
 }
 
+extension EnvironmentValues {
+    /// Inside a conversation, panels and titles take the message style:
+    /// bubble colour, bubble corners, system type, no ornaments.
+    @Entry var inChat = false
+    /// How chat panels are drawn: on the bubble's paper, in glass (Moon), or
+    /// with straight corners (Page).
+    @Entry var chatPanelStyle: ChatPanelStyle = .bubble
+}
+
+enum ChatPanelStyle { case bubble, glass, square }
+
 struct Panel: ViewModifier {
     var padding: CGFloat
     var toned: Bool
+    @Environment(\.inChat) private var inChat
+    @Environment(\.chatPanelStyle) private var panelStyle
 
     func body(content: Content) -> some View {
+        if inChat && panelStyle == .glass {
+            framed(content)
+        } else if inChat && panelStyle == .square {
+            content
+                .padding(padding)
+                .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Ink.text.opacity(0.06)))
+        } else if inChat {
+            // In the chat a card sits on the balloon's paper, lifted softly.
+            content
+                .padding(padding)
+                .background(
+                    RoundedRectangle(cornerRadius: MessageBubble<EmptyView>.bigRadius, style: .continuous)
+                        .fill(Ink.bubble)
+                        .shadow(color: .black.opacity(0.14), radius: 6, y: 2))
+        } else {
+            framed(content)
+        }
+    }
+
+    private func framed(_ content: Content) -> some View {
         content
             .padding(padding)
-            .background {
-                ZStack(alignment: .topTrailing) {
-                    RoundedRectangle(cornerRadius: Radius.surface, style: .continuous).fill(Ink.surface)
-                    if toned {
-                        // A corner of pink tone, like a spot-colour panel.
-                        Screentone(color: Ink.spot.opacity(0.55), spacing: 6, from: 0.9, to: 0, axis: .horizontal)
-                            .frame(width: 120, height: 46)
-                            .mask(LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom))
-                            .clipShape(UnevenRoundedRectangle(topTrailingRadius: Radius.surface, style: .continuous))
-                    }
-                }
-            }
-            .shadow(color: .black.opacity(0.05), radius: 6, y: 2)
+            .quietSurface(RoundedRectangle(cornerRadius: Radius.surface, style: .continuous))
+    }
+}
+
+extension View {
+    /// A card the quiet way: a step lighter than what is under it, with a
+    /// hairline around it. What glass used to do, without the glow.
+    func quietSurface<S: InsettableShape>(_ shape: S, fill: Color = Ink.surface, line: Bool = true) -> some View {
+        background(shape.fill(fill))
+            .overlay(shape.strokeBorder(Ink.hairline.opacity(line ? 1 : 0), lineWidth: 1))
     }
 }
 
@@ -251,9 +290,8 @@ extension View {
 
 // MARK: - Buttons
 
-/// Buttons are Liquid Glass: the primary one tinted with the spot colour,
-/// the rest clear glass. Both are interactive, so they respond to the press
-/// the way system controls do.
+/// Buttons are capsules: the primary one solid (light on dark, dark on
+/// light), the soft one an outline, the plain one just its label.
 struct CandyButtonStyle: ButtonStyle {
     enum Kind { case primary, soft, plain }
     var kind: Kind = .primary
@@ -264,18 +302,16 @@ struct CandyButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         let label = configuration.label
-            .font(compact ? .callout.weight(.semibold) : .body.weight(.bold))
-            .padding(.horizontal, compact ? 12 : 18)
-            .padding(.vertical, compact ? 6 : 10)
-            .foregroundStyle(kind == .primary ? AnyShapeStyle(.white) : AnyShapeStyle(Ink.text))
+            .font(compact ? .callout.weight(.medium) : .body.weight(.medium))
+            .padding(.horizontal, compact ? 12 : 16)
+            .padding(.vertical, compact ? 5 : 8)
+            .foregroundStyle(kind == .primary ? AnyShapeStyle(Ink.canvas) : AnyShapeStyle(Ink.text))
             .contentShape(Capsule())
-            .opacity(enabled ? 1 : 0.45)
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(.spring(duration: 0.2, bounce: 0.3), value: configuration.isPressed)
+            .opacity(enabled ? (configuration.isPressed ? 0.75 : 1) : 0.45)
         switch kind {
-        case .primary: label.glassEffect(.regular.tint(tint).interactive(), in: .capsule)
-        case .soft: label.glassEffect(.regular.interactive(), in: .capsule)
-        case .plain: label.glassEffect(.clear.interactive(), in: .capsule)
+        case .primary: label.background(Capsule().fill(Ink.text))
+        case .soft: label.quietSurface(Capsule(), fill: configuration.isPressed ? Ink.raised : .clear)
+        case .plain: label
         }
     }
 }
@@ -301,12 +337,12 @@ struct CandyIconButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: size * 0.4, weight: .bold))
-                .foregroundStyle(filled ? AnyShapeStyle(.white) : AnyShapeStyle(Ink.text))
+                .font(.system(size: size * 0.4, weight: .semibold))
+                .foregroundStyle(filled ? AnyShapeStyle(Ink.canvas) : AnyShapeStyle(Ink.text))
                 .frame(width: size, height: size)
                 .contentShape(Circle())
                 .opacity(enabled ? 1 : 0.4)
-                .glassEffect(filled ? .regular.tint(Ink.spot).interactive() : .regular.interactive(), in: .circle)
+                .quietSurface(Circle(), fill: filled ? Ink.text : Ink.surface, line: !filled)
         }
         .buttonStyle(PressScale())
     }
@@ -392,14 +428,14 @@ extension ScreenHeader where Trailing == EmptyView {
 struct PanelTitle: View {
     var title: LocalizedStringKey
     var symbol: String
+    @Environment(\.inChat) private var inChat
 
     var body: some View {
         Label {
-            Text(title).font(Lettering.display(15, relativeTo: .headline))
+            Text(title).font(.headline).foregroundStyle(Ink.text)
         } icon: {
-            Image(systemName: symbol).font(.callout.weight(.bold))
+            Image(systemName: symbol).font(.callout).foregroundStyle(Ink.muted)
         }
-        .foregroundStyle(Ink.text)
     }
 }
 
@@ -418,8 +454,8 @@ struct CandyField: View {
                 .foregroundStyle(Ink.text)
                 .onSubmit(onSubmit)
         }
-        .padding(.horizontal, 14).padding(.vertical, 9)
-        .glassEffect(.regular.interactive(), in: .capsule)
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .quietSurface(RoundedRectangle(cornerRadius: 10, style: .continuous), fill: Ink.raised)
     }
 }
 
@@ -525,5 +561,89 @@ struct HoverHighlight: ViewModifier {
 extension View {
     func hoverHighlight(cornerRadius: CGFloat = 10, inset: CGFloat = -6) -> some View {
         modifier(HoverHighlight(cornerRadius: cornerRadius, inset: inset))
+    }
+}
+
+// MARK: - Tips
+
+/// A label that appears under the pointer, quickly: what a button does.
+/// The system tooltip waits about a second and is easy to miss; this one
+/// shows after 0.4 s in glass beside the control, and still sets `.help`
+/// for VoiceOver.
+struct Tip: ViewModifier {
+    var text: Text
+    var edge: Edge = .bottom
+    @State private var hovering = false
+    @State private var shown = false
+
+    func body(content: Content) -> some View {
+        content
+            // Read out by VoiceOver; no system tooltip on top of this one.
+            .accessibilityHint(text)
+            .onHover { inside in
+                hovering = inside
+                if inside {
+                    Task {
+                        try? await Task.sleep(for: .milliseconds(400))
+                        if hovering { withAnimation(.easeOut(duration: 0.15)) { shown = true } }
+                    }
+                } else {
+                    withAnimation(.easeOut(duration: 0.1)) { shown = false }
+                }
+            }
+            .overlay(alignment: alignment) {
+                // A zero-thickness line on the chosen edge, with the tip
+                // hung off its far side: the tip always sits beside the
+                // control, never on top of it. (Alignment guides inside an
+                // optional overlay were ignored, so tips covered buttons.)
+                if shown {
+                    Group {
+                    switch edge {
+                    case .top:
+                        Color.clear.frame(height: 0)
+                            .overlay(alignment: .bottom) { bubble.padding(.bottom, 10) }
+                    case .trailing:
+                        Color.clear.frame(width: 0)
+                            .overlay(alignment: .leading) { bubble.padding(.leading, 10) }
+                    default:
+                        Color.clear.frame(height: 0)
+                            .overlay(alignment: .top) { bubble.padding(.top, 10) }
+                    }
+                    }
+                    .transition(.opacity)
+                    .allowsHitTesting(false)
+                }
+            }
+            .zIndex(shown ? 10 : 0)
+    }
+
+    /// A small quiet label: the sidebar's tone, a hairline, plain text.
+    private var bubble: some View {
+        text
+            .font(.caption)
+            .foregroundStyle(Ink.text)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .quietSurface(RoundedRectangle(cornerRadius: 6, style: .continuous), fill: Ink.sidebar)
+            .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
+            .fixedSize()
+    }
+
+    private var alignment: Alignment {
+        switch edge {
+        case .trailing: .trailing
+        case .top: .top
+        default: .bottom
+        }
+    }
+}
+
+extension View {
+    func tip(_ key: LocalizedStringKey, edge: Edge = .bottom) -> some View {
+        modifier(Tip(text: Text(key), edge: edge))
+    }
+
+    func tip(_ text: Text, edge: Edge = .bottom) -> some View {
+        modifier(Tip(text: text, edge: edge))
     }
 }

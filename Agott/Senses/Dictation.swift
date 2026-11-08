@@ -21,7 +21,19 @@ final class Dictation {
     private(set) var problem: String?
 
     var transcript: String {
-        (finalized + volatile).trimmingCharacters(in: .whitespacesAndNewlines)
+        Self.join(finalized, volatile).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Two pieces of what was heard, as one text. The transcriber hands over
+    /// sentences one at a time, and not always with a space in front:
+    /// glued together, "tudo bem." and "E você?" became "tudo bem.E você?".
+    nonisolated static func join(_ first: String, _ second: String) -> String {
+        guard let last = first.last else { return second }
+        guard let next = second.first else { return first }
+        if last.isWhitespace || next.isWhitespace { return first + second }
+        // "ok" + ", então" or "ok" + "." stays tight; anything else gets a space.
+        if ",.;:!?…)]}".contains(next) { return first + second }
+        return first + " " + second
     }
 
     @ObservationIgnored private var engine: AVAudioEngine?
@@ -78,7 +90,7 @@ final class Dictation {
                         let text = String(result.text.characters)
                         guard let self else { return }
                         if result.isFinal {
-                            self.finalized += text
+                            self.finalized = Self.join(self.finalized, text)
                             self.volatile = ""
                         } else {
                             self.volatile = text
@@ -100,7 +112,11 @@ final class Dictation {
             try engine.start()
             self.engine = engine
         } catch {
+            // A run that could not start (no microphone, no language, the
+            // model download failed) ends here instead of staying on
+            // "Listening…" until someone presses the button again.
             problem = error.localizedDescription
+            if !Task.isCancelled { tearDown() }
             throw error
         }
     }
@@ -128,36 +144,59 @@ final class Dictation {
         }
     }
 
-    /// Stops listening and returns everything heard.
+    /// Stops listening and returns everything heard. Never hangs: each wait
+    /// (still starting, the last words being finalised) has a limit, and
+    /// after it the run is torn down with whatever was heard.
     @discardableResult
     func stop() async -> String {
         guard isRunning else { return transcript }
-        _ = try? await starting?.value
+        let starting = starting
+        if await !Self.within(.seconds(3), { _ = try? await starting?.value }) { starting?.cancel() }
         engine?.inputNode.removeTap(onBus: 0)
         engine?.stop()
         engine = nil
         feed?.finish()
         feed = nil
-        try? await analyzer?.finalizeAndFinishThroughEndOfInput()
-        await results?.value
-        analyzer = nil
-        results = nil
-        isRunning = false
-        level = 0
+        let analyzer = analyzer
+        let results = results
+        _ = await Self.within(.seconds(2)) { try? await analyzer?.finalizeAndFinishThroughEndOfInput() }
+        _ = await Self.within(.seconds(1.5)) { await results?.value }
+        tearDown()
         return transcript
     }
 
     /// Abandons a run without waiting for the last words.
     func cancel() {
         starting?.cancel()
+        tearDown()
+    }
+
+    /// Everything off and back to rest.
+    private func tearDown() {
         engine?.inputNode.removeTap(onBus: 0)
         engine?.stop()
         engine = nil
         feed?.finish()
         feed = nil
         results?.cancel()
+        results = nil
         analyzer = nil
+        starting = nil
         isRunning = false
         level = 0
+        #if os(iOS)
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        #endif
+    }
+
+    /// Runs `work`, giving up after `limit`. True when it finished in time.
+    private static func within(_ limit: Duration, _ work: @escaping @Sendable () async -> Void) async -> Bool {
+        await withTaskGroup(of: Bool.self) { group in
+            group.addTask { await work(); return true }
+            group.addTask { try? await Task.sleep(for: limit); return false }
+            let first = await group.next() ?? false
+            group.cancelAll()
+            return first
+        }
     }
 }

@@ -67,11 +67,11 @@ struct RemoteChatView: View {
                     LazyVStack(alignment: .leading, spacing: 16) {
                         ForEach(remote.turns) { turn in
                             if turn.role == .user {
-                                HStack {
+                                HStack(spacing: 0) {
                                     Spacer(minLength: 50)
-                                    Text(turn.text)
-                                        .padding(.horizontal, 14).padding(.vertical, 9)
-                                        .background(Ink.accent.opacity(0.16), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                                    MessageBubble(outgoing: true) {
+                                        TextWithTime(text: AttributedString(turn.text), time: turn.date, outgoing: true)
+                                    }
                                 }
                             } else {
                                 RemoteTurnView(turn: turn)
@@ -139,7 +139,10 @@ private struct RemoteTurnView: View {
                 }
             }
             if !turn.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                MarkdownView(text: turn.text)
+                HStack(spacing: 0) {
+                    MessageBubble(outgoing: false) { MarkdownView(text: turn.text) }
+                    Spacer(minLength: 40)
+                }
             } else if turn.isStreaming && turn.cards.isEmpty && (turn.steps.isEmpty || !AppSettings.shared.showSteps) {
                 TypingDots()
             }

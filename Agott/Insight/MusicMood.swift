@@ -27,6 +27,29 @@ nonisolated struct TrackMood: Codable, Hashable, Sendable {
     var energy: Int
     var valence: Int
     var genre: String
+
+    /// The mood in the app's language. Labels are stored in English so they
+    /// group well; people read them in theirs.
+    var moodName: String { Self.name(of: mood) }
+
+    static func name(of mood: String) -> String {
+        switch mood.lowercased() {
+        case "happy": String(localized: "happy", comment: "Mood of a song")
+        case "calm": String(localized: "calm", comment: "Mood of a song")
+        case "sad": String(localized: "sad", comment: "Mood of a song")
+        case "angry": String(localized: "angry", comment: "Mood of a song")
+        case "romantic": String(localized: "romantic", comment: "Mood of a song")
+        case "nostalgic": String(localized: "nostalgic", comment: "Mood of a song")
+        case "energetic": String(localized: "energetic", comment: "Mood of a song")
+        case "anxious": String(localized: "anxious", comment: "Mood of a song")
+        case "dreamy": String(localized: "dreamy", comment: "Mood of a song")
+        case "focused": String(localized: "focused", comment: "Mood of a song")
+        case "defiant": String(localized: "defiant", comment: "Mood of a song")
+        case "playful": String(localized: "playful", comment: "Mood of a song")
+        case "melancholic": String(localized: "melancholic", comment: "Mood of a song")
+        default: mood
+        }
+    }
 }
 
 #if os(macOS)
@@ -54,6 +77,12 @@ final class MusicListener {
                 try? await Task.sleep(for: .seconds(nowPlaying == nil ? 20 : 8))
             }
         }
+    }
+
+    /// Demo screenshots: a song "playing", nothing read from this Mac.
+    func showDemo(_ play: Play, mood: TrackMood?) {
+        nowPlaying = play
+        nowMood = mood
     }
 
     func stop() {

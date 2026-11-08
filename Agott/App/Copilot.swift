@@ -130,7 +130,7 @@ final class Copilot {
     /// Puts the overlay up with the demo conversation, for screenshots.
     func showDemoOverlay() {
         sinceTurn = Agent.shared.turns.dropFirst(2).first?.id
-        mode = .answering
+        mode = .answering   
         #if os(macOS)
         OverlayController.shared.show(focus: false)
         #endif

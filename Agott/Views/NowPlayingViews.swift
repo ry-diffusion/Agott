@@ -38,7 +38,7 @@ struct NowPlayingCard: View {
                 Text(play.track).font(.headline).foregroundStyle(Ink.text).lineLimit(1)
                 Text(play.artist).font(.callout).foregroundStyle(Ink.muted).lineLimit(1)
                 if let mood {
-                    Text("Feels \(mood.mood) · \(play.app)").font(.caption).foregroundStyle(Ink.spot).lineLimit(1)
+                    Text("Feels \(mood.moodName) · \(play.app)").font(.caption).foregroundStyle(Ink.spot).lineLimit(1)
                 } else {
                     Text(play.app).font(.caption).foregroundStyle(Ink.muted)
                 }
@@ -49,6 +49,39 @@ struct NowPlayingCard: View {
 }
 
 #if os(macOS)
+/// What is playing, in the toolbar beside the title: the cover, the song and
+/// the artist. Click for its mood.
+struct NowPlayingCapsule: View {
+    @State private var listener = MusicListener.shared
+    @State private var showing = false
+
+    var body: some View {
+        if let play = listener.nowPlaying {
+            Button { showing.toggle() } label: {
+                HStack(spacing: 8) {
+                    NowPlayingArt(url: listener.artwork, size: 24)
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(play.track).font(.callout.weight(.semibold)).lineLimit(1)
+                        Text(play.artist).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                    .frame(maxWidth: 180, alignment: .leading)
+                    .fixedSize(horizontal: true, vertical: false)
+                    Image(systemName: "waveform").font(.caption).foregroundStyle(Ink.spot)
+                        .symbolEffect(.variableColor.iterative, options: .repeating)
+                }
+                .padding(.horizontal, 4)
+            }
+            .buttonStyle(.plain)
+            .help(Text("Listening to \(play.track) · \(play.artist)"))
+            .popover(isPresented: $showing, arrowEdge: .bottom) {
+                NowPlayingCard(play: play, artwork: listener.artwork, mood: listener.nowMood)
+                    .padding(14)
+                    .frame(width: 300)
+            }
+        }
+    }
+}
+
 /// A quiet line on the chat's first screen: what you are listening to.
 struct NowPlayingLine: View {
     @State private var listener = MusicListener.shared

@@ -77,11 +77,20 @@ final class AppSettings {
     /// Show how each reply was made (thinking, memory, tools). Off: Agott
     /// just talks, like a friend would.
     var showSteps: Bool { didSet { save(showSteps, "showSteps") } }
+    /// Show people and groups as "Person 12" in the chat, for screenshots,
+    /// screen sharing, or a friend looking over your shoulder.
+    var hideNames: Bool { didSet { save(hideNames, "hideNames") } }
     /// Where published artifacts live, and the Worker that serves them.
     var publishDomain: String { didSet { save(publishDomain, "publishDomain") } }
     var publishWorker: String { didSet { save(publishWorker, "publishWorker") } }
     /// Let the model read new moments after every indexing run.
     var autoLearn: Bool { didSet { save(autoLearn, "autoLearn") } }
+    /// Agott sets reminders on its own when a message sets up something at a time.
+    var autoReminders: Bool { didSet { save(autoReminders, "autoReminders") } }
+    /// WhatsApp voice notes are transcribed on this Mac and remembered.
+    var transcribeVoiceNotes: Bool { didSet { save(transcribeVoiceNotes, "transcribeVoiceNotes") } }
+    /// WhatsApp photos are read on this Mac (what is in them, text in them).
+    var describePhotos: Bool { didSet { save(describePhotos, "describePhotos") } }
     /// How much of that window one learning batch may fill.
     var batchFill: Double { didSet { save(batchFill, "batchFill") } }
     /// A paragraph about you, written by Agott from what it has learned and
@@ -115,8 +124,12 @@ final class AppSettings {
         contextTokens = defaults.object(forKey: "contextTokens") as? Int ?? 128_000
         batchFill = defaults.object(forKey: "batchFill") as? Double ?? 0.5
         autoLearn = defaults.object(forKey: "autoLearn") as? Bool ?? true
+        autoReminders = defaults.object(forKey: "autoReminders") as? Bool ?? true
+        transcribeVoiceNotes = defaults.object(forKey: "transcribeVoiceNotes") as? Bool ?? true
+        describePhotos = defaults.object(forKey: "describePhotos") as? Bool ?? true
         listenToMusic = defaults.object(forKey: "listenToMusic") as? Bool ?? true
-        showSteps = defaults.object(forKey: "showSteps") as? Bool ?? false
+        showSteps = defaults.object(forKey: "showSteps") as? Bool ?? true
+        hideNames = defaults.bool(forKey: "hideNames")
         publishDomain = defaults.string(forKey: "publishDomain") ?? "artifacts.grupomidas.com.br"
         publishWorker = defaults.string(forKey: "publishWorker") ?? "agott-artifacts"
         aboutMe = defaults.string(forKey: "aboutMe") ?? ""

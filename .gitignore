@@ -4,3 +4,4 @@ xcuserdata/**/UserInterfaceState.xcuserstate
 DerivedData/
 build/
 .impeccable/config.local.json
+*.profraw

@@ -9,45 +9,97 @@ import UIKit
 struct AssistantTurnView: View {
     var turn: Turn
     var compact = false
+    var joinsAbove = false
+    var joinsBelow = false
+    /// A name in the reply that was clicked: their card opens beside it.
+    @State private var peek: PersonPeek?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            if AppSettings.shared.showSteps {
-                StepsView(steps: turn.steps, isStreaming: turn.isStreaming)
+            // Before the first word: the live activity line, always. After
+            // it: the folded "Thought for 6s" line, unless steps are hidden.
+            let working = turn.isStreaming && turn.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && turn.cards.isEmpty && turn.error == nil
+            if working || (AppSettings.shared.showSteps && !turn.steps.isEmpty) {
+                StepsView(steps: turn.steps, isStreaming: working, started: turn.date,
+                          status: working ? Agent.shared.status : nil)
             }
             // Cards come from tools, which run before the words that follow them.
             ForEach(turn.cards) { card in
                 CardView(card: card)
+                    .environment(\.inChat, true)
+                    .environment(\.chatPanelStyle, .glass)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .transition(.asymmetric(insertion: .scale(scale: 0.97, anchor: .topLeading).combined(with: .opacity), removal: .opacity))
             }
             // A reply can be only whitespace when a card already said it all.
             if !turn.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 if compact {
-                    Text(Self.markdown(turn.text))
+                    // Inline Markdown with people's tags turned into names.
+                    Text(MarkdownView.inline(turn.text))
                         .textSelection(.enabled)
                         .foregroundStyle(Ink.text)
                 } else {
-                    // Replies read as text on the page, not bubbles: long
-                    // answers, lists and tables need the whole column.
-                    MarkdownView(text: turn.text)
+                    // Agott's words straight on the page, in reading-size
+                    // type: no bubble, no frame.
+                    MarkdownView(text: turn.text, size: .zen)
+                    // Names in the reply are links: clicking one shows who they are.
+                    .environment(\.openURL, OpenURLAction { url in
+                        guard let person = PersonPeek.from(url) else { return .systemAction }
+                        peek = person
+                        return .handled
+                    })
+                    .popover(item: $peek, arrowEdge: .leading) { PersonPeekCard(id: $0.id) }
+                    .contextMenu {
+                        Button("Copy", systemImage: "doc.on.doc") { Clipboard.copy(EntityText.plain(turn.text, hidden: AppSettings.shared.hideNames)) }
+                        if !turn.isStreaming {
+                            Button("Try again", systemImage: "arrow.clockwise") { Agent.shared.retry(turn.id) }
+                        }
+                    }
                 }
-            } else if turn.isStreaming && turn.cards.isEmpty && (turn.steps.isEmpty || !AppSettings.shared.showSteps) {
-                // Working, quietly: typing dots, nothing about how.
-                TypingDots()
-            }
-            if !compact, !turn.isStreaming, !turn.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                ReplyActions(text: turn.text, date: turn.date)
             }
             if let error = turn.error {
-                Label(error, systemImage: "exclamationmark.triangle.fill")
-                    .font(.callout)
-                    .foregroundStyle(Ink.text)
-                    .textSelection(.enabled)
-                    .panel(padding: 12, toned: true)
+                HStack(spacing: 12) {
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .font(.callout)
+                        .foregroundStyle(Ink.text)
+                        .textSelection(.enabled)
+                    if !compact {
+                        Button {
+                            withAnimation(Motion.settle) { Agent.shared.retry(turn.id) }
+                        } label: {
+                            Label("Try again", systemImage: "arrow.clockwise")
+                                .font(.callout.weight(.semibold))
+                                .foregroundStyle(Ink.spot)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 11)
+                .quietSurface(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .animation(Motion.settle, value: turn.cards.count)
+    }
+
+    /// A one-paragraph reply keeps its time on the last line; anything with
+    /// structure gets the time under it.
+    @ViewBuilder
+    private var replyBody: some View {
+        let blocks = MarkdownBlock.parse(turn.text)
+        if blocks.count == 1, case .paragraph(let text) = blocks[0] {
+            TextWithTime(text: MarkdownView.inline(text), time: turn.date, outgoing: false)
+        } else {
+            VStack(alignment: .trailing, spacing: 2) {
+                MarkdownView(text: turn.text)
+                if !turn.isStreaming {
+                    Text(turn.date, format: .dateTime.hour().minute())
+                        .font(.caption2).monospacedDigit().foregroundStyle(Ink.muted)
+                }
+            }
+        }
     }
 
     /// Splits a reply into the short texts it was written as. Lists and
@@ -82,64 +134,48 @@ struct AssistantTurnView: View {
     }
 }
 
-/// Under a finished reply: copy it, and when it was said.
-private struct ReplyActions: View {
-    var text: String
-    var date: Date
-    @State private var copied = false
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Button {
-                Clipboard.copy(text)
-                copied = true
-                Task { try? await Task.sleep(for: .seconds(1.5)); copied = false }
-            } label: {
-                Image(systemName: copied ? "checkmark" : "doc.on.doc")
-            }
-            .buttonStyle(HoverIconStyle(size: 24))
-            .help(Text("Copy"))
-            Text(date, format: .dateTime.hour().minute())
-                .foregroundStyle(Ink.muted)
-        }
-        .font(.caption.weight(.semibold))
-        // The icon sits inside a hover box; pull it back onto the text's edge.
-        .padding(.leading, -8)
-    }
-}
-
-/// Someone is typing: three dots in a bubble, the way messengers do it.
+/// Agott at work: a few drops of ink that drift, merge and part again.
 ///
-/// Timing follows Signal's indicator: each dot swells from 6 to 8 pt and
-/// from 40% to full colour, one after another 0.15 s apart, then all rest
-/// until the 1.5 s cycle starts again. The pause is what makes it read as
-/// typing rather than loading.
+/// Messengers show three dots; here they are liquid. Each drop follows its
+/// own slow loop, and a blur with an alpha threshold makes drops that come
+/// close melt into one shape (the "gooey" effect), so it reads as something
+/// alive thinking rather than a progress bar. Pink fades into violet across
+/// the drops. Still for reduced motion.
 struct TypingDots: View {
+    static let lilac = Color(.sRGB, red: 0.68, green: 0.52, blue: 1.0)
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion)) { context in
-            let t = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.5)
-            HStack(spacing: 3) {
-                ForEach(0..<3) { index in
-                    let p = reduceMotion ? 0.5 : Self.wave(t - Double(index) * 0.15)
-                    Circle()
-                        .fill(Ink.muted.opacity(0.4 + 0.6 * p))
-                        .frame(width: 6 + 2 * p, height: 6 + 2 * p)
-                        .frame(width: 8, height: 8)
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .background(Capsule().fill(Ink.surface))
+        TimelineView(.animation(minimumInterval: 1 / 60, paused: reduceMotion)) { context in
+            let t = reduceMotion ? 0 : context.date.timeIntervalSinceReferenceDate
+            LinearGradient(colors: [Ink.muted, Ink.text.opacity(0.5), Ink.muted],
+                           startPoint: UnitPoint(x: 0.5 + 0.5 * cos(t * 0.6), y: 0),
+                           endPoint: UnitPoint(x: 0.5 - 0.5 * cos(t * 0.6), y: 1))
+                .mask { Self.drops(at: t) }
+                .frame(width: 58, height: 24)
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Capsule().fill(Ink.bubble))
         .accessibilityLabel(Text("Agott is typing"))
     }
 
-    /// 0 → 1 → 0 over 0.6 s, then rest.
-    static func wave(_ x: Double) -> Double {
-        guard x > 0, x < 0.6 else { return 0 }
-        return 1 - abs(x - 0.3) / 0.3
+    private static func drops(at t: Double) -> some View {
+        Canvas { context, size in
+            context.addFilter(.alphaThreshold(min: 0.45, color: .white))
+            context.addFilter(.blur(radius: 3.5))
+            context.drawLayer { layer in
+                let mid = CGPoint(x: size.width / 2, y: size.height / 2)
+                for index in 0..<4 {
+                    let i = Double(index)
+                    // Slow, out-of-step loops: never the same picture twice.
+                    let x = mid.x + size.width * 0.36 * sin(t * (0.9 + i * 0.23) + i * 1.7)
+                    let y = mid.y + size.height * 0.16 * cos(t * (1.3 + i * 0.17) + i * 2.3)
+                    let r = 4.0 + 1.3 * sin(t * 1.7 + i * 2.0)
+                    layer.fill(Path(ellipseIn: CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2)), with: .color(.white))
+                }
+            }
+        }
     }
 }
 
@@ -157,6 +193,7 @@ struct CardView: View {
         case .approval(let approval): ApprovalCard(card: approval)
         case .consistency(let consistency): ConsistencyCard(card: consistency)
         case .artifact(let artifact): ArtifactCard(artifact: artifact)
+        case .chart(let chart): ChartCardView(chart: chart)
         }
     }
 }
@@ -192,7 +229,7 @@ struct ExplanationCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: "lightbulb.max").font(.title3.weight(.bold))
-                Text(card.term).font(Lettering.display(22, relativeTo: .title2))
+                Text(card.term).font(.title3.weight(.bold))
             }
             .foregroundStyle(Ink.text)
             Text(card.meaning).foregroundStyle(Ink.text).fixedSize(horizontal: false, vertical: true)
@@ -312,7 +349,7 @@ struct PersonCard: View {
             HStack(alignment: .center, spacing: 12) {
                 Avatar(name: card.name, size: 46)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(card.name).font(Lettering.display(19, relativeTo: .title3)).foregroundStyle(Ink.text)
+                    Text(card.name).font(.headline).foregroundStyle(Ink.text)
                     Text(card.vibe.capitalized).font(.callout).foregroundStyle(Ink.muted)
                 }
                 Spacer()
@@ -365,50 +402,87 @@ struct Avatar: View {
     var name: String
     var size: CGFloat = 32
 
+    /// Telegram's avatar for someone without a photo, everywhere in the app.
     var body: some View {
-        let initials = name.split(separator: " ").prefix(2).compactMap(\.first).map(String.init).joined()
-        Text(initials.isEmpty ? "?" : initials.uppercased())
-            .font(Lettering.display(size * 0.36))
-            .foregroundStyle(Ink.text)
-            .frame(width: size, height: size)
-            .background {
-                ZStack {
-                    Circle().fill(Ink.surface)
-                    Screentone(color: Ink.text.opacity(0.28), spacing: 4.5, from: 0, to: 0.8)
-                        .clipShape(Circle())
-                }
-            }
+        InitialsAvatar(text: name.isEmpty ? "?" : name, size: size)
     }
 }
 
 struct EventsCard: View {
     var card: Card.EventList
+    @State private var expanded = false
+    /// Enough to see the next day or two at a glance; the rest on request.
+    static let collapsedLimit = 8
+
+    /// Events by day, in order, each day once.
+    private var days: [(day: Date, items: [Card.EventList.Item])] {
+        let calendar = Calendar.current
+        let shown = expanded ? card.items : Array(card.items.prefix(Self.collapsedLimit))
+        var result: [(day: Date, items: [Card.EventList.Item])] = []
+        for item in shown {
+            let day = calendar.startOfDay(for: item.start)
+            if let last = result.indices.last, result[last].day == day {
+                result[last].items.append(item)
+            } else {
+                result.append((day, [item]))
+            }
+        }
+        return result
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             PanelTitle(title: "Calendar", symbol: "calendar")
-            ForEach(Array(card.items.enumerated()), id: \.offset) { index, item in
-                HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    VStack(alignment: .trailing, spacing: 0) {
-                        Text(item.start, format: .dateTime.weekday(.abbreviated).day())
-                            .font(.callout.weight(.bold)).foregroundStyle(Ink.text)
-                        Text(item.start, format: .dateTime.hour().minute())
-                            .font(.caption).foregroundStyle(Ink.muted)
-                    }
-                    .monospacedDigit()
-                    .frame(width: 70, alignment: .trailing)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(item.title).font(.callout.weight(.semibold)).foregroundStyle(Ink.text)
-                        if !item.detail.isEmpty { Text(item.detail).font(.caption).foregroundStyle(Ink.muted) }
+            ForEach(days, id: \.day) { group in
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(Self.dayName(group.day))
+                        .font(Lettering.display(12, relativeTo: .caption))
+                        .foregroundStyle(Calendar.current.isDateInToday(group.day) ? Ink.spot : Ink.text)
+                    ForEach(Array(group.items.enumerated()), id: \.offset) { _, item in
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                            Text(item.start, format: .dateTime.hour().minute())
+                                .font(.caption.weight(.medium))
+                                .monospacedDigit()
+                                .foregroundStyle(Ink.muted)
+                                .frame(width: 40, alignment: .leading)
+                            Text(item.title)
+                                .font(.callout)
+                                .foregroundStyle(Ink.text)
+                                .lineLimit(1)
+                                .layoutPriority(1)
+                            if !item.detail.isEmpty {
+                                Text(item.detail)
+                                    .font(.caption)
+                                    .foregroundStyle(Ink.muted)
+                                    .lineLimit(1)
+                            }
+                        }
+                        .help(Text(item.detail.isEmpty ? item.title : "\(item.title) · \(item.detail)"))
                     }
                 }
-                if index < card.items.count - 1 {
-                    Rectangle().fill(Ink.hairline).frame(height: 1)
+            }
+            if card.items.count > Self.collapsedLimit {
+                Button {
+                    withAnimation(Motion.settle) { expanded.toggle() }
+                } label: {
+                    Text(expanded ? String(localized: "Show less")
+                                  : String(localized: "Show \(card.items.count - Self.collapsedLimit) more"))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Ink.spot)
                 }
+                .buttonStyle(.plain)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .panel()
+    }
+
+    /// "Today", "Tomorrow", or the weekday and date.
+    static func dayName(_ day: Date) -> String {
+        let calendar = Calendar.current
+        if calendar.isDateInToday(day) { return String(localized: "Today") }
+        if calendar.isDateInTomorrow(day) { return String(localized: "Tomorrow") }
+        return day.formatted(.dateTime.weekday(.wide).day().month(.abbreviated))
     }
 }
 
@@ -528,7 +602,7 @@ struct ConsistencyCard: View {
     }
 }
 
-/// Tone from -1 to 1 as a marker on a screentone track: cold left, warm right.
+/// Tone from -1 to 1 as a marker on a plain track: cold left, warm right.
 struct ToneBar: View {
     var value: Double
 
@@ -536,10 +610,8 @@ struct ToneBar: View {
         GeometryReader { proxy in
             let x = proxy.size.width * CGFloat((max(-1, min(1, value)) + 1) / 2)
             ZStack(alignment: .leading) {
-                Capsule().fill(Ink.text.opacity(0.08))
-                Screentone(color: Ink.spot, spacing: 4, from: 0, to: 0.9, axis: .horizontal)
-                    .clipShape(Capsule())
-                    .opacity(0.8)
+                Capsule().fill(Ink.text.opacity(0.1)).frame(height: 4)
+                Capsule().fill(Ink.spot.opacity(0.7)).frame(width: max(4, x), height: 4)
                 Circle().fill(Ink.text).frame(width: 10, height: 10).offset(x: x - 5)
             }
         }

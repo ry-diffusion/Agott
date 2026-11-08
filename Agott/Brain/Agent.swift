@@ -23,6 +23,8 @@ nonisolated struct Turn: Identifiable, Codable, Hashable, Sendable {
     var isStreaming = false
     /// What Agott did to write this reply: thinking, context, tool calls.
     var steps: [Step] = []
+    /// Files sent with this message.
+    var attachments: [FileAttachment] = []
 
     init(id: UUID = UUID(), role: Role, text: String, cards: [Card] = [], date: Date = Date(),
          screenApp: String? = nil, memoryCount: Int = 0, error: String? = nil, isStreaming: Bool = false,
@@ -52,6 +54,7 @@ nonisolated struct Turn: Identifiable, Codable, Hashable, Sendable {
         error = try c.decodeIfPresent(String.self, forKey: .error)
         isStreaming = try c.decodeIfPresent(Bool.self, forKey: .isStreaming) ?? false
         steps = try c.decodeIfPresent([Step].self, forKey: .steps) ?? []
+        attachments = try c.decodeIfPresent([FileAttachment].self, forKey: .attachments) ?? []
     }
 }
 
@@ -69,15 +72,26 @@ final class Agent {
     private(set) var mood: Mood = .idle
     private(set) var status: String?
     private(set) var isBusy = false
+    /// The conversation a reply is being written in. It keeps going when you
+    /// switch to another chat, and lands where it was asked.
+    private(set) var runningConversation: UUID?
+    /// Busy in the chat on screen (not one you left mid-reply).
+    var isBusyHere: Bool { isBusy && runningConversation == currentID }
+    /// Chats you left while their reply was still coming, until it lands.
+    @ObservationIgnored private var away: [UUID: [Turn]] = [:]
 
     @ObservationIgnored private var session: LanguageModelSession?
     @ObservationIgnored private var sessionProvider: ModelProvider?
+    /// The model the session was made for: picking another starts a new one.
+    @ObservationIgnored private var sessionModel: String?
     @ObservationIgnored private var task: Task<Void, Never>?
+    @ObservationIgnored private var taskToken = UUID()
     @ObservationIgnored private let log = Logger(subsystem: "br.com.zesmoi.Agott", category: "agent")
 
     private init() {
         if LaunchOptions.isDemo {
             turns = DemoData.turns()
+            conversations = DemoData.conversations(current: currentID)
         } else {
             conversations = Self.loadIndex()
             if let latest = conversations.first {
@@ -96,17 +110,124 @@ final class Agent {
     func setMood(_ mood: Mood) { self.mood = mood }
 
     /// Sends a message. `lookAtScreen` attaches what is on screen.
-    func send(_ text: String, lookAtScreen: Bool = false) {
+    /// A message written while Agott was still answering; it goes next.
+    struct Queued: Identifiable, Hashable {
+        var id = UUID()
+        var text: String
+        var lookAtScreen: Bool
+        var attachments: [FileAttachment]
+        var date = Date()
+    }
+
+    /// Messages waiting their turn, oldest first.
+    private(set) var queue: [Queued] = []
+
+    func send(_ text: String, lookAtScreen: Bool = false, attachments: [FileAttachment] = []) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !isBusy else { return }
-        task = Task { await run(trimmed, lookAtScreen: lookAtScreen) }
+        guard !trimmed.isEmpty || !attachments.isEmpty else { return }
+        let message = Queued(text: trimmed, lookAtScreen: lookAtScreen, attachments: attachments)
+        // Busy: wait in line instead of being dropped.
+        if isBusy || task != nil {
+            queue.append(message)
+            return
+        }
+        start(message)
+    }
+
+    func unqueue(_ id: UUID) { queue.removeAll { $0.id == id } }
+
+    private func start(_ message: Queued) {
+        let token = UUID()
+        taskToken = token
+        task = Task {
+            await run(message.text, lookAtScreen: message.lookAtScreen, attachments: message.attachments)
+            // A stopped run must not clear or advance a newer one.
+            guard taskToken == token else { return }
+            task = nil
+            if !queue.isEmpty { start(queue.removeFirst()) }
+        }
     }
 
     func cancel() {
+        queue.removeAll()
         task?.cancel()
+        task = nil
+        taskToken = UUID()
         Approvals.shared.denyAll()
         finish(mood: .idle)
         if let index = turns.indices.last, turns[index].isStreaming { turns[index].isStreaming = false }
+    }
+
+    // MARK: Turns, wherever they are
+
+    /// Changes one turn, in the chat on screen or in one you left mid-reply.
+    @discardableResult
+    private func update(_ id: UUID, _ body: (inout Turn) -> Void) -> Bool {
+        if let index = turns.firstIndex(where: { $0.id == id }) {
+            body(&turns[index])
+            return true
+        }
+        for key in away.keys {
+            if let index = away[key]?.firstIndex(where: { $0.id == id }) {
+                body(&away[key]![index])
+                return true
+            }
+        }
+        return false
+    }
+
+    private func turn(_ id: UUID) -> Turn? {
+        turns.first { $0.id == id } ?? away.values.lazy.compactMap { $0.first { $0.id == id } }.first
+    }
+
+    private func turns(in conversation: UUID) -> [Turn] {
+        conversation == currentID ? turns : (away[conversation] ?? [])
+    }
+
+    /// Leaving the chat on screen. A reply still coming keeps coming.
+    private func leaveCurrent() {
+        if isBusyHere {
+            away[currentID] = turns
+            // Messages queued here would land in the next chat; drop them.
+            queue.removeAll()
+        } else if isBusy {
+            // A reply in another chat is still coming; leave it be.
+            queue.removeAll()
+        } else {
+            cancel()
+        }
+        save()
+    }
+
+    // MARK: Going back
+
+    /// Back to just before this message: it and everything after it leave
+    /// the conversation, and the model forgets them too. Returns the message.
+    @discardableResult
+    func rewind(to id: UUID) -> Turn? {
+        guard let index = turns.firstIndex(where: { $0.id == id }) else { return nil }
+        let turn = turns[index]
+        if isBusyHere { cancel() }
+        turns.removeSubrange(index...)
+        if let key = openArtifactKey, !artifacts.contains(where: { $0.key == key }) { openArtifactKey = nil }
+        // The next message rebuilds the model's history from what is left.
+        session = nil
+        save(allowEmpty: true)
+        return turn
+    }
+
+    /// Replaces one of your messages: the answers after it go, and the new
+    /// words are asked instead.
+    func edit(_ id: UUID, to text: String, attachments: [FileAttachment]) {
+        guard let original = rewind(to: id) else { return }
+        send(text, lookAtScreen: original.screenApp != nil, attachments: attachments)
+    }
+
+    /// Asks again: from a reply, the message before it; from your message, itself.
+    func retry(_ id: UUID) {
+        guard let index = turns.firstIndex(where: { $0.id == id }) else { return }
+        guard let question = turns[...index].last(where: { $0.role == .user }), let original = rewind(to: question.id) else { return }
+        send(original.text, lookAtScreen: original.screenApp != nil, attachments: original.attachments)
     }
 
     // MARK: Artifacts
@@ -154,8 +275,7 @@ final class Agent {
     /// Starts a fresh conversation; the current one stays in the list.
     func newConversation() {
         openArtifactKey = nil
-        cancel()
-        save()
+        leaveCurrent()
         turns = []
         currentID = UUID()
         session = nil
@@ -164,15 +284,17 @@ final class Agent {
     func open(_ id: UUID) {
         guard id != currentID else { return }
         openArtifactKey = nil
-        cancel()
-        save()
+        leaveCurrent()
         currentID = id
-        turns = Self.load(id)
+        // Back to a chat whose reply is still coming: pick it up live.
+        turns = away.removeValue(forKey: id) ?? Self.load(id)
         // The model gets this conversation's history back on the next message.
         session = nil
     }
 
     func delete(_ id: UUID) {
+        if runningConversation == id { cancel() }
+        away[id] = nil
         conversations.removeAll { $0.id == id }
         try? FileManager.default.removeItem(at: Self.fileURL(id))
         Self.saveIndex(conversations)
@@ -183,36 +305,49 @@ final class Agent {
         }
     }
 
-    private func run(_ text: String, lookAtScreen: Bool) async {
+    private func run(_ text: String, lookAtScreen: Bool, attachments: [FileAttachment] = []) async {
+        // A newer fix for next time; this message uses the one already known.
+        Whereabouts.shared.refresh()
+        // Which run this is: Stop, Edit and Ask again start a new one, and
+        // this one must not touch its state when it wakes up late.
+        let runToken = taskToken
         isBusy = true
+        let conversation = currentID
+        runningConversation = conversation
         mood = .thinking
         status = nil
+        // What was said just before, so "and her?" can be resolved.
+        let earlier = turns.suffix(4).map { ($0.role == .user ? "User: " : "Agott: ") + String($0.text.prefix(300)) }
         var user = Turn(role: .user, text: text)
+        user.attachments = attachments
         turns.append(user)
         turns.append(Turn(role: .assistant, text: "", isStreaming: true))
         let replyIndex = turns.count - 1
         let replyID = turns[replyIndex].id
 
         CardBus.shared.sink = { [weak self] card in
-            guard let self, let index = self.turns.firstIndex(where: { $0.id == replyID }) else { return }
+            guard let self else { return }
             var card = card
             if case .artifact(var artifact) = card {
                 // Same title as an earlier one: this is its next version.
-                artifact.version = (self.versions(of: artifact.key).map(\.version).max() ?? 0) + 1
+                let earlier = self.turns(in: conversation).flatMap(\.cards).compactMap { card -> Card.Artifact? in
+                    if case .artifact(let a) = card { a } else { nil }
+                }
+                artifact.version = (earlier.filter { $0.key == artifact.key }.map(\.version).max() ?? 0) + 1
                 card = .artifact(artifact)
-                self.openArtifactKey = artifact.key
+                if conversation == self.currentID { self.openArtifactKey = artifact.key }
             }
-            self.turns[index].cards.append(card)
+            self.update(replyID) { $0.cards.append(card) }
             if case .approval = card { self.mood = .surprised }
         }
         CardBus.shared.update = { [weak self] card in
-            guard let self, case .approval(let update) = card,
-                  let index = self.turns.firstIndex(where: { $0.id == replyID }),
-                  let cardIndex = self.turns[index].cards.firstIndex(where: { $0.id == update.id }),
-                  case .approval(var existing) = self.turns[index].cards[cardIndex]
-            else { return }
-            existing.state = update.state
-            self.turns[index].cards[cardIndex] = .approval(existing)
+            guard let self, case .approval(let approval) = card else { return }
+            self.update(replyID) { turn in
+                guard let cardIndex = turn.cards.firstIndex(where: { $0.id == approval.id }),
+                      case .approval(var existing) = turn.cards[cardIndex] else { return }
+                existing.state = approval.state
+                turn.cards[cardIndex] = .approval(existing)
+            }
             self.mood = .working
         }
 
@@ -221,7 +356,7 @@ final class Agent {
         var contextSteps: [Step] = []
         func show(_ step: Step) {
             if let i = contextSteps.firstIndex(where: { $0.id == step.id }) { contextSteps[i] = step } else { contextSteps.append(step) }
-            if let index = turns.firstIndex(where: { $0.id == replyID }) { turns[index].steps = contextSteps }
+            update(replyID) { $0.steps = contextSteps }
         }
         #if os(macOS)
         if lookAtScreen && AppSettings.shared.useScreenContext {
@@ -247,6 +382,13 @@ final class Agent {
         show(memoryStep)
         // While a big read holds the store, memory may answer slowly; the
         // reply should not wait on it for long.
+        // Jev plans everything this message needs (who, when, the chat, the
+        // relationship, the calendar) while the general recall runs, and it
+        // is all fetched at once: one wait instead of a tool call per need.
+        let planned = Task { () -> [RecallPlanner.Gathered] in
+            guard let plan = await RecallPlanner.plan(for: text, earlier: earlier), !plan.isEmpty else { return [] }
+            return await RecallPlanner.gather(plan, query: text)
+        }
         let recall = await Self.recall(text, within: .seconds(10))
         if let recall, !recall.isEmpty {
             context.append(recall.rendered(characterBudget: 7000))
@@ -269,6 +411,17 @@ final class Agent {
         memoryStep.state = .done
         memoryStep.ended = .now
         show(memoryStep)
+        let gathered = await planned.value
+        for (index, item) in gathered.enumerated() {
+            show(Step(id: "plan-\(index)", kind: .context, title: item.title, symbol: item.symbol, state: .done,
+                      detail: String(item.text.prefix(600)), started: .now, ended: .now))
+        }
+        if !gathered.isEmpty {
+            context.append(
+                "Gathered for this message before you answer. Use it first; call a tool only for something "
+                + "specific that is still missing.\n\n"
+                + gathered.map { "## \($0.title)\n\($0.text)" }.joined(separator: "\n\n"))
+        }
         self.contextSteps = contextSteps
         #if os(macOS)
         // What is playing is part of the moment.
@@ -277,26 +430,46 @@ final class Agent {
             context.append("The user is listening to \"\(play.track)\" by \(play.artist) on \(play.app)\(mood).")
         }
         #endif
-        if let index = turns.firstIndex(where: { $0.id == user.id }) { turns[index] = user }
+        update(user.id) { $0 = user }
 
+        // Files: their words go in the context; images go as images when the
+        // model can see.
+        var images: [URL] = []
+        if !attachments.isEmpty {
+            let files = await AttachmentStore.context(for: attachments, modelSeesImages: Self.chatSeesImages)
+            if !files.text.isEmpty { context.append("Files the user sent with this message:\n" + files.text) }
+            images = files.images
+        }
+        let ask = text.isEmpty ? String(localized: "Take a look at this.") : text
         let prompt = context.isEmpty
-            ? text
-            : "<context>\n\(context.joined(separator: "\n\n"))\n</context>\n\n\(text)"
+            ? ask
+            : "<context>\n\(context.joined(separator: "\n\n"))\n</context>\n\n\(ask)"
 
+        // Stopped while remembering or planning: no answer, nothing to clean
+        // up that a newer run now owns.
+        guard taskToken == runToken, !Task.isCancelled else { return }
         status = nil
         mood = .thinking
-        await respond(to: prompt, replyID: replyID, retry: true)
+        await respond(to: prompt, images: images, replyID: replyID, conversation: conversation, retry: true)
+        // Names the model wrote plainly become tags too, for the people it was
+        // told about, so hiding names hides them all.
+        let told = PeopleDirectory.tags(in: prompt).compactMap { PeopleDirectory.shared.name($0) }
+        if !told.isEmpty { update(replyID) { $0.text = PeopleDirectory.tagNames($0.text, people: told) } }
+        save(conversation)
+        nameConversation(conversation)
+        // Only the run that still owns them lets go of the card channel and
+        // of a chat you left (its reply has landed and is saved).
+        guard taskToken == runToken else { return }
         CardBus.shared.sink = nil
         CardBus.shared.update = nil
-        save()
-        nameConversation()
+        if conversation != currentID { away[conversation] = nil }
     }
 
     /// Gives the conversation a subject and its people after the first reply,
     /// and again once it has grown (subjects drift).
-    private func nameConversation() {
+    private func nameConversation(_ id: UUID) {
         guard !LaunchOptions.isDemo else { return }
-        let id = currentID
+        let turns = turns(in: id)
         let count = turns.count
         let written = conversations.first { $0.id == id }?.subjectTurns ?? 0
         guard written == 0 || (written < 8 && count >= 8) else { return }
@@ -318,20 +491,36 @@ final class Agent {
         }
     }
 
-    private func respond(to prompt: String, replyID: UUID, retry: Bool) async {
+    /// Whether the chat model takes images.
+    static var chatSeesImages: Bool {
+        ModelHub.resolved() == .openCode && (ModelCatalog.shared.model(AppSettings.shared.modelName)?.vision ?? false)
+    }
+
+    private func respond(to prompt: String, images: [URL] = [], replyID: UUID, conversation: UUID, retry: Bool) async {
         let provider = ModelHub.resolved()
-        if session == nil || sessionProvider != provider {
+        // The chat's own session; a chat you left gets one of its own, so
+        // the one on screen never inherits another chat's history.
+        let model = AppSettings.shared.modelName
+        var active = conversation == currentID && sessionProvider == provider && sessionModel == model ? session : nil
+        if active == nil {
             // Earlier turns of this conversation come back as history, so a
             // reopened chat carries on instead of starting from nothing.
-            let earlier = turns.filter { !$0.isStreaming && $0.id != replyID }.dropLast()
-            session = ModelHub.session(
+            let earlier = turns(in: conversation).filter { !$0.isStreaming && $0.id != replyID }.dropLast()
+            active = ModelHub.session(
                 provider: provider, tools: Persona.tools(for: provider),
                 instructions: Persona.instructions(provider: provider),
+                // The chat model itself sees images when it can.
+                vision: Self.chatSeesImages,
+                modelName: Self.chatSeesImages ? AppSettings.shared.modelName : nil,
                 thinking: true,
                 history: Array(earlier.suffix(30)))
-            sessionProvider = provider
+            if conversation == currentID {
+                session = active
+                sessionProvider = provider
+                sessionModel = model
+            }
         }
-        guard let session else { return }
+        guard let session = active else { return }
 
         // Watch the transcript while the model works, so thinking and every
         // tool call appear as they happen, not after.
@@ -349,26 +538,27 @@ final class Agent {
         }
 
         do {
-            let stream = session.streamResponse(to: prompt)
+            let stream = session.streamResponse(to: Prompt {
+                prompt
+                images.map { FoundationModels.Attachment(imageURL: $0) }
+            })
             for try await snapshot in stream {
                 try Task.checkCancellation()
-                guard let index = turns.firstIndex(where: { $0.id == replyID }) else { break }
-                turns[index].text = snapshot.content
+                guard update(replyID, { $0.text = snapshot.content }) else { break }
                 if !snapshot.content.isEmpty { mood = .talking; status = nil }
             }
-            if let index = turns.firstIndex(where: { $0.id == replyID }) {
-                turns[index].isStreaming = false
-                let hasCards = !turns[index].cards.isEmpty
+            var hasCards = false
+            if update(replyID, { $0.isStreaming = false; hasCards = !$0.cards.isEmpty }) {
                 finish(mood: hasCards ? .happy : .idle)
             }
         } catch is CancellationError {
-            finish(mood: .idle)
+            // `cancel()` already settled things; a newer run may be going.
         } catch let error as LanguageModelError {
             if case .contextSizeExceeded = error, retry {
                 // Start over with a clean session; the conversation so far is
                 // already summarised in the turns the user can see.
-                self.session = nil
-                await respond(to: prompt, replyID: replyID, retry: false)
+                if conversation == currentID { self.session = nil }
+                await respond(to: prompt, images: images, replyID: replyID, conversation: conversation, retry: false)
                 return
             }
             fail(replyID, error)
@@ -380,10 +570,10 @@ final class Agent {
     @ObservationIgnored private var contextSteps: [Step] = []
 
     private func updateSteps(replyID: UUID, session: LanguageModelSession, baseline: Int, clock: StepTracker.Clock, busy: Bool) {
-        guard let index = turns.firstIndex(where: { $0.id == replyID }) else { return }
+        guard let current = turn(replyID) else { return }
         let derived = StepTracker.steps(from: session.transcript, after: baseline, busy: busy, clock: clock)
         let steps = contextSteps + derived
-        if turns[index].steps != steps { turns[index].steps = steps }
+        if current.steps != steps { update(replyID) { $0.steps = steps } }
         if busy, let running = derived.last(where: { $0.state == .running }) {
             status = running.title + "…"
             mood = running.kind == .thinking ? .thinking : .working
@@ -391,10 +581,12 @@ final class Agent {
     }
 
     private func fail(_ id: UUID, _ error: Error) {
+        // Stopped on purpose (stop, edit, try again): not a failure.
+        guard !Task.isCancelled else { return }
         log.error("Turn failed: \(error.localizedDescription, privacy: .public)")
-        if let index = turns.firstIndex(where: { $0.id == id }) {
-            turns[index].isStreaming = false
-            turns[index].error = error.localizedDescription
+        update(id) {
+            $0.isStreaming = false
+            $0.error = error.localizedDescription
         }
         // A broken session (bad key, network) should not poison the next try.
         session = nil
@@ -403,6 +595,7 @@ final class Agent {
 
     private func finish(mood: Mood) {
         isBusy = false
+        runningConversation = nil
         status = nil
         self.mood = mood
         guard mood == .happy || mood == .confused else { return }
@@ -423,15 +616,16 @@ final class Agent {
     nonisolated private static func fileURL(_ id: UUID) -> URL { folder.appending(path: "\(id.uuidString).json") }
     nonisolated private static var indexURL: URL { folder.appending(path: "index.json") }
 
-    private func save() {
-        guard !LaunchOptions.isDemo, !turns.isEmpty else { return }
+    private func save(_ conversation: UUID? = nil, allowEmpty: Bool = false) {
+        let id = conversation ?? currentID
+        let turns = turns(in: id)
+        guard !LaunchOptions.isDemo, allowEmpty || !turns.isEmpty else { return }
         let recent = Array(turns.suffix(400))
-        let id = currentID
         let title = turns.first(where: { $0.role == .user })?.text ?? String(localized: "New conversation")
         let previous = conversations.first { $0.id == id }
         var info = ConversationInfo(
             id: id, title: String(title.prefix(70)),
-            preview: String((turns.last { $0.role == .assistant }?.text ?? "").prefix(90)),
+            preview: String((turns.last { $0.role == .assistant }?.text ?? "").markdownStripped.prefix(90)),
             updated: turns.last?.date ?? .now)
         info.subject = previous?.subject
         info.people = previous?.people
@@ -463,7 +657,7 @@ final class Agent {
         try? data.write(to: fileURL(id), options: .atomic)
         let info = ConversationInfo(
             id: id, title: String((turns.first { $0.role == .user }?.text ?? "Agott").prefix(70)),
-            preview: String((turns.last { $0.role == .assistant }?.text ?? "").prefix(90)),
+            preview: String((turns.last { $0.role == .assistant }?.text ?? "").markdownStripped.prefix(90)),
             updated: turns.last?.date ?? .now)
         saveIndex([info])
         try? FileManager.default.removeItem(at: old)
@@ -476,6 +670,42 @@ final class Agent {
         else { return [] }
         for index in turns.indices { turns[index].isStreaming = false }
         return turns
+    }
+}
+
+// MARK: - Artifact library
+
+/// One artifact in the library: its newest version and where it was made.
+nonisolated struct LibraryItem: Identifiable, Hashable, Sendable {
+    var artifact: Card.Artifact
+    var versions: Int
+    var conversation: UUID
+    var conversationTitle: String
+    var date: Date
+    var id: String { "\(conversation.uuidString)|\(artifact.key)" }
+}
+
+extension Agent {
+    /// Every artifact from every saved conversation, newest first: the
+    /// latest version of each, read off the main thread.
+    nonisolated static func library(of conversations: [ConversationInfo]) async -> [LibraryItem] {
+        var items: [LibraryItem] = []
+        for info in conversations {
+            let turns = load(info.id)
+            var latest: [String: (Card.Artifact, Date, Int)] = [:]
+            for turn in turns {
+                for card in turn.cards {
+                    guard case .artifact(let artifact) = card else { continue }
+                    let count = (latest[artifact.key]?.2 ?? 0) + 1
+                    latest[artifact.key] = (artifact, turn.date, count)
+                }
+            }
+            for (_, entry) in latest {
+                items.append(LibraryItem(artifact: entry.0, versions: entry.2, conversation: info.id,
+                                         conversationTitle: info.displayTitle, date: entry.1))
+            }
+        }
+        return items.sorted { $0.date > $1.date }
     }
 }
 

@@ -59,6 +59,8 @@ enum Reflections {
             try Task.checkCancellation()
             let batch = Array(candidates[start..<min(start + jevBatch, candidates.count)])
             let depths = await depth(of: batch)
+            // Jev could not be reached: stop, and leave these for next time.
+            guard depths.count == batch.count else { break }
             let deep = zip(batch, depths).filter { $0.1 >= deepEnough }
             if !deep.isEmpty {
                 try await condense(deep.map(\.0), depths: deep.map(\.1))
@@ -87,9 +89,13 @@ enum Reflections {
                         "A defining conversation: vulnerability, conflict, a big decision or a turning point in a relationship.",
                     ])
             }
-            if let answers = try? await Jev.ask(state: ["user": me, "moments": moments], questions: questions) {
+            do {
+                let answers = try await Jev.ask(state: ["user": me, "moments": moments], questions: questions)
                 return chunks.indices.map { answers["depth_\($0)"]?.score ?? 0 }
-            }
+            } catch where ModelHub.isConnectionProblem(error) {
+                // Jev unreachable: no guess, so these are judged properly later.
+                return []
+            } catch {}
         }
         return chunks.map(heuristicDepth)
     }
@@ -105,22 +111,30 @@ enum Reflections {
     private static func condense(_ chunks: [MemoryChunk], depths: [Double]) async throws {
         let me = AppSettings.myNameSnapshot
         let moments = chunks.enumerated().map { index, chunk in
-            "### Moment \(index + 1) · \(chunk.source.displayName) · \"\(chunk.chatName)\" · \(MemoryStore.stamp(chunk.start.timeIntervalSince1970))\n\(chunk.text.prefix(5000))"
+            "### Moment \(index + 1) · \(chunk.source.displayName) · \(Retriever.Recall.place(chunk)) · \(MemoryStore.stamp(chunk.start.timeIntervalSince1970))\n\(chunk.text.prefix(5000))"
         }.joined(separator: "\n\n")
         let provider = ModelHub.learningProvider
-        guard let condensed = try? await ModelHub.generate(
+        let condensed: Condensed
+        do {
+            condensed = try await ModelHub.generate(
             Condensed.self,
             prompt: "The user is \(me). Lines from \(me) are the user speaking.\n\n\(moments)",
             instructions: """
             You keep the user's private diary of conversations that mattered, from messages they shared with \
             you on purpose. For each numbered moment, write one memory the way a close friend would remember \
             it: what happened, what each person felt or needed, what was decided or promised, and what it says \
-            about them. Be specific and kind; only say what the messages support. Never include passwords, \
+            about them. Say whether it happened in a group (in front of everyone) or in private, and never \
+            mix up a group named after someone with that person. Be specific and kind; only say what the \
+            messages support. Never include passwords, \
             numbers or addresses. Write in \(Persona.languageName).
             """,
             provider: provider,
             modelName: provider == .openCode ? ModelHub.learningModel : nil)
-        else { return }
+        } catch {
+            // Unreachable: stop, and these moments stay unread for next time.
+            if ModelHub.isConnectionProblem(error) { throw error }
+            return
+        }
         for memory in condensed.memories where !memory.summary.isEmpty {
             let index = memory.moment - 1
             guard chunks.indices.contains(index), !KnowledgeGraph.isSensitive(memory.summary) else { continue }
@@ -158,8 +172,10 @@ extension MemoryStore {
                        people: [String], feeling: String, depth: Double, date: Date) throws {
         try openForRepair().run(
             """
-            INSERT OR IGNORE INTO reflections(chunk_id, source, chat, title, summary, people, feeling, depth, ts)
+            INSERT INTO reflections(chunk_id, source, chat, title, summary, people, feeling, depth, ts)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(chunk_id) DO UPDATE SET chat = excluded.chat, title = excluded.title, summary = excluded.summary,
+                people = excluded.people, feeling = excluded.feeling, depth = excluded.depth
             """,
             [.of(Int(chunkID)), .text(source.rawValue), .text(chat), .text(title), .text(summary),
              .text(people.joined(separator: ", ")), .text(feeling), .double(depth), .double(date.timeIntervalSince1970)])

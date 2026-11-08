@@ -77,6 +77,8 @@ enum FollowUps {
         var followUp: FollowUp
         var memorable: RawMessage?
         var memorability: Double
+        /// How likely the new messages set up something to be reminded of.
+        var reminder: Double = 0
     }
 
     /// Judges a chat after new messages from `name`. `recent` is the end of
@@ -122,6 +124,7 @@ enum FollowUps {
             Small talk, reactions and passing moods are not lasting.
             """),
             "remember_which": .choice("Which of `new_messages` holds the thing most worth remembering?", candidates),
+            "reminder": AutoReminders.question,
             "kind": .choice("What is the latest message from `person` in `conversation` mainly about?", [
                 "question": "Asks the user something.",
                 "plan": "An invitation, plan, date or arrangement.",
@@ -143,7 +146,8 @@ enum FollowUps {
             urgency: answers["urgency"]?.score ?? 0,
             kind: answers["kind"]?.choice ?? "small_talk",
             checked: .now)
-        return Result(followUp: followUp, memorable: memorable, memorability: answers["remember"]?.probability ?? 0)
+        return Result(followUp: followUp, memorable: memorable, memorability: answers["remember"]?.probability ?? 0,
+                      reminder: answers["reminder"]?.probability ?? 0)
     }
 }
 
@@ -154,7 +158,7 @@ enum Remembering {
     struct Draft {
         @Guide(description: "Who the fact is about: the person's name, or \"me\" for the user")
         var subject: String
-        @Guide(description: "The relation, short: works at, likes, birthday is, is travelling to, promised to…")
+        @Guide(description: "The relation, short, in the user's language: trabalha em, gosta de, faz aniversário em, vai viajar para, prometeu…")
         var predicate: String
         @Guide(description: "The value, short and specific")
         var object: String

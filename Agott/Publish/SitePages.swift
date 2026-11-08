@@ -43,8 +43,8 @@ enum SitePages {
     }
 
     static func artifact(_ artifact: Card.Artifact, entry: ArtifactPublisher.Entry) -> String {
-        if artifact.kind == .html { return artifact.content }
-        let source = jsString(artifact.content)
+        if artifact.kind == .html { return artifact.exportText }
+        let source = jsString(artifact.exportText)
         let header = """
         <header class="doc-top">
           <a class="back" href="/">← Artifacts</a>

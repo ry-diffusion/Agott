@@ -90,9 +90,12 @@ enum StepTracker {
             case .reasoning(let reasoning):
                 let running = busy && isLast
                 let started = clock.start(reasoning.id)
+                let thought = text(reasoning.segments)
                 steps.append(Step(
-                    id: reasoning.id, kind: .thinking, title: String(localized: "Thinking"), symbol: "brain",
-                    state: running ? .running : .done, detail: text(reasoning.segments),
+                    id: reasoning.id, kind: .thinking,
+                    // While it thinks, the latest thing it is thinking about.
+                    title: (running ? gist(of: thought) : nil) ?? String(localized: "Thinking"), symbol: "brain",
+                    state: running ? .running : .done, detail: thought,
                     started: started, ended: running ? nil : clock.end(reasoning.id)))
             case .toolCalls(let calls):
                 for call in calls {
@@ -133,6 +136,28 @@ enum StepTracker {
                 state: .running, detail: nil, started: clock.start(id), ended: nil))
         }
         return steps
+    }
+
+    /// A few words for what the model is thinking about now: the latest
+    /// heading of its reasoning ("**Checking the calendar**"), or else the
+    /// start of its latest sentence. Nil while there is nothing readable yet.
+    static func gist(of thought: String) -> String? {
+        let text = thought.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return nil }
+        // Reasoning summaries open each part with a bold heading.
+        if let heading = text.matches(of: /\*\*([^*\n]{3,80})\*\*/).last.map({ String($0.1) }) {
+            return heading.trimmingCharacters(in: .whitespaces.union(.punctuationCharacters))
+        }
+        // Otherwise the last finished sentence (the one being written is
+        // still changing every frame), shortened.
+        let sentences = text.split(whereSeparator: { ".!?\n".contains($0) })
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { $0.count > 8 }
+        let finished = text.last.map { ".!?\n".contains($0) } == true ? sentences.last : sentences.dropLast().last
+        guard let line = finished ?? sentences.last else { return nil }
+        let words = line.split(separator: " ")
+        let short = words.prefix(9).joined(separator: " ")
+        return words.count > 9 ? short + "…" : short
     }
 
     /// Memory results come back as "### Source · Chat · date" sections; each
@@ -202,8 +227,20 @@ enum StepTracker {
         case "show_explanation": return (String(localized: "Writing an explanation"), "lightbulb")
         case "suggest_replies": return (String(localized: "Drafting replies"), "bubble.left.and.text.bubble.right")
         case "show_checklist": return (String(localized: "Making a checklist"), "checklist")
+        case "show_chart": return (String(localized: "Drawing a chart"), "chart.bar.xaxis")
         case "artifact": return (String(localized: "Writing “\(arg("title"))”"), "doc.richtext")
         case "music_mood": return (String(localized: "Listening back to your music"), "music.note")
+        case "web_search": return (String(localized: "Searching the web for “\(arg("query"))”"), "magnifyingglass")
+        case "read_web_page": return (String(localized: "Reading \(URL(string: arg("url"))?.host() ?? arg("url"))"), "safari")
+        case "find_place": return (String(localized: "Finding \(arg("query")) on the map"), "map")
+        case "nearby_places": return (String(localized: "Looking for \(arg("kind")) near \(arg("near"))"), "mappin.and.ellipse")
+        case "movie_info": return (String(localized: "Looking up \(arg("title")) on IMDb"), "film")
+        case "where_am_i": return (String(localized: "Checking where you are"), "location")
+        case "apple_maps_search": return (String(localized: "Searching Maps for \(arg("query"))"), "map")
+        case "travel_time": return (String(localized: "Working out the way to \(arg("to"))"), "car")
+        case "translate": return (String(localized: "Translating"), "character.bubble")
+        case "remind_me": return (String(localized: "Setting a reminder"), "bell")
+        case "contact_info": return (String(localized: "Looking up \(arg("name")) in Contacts"), "person.crop.circle")
         default: return (tool.replacingOccurrences(of: "_", with: " "), "wrench.and.screwdriver")
         }
     }

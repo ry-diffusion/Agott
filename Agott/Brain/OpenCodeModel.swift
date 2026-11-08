@@ -56,12 +56,19 @@ nonisolated struct OpenCodeExecutor: LanguageModelExecutor {
         case missingKey
         case badURL
         case http(Int, String)
+        /// The secure connection keeps being cut before anything is said.
+        case unreachable(String)
+        /// The model gave up partway through this request (a content filter,
+        /// a context that would not fit): about this input, not the server.
+        case streamFailed(String)
 
         var errorDescription: String? {
             switch self {
+            case .unreachable(let host): String(localized: "Couldn't open a secure connection to \(host): it was cut during the handshake. A VPN, a proxy or this network may be blocking it.")
             case .missingKey: String(localized: "Add your OpenCode Go API key in Settings.")
             case .badURL: String(localized: "The model endpoint URL is not valid.")
             case .http(let code, let body): String(localized: "The model server answered \(code): \(body)")
+            case .streamFailed(let message): String(localized: "The model stopped partway: \(message)")
             }
         }
     }
@@ -105,7 +112,9 @@ nonisolated struct OpenCodeExecutor: LanguageModelExecutor {
 
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
-        urlRequest.timeoutInterval = 300
+        // Seconds of silence before giving up. Thinking models stream their
+        // reasoning, so a quiet connection is a dead one, not a slow answer.
+        urlRequest.timeoutInterval = 120
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         urlRequest.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         urlRequest.setValue("Bearer \(configuration.apiKey)", forHTTPHeaderField: "Authorization")
@@ -195,15 +204,27 @@ nonisolated struct OpenCodeExecutor: LanguageModelExecutor {
                 }
                 let hinted = (http.value(forHTTPHeaderField: "Retry-After")).flatMap(Double.init)
                 try await backoff(attempt: attempt, hinted: hinted, reason: http.statusCode)
-            } catch let error as URLError where attempt < maxAttempts && Self.isTransient(error) {
+            } catch let error as URLError where Self.isHandshakeFailure(error) {
+                // A cut handshake is the network refusing, not a busy server:
+                // one quick retry, then say so instead of thinking forever.
+                guard attempt < 2 else { throw ExecutorError.unreachable(request.url?.host() ?? "the model server") }
+                try await backoff(attempt: attempt, hinted: nil, reason: error.errorCode)
+            } catch let error as URLError where attempt < 3 && Self.isTransient(error) {
+                // Network trouble: two quick retries. Each can wait two
+                // minutes, so five would keep you watching "Thinking" for ten.
                 try await backoff(attempt: attempt, hinted: nil, reason: error.errorCode)
             }
         }
     }
 
+    static func isHandshakeFailure(_ error: URLError) -> Bool {
+        [.secureConnectionFailed, .serverCertificateUntrusted, .serverCertificateHasBadDate,
+         .clientCertificateRejected].contains(error.code)
+    }
+
     static func isTransient(_ error: URLError) -> Bool {
         [.timedOut, .networkConnectionLost, .notConnectedToInternet, .cannotConnectToHost,
-         .dnsLookupFailed, .cannotFindHost, .secureConnectionFailed].contains(error.code)
+         .dnsLookupFailed, .cannotFindHost].contains(error.code)
     }
 
     private static func backoff(attempt: Int, hinted: Double?, reason: Int) async throws {

@@ -156,7 +156,7 @@ struct PermissionRow: View {
 }
 
 #if os(macOS)
-private struct IPhonePairingSection: View {
+struct IPhonePairingSection: View {
     @State private var host = RemoteHost.shared
 
     var body: some View {

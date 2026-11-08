@@ -55,6 +55,8 @@
         "INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription": "Agott reads and adds events when you ask it to.",
         "INFOPLIST_KEY_NSContactsUsageDescription": "Agott matches phone numbers in your chats to the names of the people you know.",
         "INFOPLIST_KEY_NSLocalNetworkUsageDescription": "Agott connects your iPhone to Agott on your Mac over your local network.",
+        "INFOPLIST_KEY_NSLocationUsageDescription": "Agott uses your city so it knows where you are when you ask about places, routes, the time or the weather.",
+        "INFOPLIST_KEY_NSLocationWhenInUseUsageDescription": "Agott uses your city so it knows where you are when you ask about places, routes, the time or the weather.",
         "INFOPLIST_KEY_NSMicrophoneUsageDescription": "Agott listens while you hold the talk key, so you can speak to it.",
         "INFOPLIST_KEY_NSRemindersFullAccessUsageDescription": "Agott reads and adds tasks when you ask it to.",
         "INFOPLIST_KEY_NSSpeechRecognitionUsageDescription": "Agott turns what you say into text on this device.",

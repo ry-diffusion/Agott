@@ -122,10 +122,10 @@ nonisolated struct RelationshipReadTool: Tool {
 nonisolated struct ArtifactTool: Tool {
     let name = "artifact"
     let description = """
-    Make or revise something the user will keep, copy or reuse: a document, a long message or email draft, a \
-    plan, a study guide, code, a small interactive web page, a table. It opens in a panel beside the chat. To \
-    revise one, call again with the same title and the full new content; it becomes the next version. Do not \
-    use it for short answers or anything under a few paragraphs.
+    Make or revise something the user asked to keep as a document: a file, a long draft, a study guide, \
+    code, a small interactive web page. It opens in a panel beside the chat. To revise one, call again with \
+    the same title and the full new content; it becomes the next version. Prefer answering in the chat: \
+    only use this when the user asks for a document or the content is longer than a page and meant to be saved.
     """
 
     @Generable
@@ -149,5 +149,50 @@ nonisolated struct ArtifactTool: Tool {
             key: arguments.title.folded, title: arguments.title, kind: kind,
             language: arguments.language, content: arguments.content)))
         return "The artifact \"\(arguments.title)\" is open beside the chat. Say in one sentence what it is; do not repeat its content."
+    }
+}
+
+nonisolated struct ChartTool: Tool {
+    let name = "show_chart"
+    let description = """
+    Show a chart in the conversation when numbers are easier to see than to read: trends over time (line or \
+    area), comparisons (bar, horizontal bar, stacked bar), shares of a whole (pie or donut), or how two \
+    measures relate (scatter, with numeric labels). Use real numbers from memory, tools or the user.
+    """
+
+    @Generable
+    struct Arguments {
+        var title: String
+        @Guide(description: "Optional short note under the title, e.g. the period or source")
+        var subtitle: String?
+        var kind: Kind
+        @Guide(description: "The x-axis labels or categories, in order. For scatter, numbers as text.", .maximumCount(60))
+        var labels: [String]
+        @Guide(description: "One or more series; each has one value per label", .maximumCount(6))
+        var series: [Series]
+        @Guide(description: "Unit of the values, e.g. msgs, R$, h, %")
+        var unit: String?
+
+        @Generable
+        struct Series {
+            var name: String
+            var values: [Double]
+        }
+
+        @Generable
+        enum Kind { case bar, horizontalBar, stackedBar, line, area, pie, donut, scatter }
+    }
+
+    @concurrent func call(arguments: Arguments) async throws -> String {
+        let kind = Card.ChartData.Kind(rawValue: "\(arguments.kind)") ?? .bar
+        let count = arguments.labels.count
+        // Every series must line up with the labels.
+        let series = arguments.series.map { item in
+            Card.ChartData.Series(name: item.name, values: Array((item.values + Array(repeating: 0, count: max(0, count - item.values.count))).prefix(count)))
+        }
+        guard count > 0, !series.isEmpty else { return "A chart needs labels and at least one series of values." }
+        await CardBus.post(.chart(.init(title: arguments.title, subtitle: arguments.subtitle, kind: kind,
+                                        labels: arguments.labels, series: series, unit: arguments.unit)))
+        return "The chart is on screen. Say in a sentence or two what stands out; do not list the numbers again."
     }
 }

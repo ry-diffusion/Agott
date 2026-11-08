@@ -45,14 +45,16 @@ nonisolated final class Organizer: @unchecked Sendable {
         }
     }
 
-    func createReminder(title: String, due: Date?, notes: String?) throws -> EKReminder {
+    func createReminder(title: String, due: Date?, alert: Date? = nil, notes: String?) throws -> EKReminder {
+        if !remindersAuthorized { throw CocoaError(.featureUnsupported) }
         let reminder = EKReminder(eventStore: store)
         reminder.title = title
         reminder.notes = notes
         reminder.calendar = store.defaultCalendarForNewReminders()
         if let due {
             reminder.dueDateComponents = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: due)
-            reminder.addAlarm(EKAlarm(absoluteDate: due))
+            // The alert can come before the time itself ("leave in an hour").
+            reminder.addAlarm(EKAlarm(absoluteDate: alert ?? due))
         }
         try store.save(reminder, commit: true)
         return reminder

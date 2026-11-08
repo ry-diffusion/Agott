@@ -14,6 +14,26 @@
         }
       }
     },
+    "[photo] %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "[foto] %@"
+          }
+        }
+      }
+    },
+    "[voice note] %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "[áudio] %@"
+          }
+        }
+      }
+    },
     "%@ · %@" : {
       "shouldTranslate" : false
     },
@@ -70,6 +90,16 @@
         }
       }
     },
+    "%@ messages" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ mensagens"
+          }
+        }
+      }
+    },
     "%@ messages from them" : {
       "localizations" : {
         "pt-BR" : {
@@ -86,6 +116,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ msgs"
+          }
+        }
+      }
+    },
+    "%@ tokens, %lld%% per batch" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ tokens, %lld%% por lote"
           }
         }
       }
@@ -127,6 +167,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld mensagens lembradas"
+          }
+        }
+      }
+    },
+    "%lld min read" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld min de leitura"
+          }
+        }
+      }
+    },
+    "%lld moments, about %@ tokens" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld trechos, cerca de %@ tokens"
+          }
+        }
+      }
+    },
+    "%lld pages" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld páginas"
+          }
+        }
+      }
+    },
+    "%lld people" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld pessoas"
           }
         }
       }
@@ -203,6 +283,16 @@
         }
       }
     },
+    "2 weeks ago" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2 semanas atrás"
+          }
+        }
+      }
+    },
     "6 digits" : {
       "localizations" : {
         "pt-BR" : {
@@ -213,12 +303,33 @@
         }
       }
     },
+    "12 weeks ago" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "12 semanas atrás"
+          }
+        }
+      }
+    },
     "A chill day with no plans" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Um dia tranquilo, sem planos"
+          }
+        }
+      }
+    },
+    "A manga page: Agott writes on the paper, you answer in small pink balloons." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uma página de mangá: o Agott escreve no papel, você responde em balõezinhos rosa."
           }
         }
       }
@@ -239,6 +350,27 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tem pergunta esperando"
+          }
+        }
+      }
+    },
+    "A slow gradient sky, the mascot breathing on top, answers on glass in larger type." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um céu em degradê lento, o mascote respirando no topo, respostas em vidro com letra maior."
+          }
+        }
+      }
+    },
+    "about %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "cerca de %@"
           }
         }
       }
@@ -393,6 +525,16 @@
         }
       }
     },
+    "age" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "idade"
+          }
+        }
+      }
+    },
     "Agott" : {
       "localizations" : {
         "pt-BR" : {
@@ -403,7 +545,18 @@
         }
       }
     },
+    "Agott doesn't know who this is yet." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Agott ainda não sabe quem é."
+          }
+        }
+      }
+    },
     "Agott goes back over every message to learn and to remember the conversations that mattered. What it already knows stays. With OpenCode this uses tokens; it runs in the background." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -493,6 +646,36 @@
         }
       }
     },
+    "Agott reads it on this Mac to know what's coming up." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Agott lê a agenda neste Mac para saber o que vem por aí."
+          }
+        }
+      }
+    },
+    "Agott reads new moments and learns about you and your people." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Agott lê os momentos novos e aprende sobre você e suas pessoas."
+          }
+        }
+      }
+    },
+    "Agott reads your WhatsApp and iMessage conversations again, groups you only read included, starting with the people you talk to most. It learns facts with proof, nicknames, who is linked to whom, and rewrites the conversations that mattered. What it already knows stays." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Agott relê suas conversas do WhatsApp e do iMessage, inclusive os grupos em que você só lê, começando pelas pessoas com quem você mais fala. Ele aprende fatos com prova, apelidos, quem é ligado a quem, e reescreve as conversas que importaram. O que ele já sabe continua."
+          }
+        }
+      }
+    },
     "Agott reads your WhatsApp, iMessage and Claude history into a private database on this Mac. Only the passages a question needs are sent to the model you picked." : {
       "localizations" : {
         "pt-BR" : {
@@ -519,6 +702,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "O Agott começa toda conversa a partir disto. Corrija o que estiver errado."
+          }
+        }
+      }
+    },
+    "Agott uses AI and can make mistakes." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Agott usa IA e pode errar."
           }
         }
       }
@@ -563,6 +756,16 @@
         }
       }
     },
+    "All day" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dia inteiro"
+          }
+        }
+      }
+    },
     "Allow" : {
       "localizations" : {
         "pt-BR" : {
@@ -579,6 +782,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Permitido"
+          }
+        }
+      }
+    },
+    "Also called %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Também chamado de %@"
           }
         }
       }
@@ -619,6 +832,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Analisar memórias novas depois de cada indexação"
+          }
+        }
+      }
+    },
+    "angry" : {
+      "comment" : "Mood of a song",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "com raiva"
+          }
+        }
+      }
+    },
+    "anxious" : {
+      "comment" : "Mood of a song",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ansioso"
           }
         }
       }
@@ -686,6 +921,16 @@
         }
       }
     },
+    "Artifacts" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Artefatos"
+          }
+        }
+      }
+    },
     "Ask about this screen, your chats, your day…" : {
       "localizations" : {
         "pt-BR" : {
@@ -737,6 +982,16 @@
         }
       }
     },
+    "Ask anything" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pergunte qualquer coisa"
+          }
+        }
+      }
+    },
     "Ask your Mac" : {
       "localizations" : {
         "pt-BR" : {
@@ -747,12 +1002,102 @@
         }
       }
     },
+    "Attach a photo, PDF or file" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anexar foto, PDF ou arquivo"
+          }
+        }
+      }
+    },
+    "Auto" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto"
+          }
+        }
+      }
+    },
+    "Autopilot" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Piloto automático"
+          }
+        }
+      }
+    },
     "Autopilot: act without asking first" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Piloto automático: agir sem perguntar antes"
+          }
+        }
+      }
+    },
+    "Back" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voltar"
+          }
+        }
+      }
+    },
+    "Back to folders and chats (Esc)" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voltar às pastas e conversas (Esc)"
+          }
+        }
+      }
+    },
+    "Back to Home" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voltar ao Início"
+          }
+        }
+      }
+    },
+    "Back to People" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voltar para Pessoas"
+          }
+        }
+      }
+    },
+    "Balloon" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Balão"
+          }
+        }
+      }
+    },
+    "birthday" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "faz aniversário em"
           }
         }
       }
@@ -787,6 +1132,17 @@
         }
       }
     },
+    "calm" : {
+      "comment" : "Mood of a song",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "calmo"
+          }
+        }
+      }
+    },
     "Calm" : {
       "localizations" : {
         "pt-BR" : {
@@ -803,6 +1159,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cancelar"
+          }
+        }
+      }
+    },
+    "Cancel editing" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancelar edição"
           }
         }
       }
@@ -847,6 +1213,16 @@
         }
       }
     },
+    "Checked on everyone" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dei uma olhada em todo mundo"
+          }
+        }
+      }
+    },
     "Checking on everyone" : {
       "localizations" : {
         "pt-BR" : {
@@ -863,6 +1239,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vendo como está todo mundo…"
+          }
+        }
+      }
+    },
+    "Checking where you are" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vendo onde você está"
           }
         }
       }
@@ -927,6 +1313,16 @@
         }
       }
     },
+    "Choose the chat model" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolher o modelo do chat"
+          }
+        }
+      }
+    },
     "Choose the model" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -964,6 +1360,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Clicar na tela"
+          }
+        }
+      }
+    },
+    "Click, type, run scripts and send without asking first." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clicar, digitar, rodar scripts e enviar sem perguntar antes."
           }
         }
       }
@@ -1048,6 +1454,16 @@
         }
       }
     },
+    "Coming up" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A seguir"
+          }
+        }
+      }
+    },
     "Commits to a time, like she asked" : {
       "localizations" : {
         "pt-BR" : {
@@ -1118,6 +1534,16 @@
         }
       }
     },
+    "Connect calendar" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conectar agenda"
+          }
+        }
+      }
+    },
     "Connected" : {
       "localizations" : {
         "pt-BR" : {
@@ -1174,6 +1600,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Contatos"
+          }
+        }
+      }
+    },
+    "Context window" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Janela de contexto"
           }
         }
       }
@@ -1288,12 +1724,44 @@
         }
       }
     },
+    "Couldn't open a secure connection to %@: it was cut during the handshake. A VPN, a proxy or this network may be blocking it." : {
+      "comment" : "A description of an error that might occur when using the OpenAI API.",
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não consegui abrir uma conexão segura com %@: ela foi cortada no meio do handshake. Uma VPN, um proxy ou esta rede pode estar bloqueando."
+          }
+        }
+      }
+    },
     "Create an app" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Criar um app"
+          }
+        }
+      }
+    },
+    "Day" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dia"
+          }
+        }
+      }
+    },
+    "Day and night" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dia e noite"
           }
         }
       }
@@ -1328,6 +1796,17 @@
         }
       }
     },
+    "defiant" : {
+      "comment" : "Mood of a song",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "desafiador"
+          }
+        }
+      }
+    },
     "Delete conversation" : {
       "localizations" : {
         "pt-BR" : {
@@ -1358,6 +1837,16 @@
         }
       }
     },
+    "Design Lab" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laboratório de design"
+          }
+        }
+      }
+    },
     "Dictating…" : {
       "localizations" : {
         "pt-BR" : {
@@ -1378,6 +1867,16 @@
         }
       }
     },
+    "dislikes" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "não gosta de"
+          }
+        }
+      }
+    },
     "Document" : {
       "localizations" : {
         "pt-BR" : {
@@ -1388,12 +1887,52 @@
         }
       }
     },
+    "Documents" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Documentos"
+          }
+        }
+      }
+    },
+    "Documents in this chat" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Documentos desta conversa"
+          }
+        }
+      }
+    },
+    "Documents, code and pages Agott writes for you show up here." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Documentos, códigos e páginas que o Agott escreve para você aparecem aqui."
+          }
+        }
+      }
+    },
     "Don't" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Não"
+          }
+        }
+      }
+    },
+    "Don't send" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não enviar"
           }
         }
       }
@@ -1448,6 +1987,68 @@
         }
       }
     },
+    "Drawing a chart" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fazendo um gráfico"
+          }
+        }
+      }
+    },
+    "dreamy" : {
+      "comment" : "Mood of a song",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sonhador"
+          }
+        }
+      }
+    },
+    "Drop to attach" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solte para anexar"
+          }
+        }
+      }
+    },
+    "Edit" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editar"
+          }
+        }
+      }
+    },
+    "Editing" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editando"
+          }
+        }
+      }
+    },
+    "energetic" : {
+      "comment" : "Mood of a song",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "animado"
+          }
+        }
+      }
+    },
     "English (US)" : {
       "localizations" : {
         "pt-BR" : {
@@ -1478,12 +2079,42 @@
         }
       }
     },
+    "Event" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Evento"
+          }
+        }
+      }
+    },
     "Everyone" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Todo mundo"
+          }
+        }
+      }
+    },
+    "Everyone else" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todo o resto"
+          }
+        }
+      }
+    },
+    "Everything" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tudo"
           }
         }
       }
@@ -1514,6 +2145,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Família"
+          }
+        }
+      }
+    },
+    "feels" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "se sente"
           }
         }
       }
@@ -1558,7 +2199,18 @@
         }
       }
     },
+    "Finding %@ on the map" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Procurando %@ no mapa"
+          }
+        }
+      }
+    },
     "Finding circles…" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -1594,6 +2246,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Arrumando os nomes dos seus contatos do WhatsApp…"
+          }
+        }
+      }
+    },
+    "focused" : {
+      "comment" : "Mood of a song",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "focado"
           }
         }
       }
@@ -1634,6 +2297,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Grátis · privado"
+          }
+        }
+      }
+    },
+    "From your chat with %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Da sua conversa com %@"
           }
         }
       }
@@ -1694,6 +2367,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Globo (🌐)"
+          }
+        }
+      }
+    },
+    "Go back to before this" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voltar para antes desta"
           }
         }
       }
@@ -1768,6 +2451,36 @@
         }
       }
     },
+    "Group %lld" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grupo %lld"
+          }
+        }
+      }
+    },
+    "Group chat" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grupo"
+          }
+        }
+      }
+    },
+    "Groups" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grupos"
+          }
+        }
+      }
+    },
     "haha it's slang, relax\n\nshe's not actually at the lagoon. well, almost" : {
       "localizations" : {
         "pt-BR" : {
@@ -1778,12 +2491,53 @@
         }
       }
     },
+    "happy" : {
+      "comment" : "Mood of a song",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "feliz"
+          }
+        }
+      }
+    },
     "Happy" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Feliz"
+          }
+        }
+      }
+    },
+    "has" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "tem"
+          }
+        }
+      }
+    },
+    "has a conflict with" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "está brigado(a) com"
+          }
+        }
+      }
+    },
+    "has a crush on" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "tem crush em"
           }
         }
       }
@@ -1819,12 +2573,72 @@
         }
       }
     },
+    "Hide groups" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esconder grupos"
+          }
+        }
+      }
+    },
+    "Hide names" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esconder nomes"
+          }
+        }
+      }
+    },
+    "Hide names of people and groups" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esconder nomes de pessoas e grupos"
+          }
+        }
+      }
+    },
     "Hide steps" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ocultar passos"
+          }
+        }
+      }
+    },
+    "Hide the sidebar" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ocultar a barra lateral"
+          }
+        }
+      }
+    },
+    "History" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Histórico"
+          }
+        }
+      }
+    },
+    "Hold to ask" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Segurar para perguntar"
           }
         }
       }
@@ -1850,11 +2664,42 @@
       }
     },
     "Hold to talk" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Segure para falar"
+          }
+        }
+      }
+    },
+    "Hold to talk, or tap to talk hands-free" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Segure para falar, ou toque para falar sem segurar"
+          }
+        }
+      }
+    },
+    "Hold, speak, let go: Agott answers over what you are doing. Tap to type instead." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Segure, fale, solte: o Agott responde por cima do que você está fazendo. Toque para digitar."
+          }
+        }
+      }
+    },
+    "Home" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Início"
           }
         }
       }
@@ -1879,6 +2724,16 @@
         }
       }
     },
+    "How Agott calls you and finds you in your chats." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Como o Agott te chama e te encontra nas suas conversas."
+          }
+        }
+      }
+    },
     "How should I answer %@?" : {
       "localizations" : {
         "pt-BR" : {
@@ -1895,6 +2750,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Como foi meu dia?"
+          }
+        }
+      }
+    },
+    "How you talk" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Como vocês conversam"
           }
         }
       }
@@ -1939,6 +2804,16 @@
         }
       }
     },
+    "Import" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importar"
+          }
+        }
+      }
+    },
     "Import a claude.ai export…" : {
       "localizations" : {
         "pt-BR" : {
@@ -1949,12 +2824,42 @@
         }
       }
     },
+    "in %lld groups" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "em %lld grupos"
+          }
+        }
+      }
+    },
     "in progress" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "em andamento"
+          }
+        }
+      }
+    },
+    "In the direct chat with %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Na conversa direta com %@"
+          }
+        }
+      }
+    },
+    "In the group “%@”" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No grupo “%@”"
           }
         }
       }
@@ -1989,6 +2894,16 @@
         }
       }
     },
+    "Inferred" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deduzido"
+          }
+        }
+      }
+    },
     "Insert" : {
       "localizations" : {
         "pt-BR" : {
@@ -2009,6 +2924,16 @@
         }
       }
     },
+    "involves" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "envolve"
+          }
+        }
+      }
+    },
     "iPhone" : {
       "localizations" : {
         "pt-BR" : {
@@ -2019,12 +2944,142 @@
         }
       }
     },
+    "is a child of" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "é filho(a) de"
+          }
+        }
+      }
+    },
+    "is a parent of" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "é mãe/pai de"
+          }
+        }
+      }
+    },
+    "is a sibling of" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "é irmão(ã) de"
+          }
+        }
+      }
+    },
+    "is best friends with" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "é melhor amigo(a) de"
+          }
+        }
+      }
+    },
+    "is dating" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "namora"
+          }
+        }
+      }
+    },
+    "is family of" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "é da família de"
+          }
+        }
+      }
+    },
+    "is friends with" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "é amigo(a) de"
+          }
+        }
+      }
+    },
+    "is from" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "é de"
+          }
+        }
+      }
+    },
+    "is good at" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "é bom em"
+          }
+        }
+      }
+    },
+    "is learning" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "está aprendendo"
+          }
+        }
+      }
+    },
+    "is the crush of" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "é o crush de"
+          }
+        }
+      }
+    },
+    "is the ex of" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "é ex de"
+          }
+        }
+      }
+    },
     "It goes to %@, where anyone with the link can open it. Check it holds nothing private about you or others." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vai para %@, onde qualquer pessoa com o link pode abrir. Confira se não tem nada privado sobre você ou outras pessoas."
+          }
+        }
+      }
+    },
+    "It runs in the background; you can pause it." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Roda em segundo plano; dá para pausar."
           }
         }
       }
@@ -2049,12 +3104,42 @@
         }
       }
     },
+    "knows" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "conhece"
+          }
+        }
+      }
+    },
+    "Label" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rótulo"
+          }
+        }
+      }
+    },
     "Last 30 days" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Últimos 30 dias"
+          }
+        }
+      }
+    },
+    "Last message" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Última mensagem"
           }
         }
       }
@@ -2079,12 +3164,33 @@
         }
       }
     },
+    "Learn after each reading" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aprender depois de cada leitura"
+          }
+        }
+      }
+    },
     "Learn again from every message, with deeper memories" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aprender de novo com todas as mensagens, com memórias mais profundas"
+          }
+        }
+      }
+    },
+    "Learn again from your conversations: who is who, nicknames, links between people" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aprender de novo com as suas conversas: quem é quem, apelidos, ligações entre pessoas"
           }
         }
       }
@@ -2119,6 +3225,16 @@
         }
       }
     },
+    "Leave zen" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sair do zen"
+          }
+        }
+      }
+    },
     "Left hanging" : {
       "localizations" : {
         "pt-BR" : {
@@ -2135,6 +3251,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Deixar o Agott ver o app que você estava usando"
+          }
+        }
+      }
+    },
+    "likes" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "gosta de"
+          }
+        }
+      }
+    },
+    "Linked to" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ligações"
+          }
+        }
+      }
+    },
+    "Listen to voice notes" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvir áudios"
           }
         }
       }
@@ -2189,12 +3335,82 @@
         }
       }
     },
+    "Listening to voice notes and looking at photos…" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvindo áudios e vendo fotos…"
+          }
+        }
+      }
+    },
+    "Listening to voice notes and looking at photos… %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvindo áudios e vendo fotos… %@"
+          }
+        }
+      }
+    },
     "Listening…" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ouvindo…"
+          }
+        }
+      }
+    },
+    "listens to" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ouve"
+          }
+        }
+      }
+    },
+    "lives in" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "mora em"
+          }
+        }
+      }
+    },
+    "lives with" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "mora com"
+          }
+        }
+      }
+    },
+    "Look at photos" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ver fotos"
+          }
+        }
+      }
+    },
+    "Look at the screen" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Olhar a tela"
           }
         }
       }
@@ -2225,6 +3441,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Olhei o WhatsApp"
+          }
+        }
+      }
+    },
+    "Looked at you and %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Olhei você e %@"
+          }
+        }
+      }
+    },
+    "Looked at your calendar" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Olhei seu calendário"
           }
         }
       }
@@ -2289,12 +3525,52 @@
         }
       }
     },
+    "Looking for %@ near %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Looking for %1$@ near %2$@"
+          }
+        }
+      }
+    },
+    "Looking for %1$@ near %2$@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Procurando %1$@ perto de %2$@"
+          }
+        }
+      }
+    },
     "Looking for Agott on your network…" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Procurando o Agott na sua rede…"
+          }
+        }
+      }
+    },
+    "Looking up %@ in Contacts" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Procurando %@ nos Contatos"
+          }
+        }
+      }
+    },
+    "Looking up %@ on IMDb" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vendo %@ no IMDb"
           }
         }
       }
@@ -2329,6 +3605,16 @@
         }
       }
     },
+    "Map" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mapa"
+          }
+        }
+      }
+    },
     "Mariana laughed it off; nothing harsh from anyone else." : {
       "localizations" : {
         "pt-BR" : {
@@ -2359,6 +3645,27 @@
         }
       }
     },
+    "melancholic" : {
+      "comment" : "Mood of a song",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "melancólico"
+          }
+        }
+      }
+    },
+    "member of" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "membro de"
+          }
+        }
+      }
+    },
     "Memory" : {
       "localizations" : {
         "pt-BR" : {
@@ -2379,12 +3686,42 @@
         }
       }
     },
+    "mentions" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "menciona"
+          }
+        }
+      }
+    },
+    "Message" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mensagem"
+          }
+        }
+      }
+    },
     "Messages" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mensagens"
+          }
+        }
+      }
+    },
+    "Messages per day" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mensagens por dia"
           }
         }
       }
@@ -2400,6 +3737,7 @@
       }
     },
     "Messages per week, last 12 weeks" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -2439,6 +3777,16 @@
         }
       }
     },
+    "Models" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modelos"
+          }
+        }
+      }
+    },
     "Moments are packed into one request until they fill this share of the context. About %lldk characters per batch." : {
       "localizations" : {
         "pt-BR" : {
@@ -2455,6 +3803,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Humor"
+          }
+        }
+      }
+    },
+    "Moon" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lua"
           }
         }
       }
@@ -2500,6 +3858,7 @@
       }
     },
     "Needs Full Disk Access to read" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -2529,6 +3888,26 @@
         }
       }
     },
+    "New Conversation" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nova conversa"
+          }
+        }
+      }
+    },
+    "Night" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noite"
+          }
+        }
+      }
+    },
     "No conversations match" : {
       "localizations" : {
         "pt-BR" : {
@@ -2549,12 +3928,32 @@
         }
       }
     },
+    "No events in the next three days." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhum evento nos próximos três dias."
+          }
+        }
+      }
+    },
     "No facts yet." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nenhum fato ainda."
+          }
+        }
+      }
+    },
+    "No groups or people learned yet." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhum grupo ou pessoa aprendido ainda."
           }
         }
       }
@@ -2575,6 +3974,37 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nenhuma memória dessa fonte ainda."
+          }
+        }
+      }
+    },
+    "No one here yet" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ninguém aqui ainda"
+          }
+        }
+      }
+    },
+    "No projects learned yet." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhum projeto aprendido ainda."
+          }
+        }
+      }
+    },
+    "nostalgic" : {
+      "comment" : "Mood of a song",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nostálgico"
           }
         }
       }
@@ -2619,6 +4049,26 @@
         }
       }
     },
+    "Nothing coming up" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nada por vir"
+          }
+        }
+      }
+    },
+    "Nothing here yet." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nada aqui ainda."
+          }
+        }
+      }
+    },
     "Nothing in memory about this" : {
       "localizations" : {
         "pt-BR" : {
@@ -2639,6 +4089,26 @@
         }
       }
     },
+    "Nothing learned about them yet." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ainda não aprendeu nada sobre essa pessoa."
+          }
+        }
+      }
+    },
+    "Nothing matches." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nada encontrado."
+          }
+        }
+      }
+    },
     "Nothing yet. Let Agott read your Claude history and messages, or write about yourself here." : {
       "localizations" : {
         "pt-BR" : {
@@ -2655,6 +4125,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Perceber o que eu ouço no Spotify ou Apple Music"
+          }
+        }
+      }
+    },
+    "Notice your music" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Perceber sua música"
           }
         }
       }
@@ -2690,6 +4170,7 @@
       }
     },
     "Oi!" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -2731,6 +4212,16 @@
         }
       }
     },
+    "Only the conversation" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Só a conversa"
+          }
+        }
+      }
+    },
     "Only when it needs me" : {
       "localizations" : {
         "pt-BR" : {
@@ -2751,6 +4242,16 @@
         }
       }
     },
+    "Open %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir %@"
+          }
+        }
+      }
+    },
     "Open Agott" : {
       "localizations" : {
         "pt-BR" : {
@@ -2767,6 +4268,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Abra o Agott no iPhone, escolha este Mac e digite o código. Seu celular conversa com o Agott daqui, com toda a sua memória e apps."
+          }
+        }
+      }
+    },
+    "Open Calendar" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir Calendário"
+          }
+        }
+      }
+    },
+    "Open in People" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir em Pessoas"
           }
         }
       }
@@ -2831,6 +4352,36 @@
         }
       }
     },
+    "other" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "outro"
+          }
+        }
+      }
+    },
+    "Page" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Página"
+          }
+        }
+      }
+    },
+    "Pages" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Páginas"
+          }
+        }
+      }
+    },
     "Pairing code" : {
       "localizations" : {
         "pt-BR" : {
@@ -2871,6 +4422,20 @@
         }
       }
     },
+    "People and groups show as Person 12, for screenshots and screen sharing." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pessoas e grupos aparecem como Pessoa 12, para prints e compartilhar a tela."
+          }
+        }
+      }
+    },
+    "Period" : {
+      "comment" : "The name of the x-axis label for the chat activity chart.",
+      "isCommentAutoGenerated" : true
+    },
     "Permissions" : {
       "localizations" : {
         "pt-BR" : {
@@ -2891,7 +4456,18 @@
         }
       }
     },
+    "Person %lld" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pessoa %lld"
+          }
+        }
+      }
+    },
     "Pick someone" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -2907,6 +4483,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lugar"
+          }
+        }
+      }
+    },
+    "Places" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lugares"
+          }
+        }
+      }
+    },
+    "plans" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "planeja"
           }
         }
       }
@@ -2932,6 +4528,27 @@
         }
       }
     },
+    "playful" : {
+      "comment" : "Mood of a song",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "brincalhão"
+          }
+        }
+      }
+    },
+    "plays" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "joga"
+          }
+        }
+      }
+    },
     "Plays with her joke" : {
       "localizations" : {
         "pt-BR" : {
@@ -2948,6 +4565,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Português (Brasil)"
+          }
+        }
+      }
+    },
+    "Preferences" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preferências"
           }
         }
       }
@@ -3038,6 +4665,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Projeto"
+          }
+        }
+      }
+    },
+    "Projects" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projetos"
           }
         }
       }
@@ -3189,6 +4826,7 @@
       }
     },
     "Read everything again" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -3199,11 +4837,22 @@
       }
     },
     "Read everything again?" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ler tudo de novo?"
+          }
+        }
+      }
+    },
+    "Read everything, Claude too" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ler tudo, inclusive o Claude"
           }
         }
       }
@@ -3224,6 +4873,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ler nossa história"
+          }
+        }
+      }
+    },
+    "Read your chat with %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Li sua conversa com %@"
+          }
+        }
+      }
+    },
+    "Read your conversations again?" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reler suas conversas?"
+          }
+        }
+      }
+    },
+    "Reading %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lendo %@"
           }
         }
       }
@@ -3348,6 +5027,16 @@
         }
       }
     },
+    "reads" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "lê"
+          }
+        }
+      }
+    },
     "Reads up to 400 moments you wrote, packed into batches that fit the model's context." : {
       "localizations" : {
         "pt-BR" : {
@@ -3364,6 +5053,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Raciocínio"
+          }
+        }
+      }
+    },
+    "Recent" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recentes"
           }
         }
       }
@@ -3408,6 +5107,16 @@
         }
       }
     },
+    "Release to send" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solte para enviar"
+          }
+        }
+      }
+    },
     "Remembered %lld things" : {
       "localizations" : {
         "pt-BR" : {
@@ -3424,6 +5133,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lembrei de 3 coisas"
+          }
+        }
+      }
+    },
+    "Remembered that stretch of time" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lembrei desse período"
+          }
+        }
+      }
+    },
+    "Remembered things with %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lembrei de coisas com %@"
           }
         }
       }
@@ -3480,12 +5209,42 @@
         }
       }
     },
+    "Reminder set" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lembrete criado"
+          }
+        }
+      }
+    },
     "Reminders" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lembretes"
+          }
+        }
+      }
+    },
+    "Remove" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remover"
+          }
+        }
+      }
+    },
+    "Reread people" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reler pessoas"
           }
         }
       }
@@ -3530,6 +5289,17 @@
         }
       }
     },
+    "romantic" : {
+      "comment" : "Mood of a song",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "romântico"
+          }
+        }
+      }
+    },
     "Run a script" : {
       "localizations" : {
         "pt-BR" : {
@@ -3560,12 +5330,53 @@
         }
       }
     },
+    "sad" : {
+      "comment" : "Mood of a song",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "triste"
+          }
+        }
+      }
+    },
+    "said" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "disse"
+          }
+        }
+      }
+    },
+    "Said by them" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dito pela própria pessoa"
+          }
+        }
+      }
+    },
     "Same as chat model" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mesmo da conversa"
+          }
+        }
+      }
+    },
+    "Save as File…" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salvar como arquivo…"
           }
         }
       }
@@ -3606,6 +5417,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Diga oi"
+          }
+        }
+      }
+    },
+    "Say more" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diga mais"
           }
         }
       }
@@ -3660,13 +5481,32 @@
         }
       }
     },
+    "Search artifacts" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscar artefatos"
+          }
+        }
+      }
+    },
     "Search conversations" : {
-      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Buscar conversas"
+          }
+        }
+      }
+    },
+    "Search conversations (⌘K)" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscar conversas (⌘K)"
           }
         }
       }
@@ -3701,6 +5541,26 @@
         }
       }
     },
+    "Searching Maps for %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Procurando %@ no Mapas"
+          }
+        }
+      }
+    },
+    "Searching the web for “%@”" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pesquisando “%@” na web"
+          }
+        }
+      }
+    },
     "Searching your memories" : {
       "localizations" : {
         "pt-BR" : {
@@ -3722,6 +5582,7 @@
       }
     },
     "See how things stand, and get help answering." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -3751,12 +5612,72 @@
         }
       }
     },
+    "Send after this answer" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar depois desta resposta"
+          }
+        }
+      }
+    },
     "Send her the ticket options today; she's been waiting since this morning." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Manda as opções de passagem hoje; ela está esperando desde cedo."
+          }
+        }
+      }
+    },
+    "Sends a tiny message to the chat model." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manda uma mensagenzinha para o modelo do chat."
+          }
+        }
+      }
+    },
+    "Sends when Agott finishes this answer" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vai quando o Agott terminar esta resposta"
+          }
+        }
+      }
+    },
+    "Series" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Série"
+          }
+        }
+      }
+    },
+    "Set reminders for me" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Criar lembretes para mim"
+          }
+        }
+      }
+    },
+    "Setting a reminder" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Criando um lembrete"
           }
         }
       }
@@ -3841,6 +5762,16 @@
         }
       }
     },
+    "Show names" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar nomes"
+          }
+        }
+      }
+    },
     "Show or hide the key" : {
       "localizations" : {
         "pt-BR" : {
@@ -3857,6 +5788,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mostrar passos"
+          }
+        }
+      }
+    },
+    "Show the sidebar" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar a barra lateral"
+          }
+        }
+      }
+    },
+    "Show the steps" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar as etapas"
+          }
+        }
+      }
+    },
+    "Shows who this is" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra quem é"
           }
         }
       }
@@ -3919,6 +5880,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sonolento"
+          }
+        }
+      }
+    },
+    "Someone" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alguém"
           }
         }
       }
@@ -4073,6 +6044,36 @@
         }
       }
     },
+    "Stop listening and send" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parar de ouvir e enviar"
+          }
+        }
+      }
+    },
+    "studies" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "estuda"
+          }
+        }
+      }
+    },
+    "studies with" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "estuda com"
+          }
+        }
+      }
+    },
     "Suggest replies" : {
       "localizations" : {
         "pt-BR" : {
@@ -4123,6 +6124,36 @@
         }
       }
     },
+    "Tables" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tabelas"
+          }
+        }
+      }
+    },
+    "Take a look at this." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dá uma olhada nisso."
+          }
+        }
+      }
+    },
+    "Talk" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Falar"
+          }
+        }
+      }
+    },
     "Talk to Agott on your Mac" : {
       "localizations" : {
         "pt-BR" : {
@@ -4134,6 +6165,7 @@
       }
     },
     "Talk to me…" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -4153,12 +6185,42 @@
         }
       }
     },
+    "talks with" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "conversa com"
+          }
+        }
+      }
+    },
     "Tap the ask key to type instead of talking. Dictation is cleaned up and typed where your cursor is." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Toque na tecla de perguntar para digitar em vez de falar. O ditado é limpo e digitado onde está o cursor."
+          }
+        }
+      }
+    },
+    "Tap to send" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toque para enviar"
+          }
+        }
+      }
+    },
+    "Telegram's balloons in a narrow centred column, a soft pink glow behind." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os balões do Telegram numa coluna estreita e centralizada, com um brilho rosa suave atrás."
           }
         }
       }
@@ -4179,6 +6241,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Testando…"
+          }
+        }
+      }
+    },
+    "text in it: %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "texto nela: %@"
           }
         }
       }
@@ -4213,6 +6285,16 @@
         }
       }
     },
+    "The language you speak to Agott in." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O idioma em que você fala com o Agott."
+          }
+        }
+      }
+    },
     "The model endpoint URL is not valid." : {
       "localizations" : {
         "pt-BR" : {
@@ -4243,6 +6325,16 @@
         }
       }
     },
+    "The model stopped partway: %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O modelo parou no meio: %@"
+          }
+        }
+      }
+    },
     "The on-device embedding model is not available on this Mac." : {
       "localizations" : {
         "pt-BR" : {
@@ -4269,6 +6361,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "A turma da pelada semanal."
+          }
+        }
+      }
+    },
+    "Their last message is still unanswered." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A última mensagem ainda está sem resposta."
           }
         }
       }
@@ -4329,6 +6431,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pensando no que dizer…"
+          }
+        }
+      }
+    },
+    "Thinking…" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pensando…"
+          }
+        }
+      }
+    },
+    "thinks" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "acha"
+          }
+        }
+      }
+    },
+    "This week" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta semana"
           }
         }
       }
@@ -4464,6 +6596,26 @@
         }
       }
     },
+    "Today" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoje"
+          }
+        }
+      }
+    },
+    "Tomorrow" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Amanhã"
+          }
+        }
+      }
+    },
     "tomorrow's light, just the class call at night\n\nputting something chill on. just confirm:" : {
       "localizations" : {
         "pt-BR" : {
@@ -4484,6 +6636,16 @@
         }
       }
     },
+    "Tonight" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoje à noite"
+          }
+        }
+      }
+    },
     "Topic" : {
       "localizations" : {
         "pt-BR" : {
@@ -4494,12 +6656,62 @@
         }
       }
     },
+    "Topics" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Assuntos"
+          }
+        }
+      }
+    },
+    "Translating" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Traduzindo"
+          }
+        }
+      }
+    },
+    "Tree" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Árvore"
+          }
+        }
+      }
+    },
+    "Trend" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tendência"
+          }
+        }
+      }
+    },
     "Try again" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tentar de novo"
+          }
+        }
+      }
+    },
+    "Try it" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Testar"
           }
         }
       }
@@ -4515,6 +6727,7 @@
       }
     },
     "Turn on WhatsApp or iMessage in Memory and let Agott read them." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -4594,12 +6807,32 @@
         }
       }
     },
+    "typing…" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "digitando…"
+          }
+        }
+      }
+    },
     "Typing…" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Digitando…"
+          }
+        }
+      }
+    },
+    "under a minute" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "menos de 1 min"
           }
         }
       }
@@ -4685,6 +6918,36 @@
         }
       }
     },
+    "Used only for learning, never for chat." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usado só para aprender, nunca no chat."
+          }
+        }
+      }
+    },
+    "uses" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "usa"
+          }
+        }
+      }
+    },
+    "Uses wrangler's own login (run “npx wrangler login” once)." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usa o login do próprio wrangler (rode “npx wrangler login” uma vez)."
+          }
+        }
+      }
+    },
     "Using your Mac" : {
       "localizations" : {
         "pt-BR" : {
@@ -4696,7 +6959,24 @@
       }
     },
     "v%lld" : {
-      "shouldTranslate" : false
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "v%lld"
+          }
+        }
+      }
+    },
+    "Value" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valor"
+          }
+        }
+      }
     },
     "Version %lld" : {
       "localizations" : {
@@ -4718,12 +6998,32 @@
         }
       }
     },
+    "View" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Visualização"
+          }
+        }
+      }
+    },
     "Visible on your network" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Visível na sua rede"
+          }
+        }
+      }
+    },
+    "Voice and keys" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voz e teclas"
           }
         }
       }
@@ -4738,12 +7038,32 @@
         }
       }
     },
+    "Waiting for your reply" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esperando sua resposta"
+          }
+        }
+      }
+    },
     "Waiting for your reply since %@" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Esperando sua resposta desde %@"
+          }
+        }
+      }
+    },
+    "wants" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "quer"
           }
         }
       }
@@ -4778,6 +7098,16 @@
         }
       }
     },
+    "watches" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "assiste"
+          }
+        }
+      }
+    },
     "Web page" : {
       "localizations" : {
         "pt-BR" : {
@@ -4789,11 +7119,22 @@
       }
     },
     "Week" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Semana"
+          }
+        }
+      }
+    },
+    "What Agott did and thought on the way to each reply." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O que o Agott fez e pensou até cada resposta."
           }
         }
       }
@@ -4860,6 +7201,36 @@
         }
       }
     },
+    "What is in WhatsApp photos and any text in them, read on this Mac." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O que aparece nas fotos do WhatsApp e o texto nelas, lido neste Mac."
+          }
+        }
+      }
+    },
+    "What you play on Spotify or Apple Music, to sense your mood." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O que você toca no Spotify ou Apple Music, para sentir seu humor."
+          }
+        }
+      }
+    },
+    "What you say is cleaned up and typed where your cursor is." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O que você fala é arrumado e digitado onde está o cursor."
+          }
+        }
+      }
+    },
     "What you talk about" : {
       "localizations" : {
         "pt-BR" : {
@@ -4910,12 +7281,32 @@
         }
       }
     },
+    "WhatsApp voice notes are transcribed on this Mac and remembered with the conversation." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os áudios do WhatsApp são transcritos neste Mac e lembrados junto com a conversa."
+          }
+        }
+      }
+    },
     "When" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Quando"
+          }
+        }
+      }
+    },
+    "When a message sets up a call, a plan or a deadline, Agott adds it to Reminders with an alert." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quando uma mensagem marca uma ligação, um plano ou um prazo, o Agott põe nos Lembretes com um alerta."
           }
         }
       }
@@ -4930,7 +7321,28 @@
         }
       }
     },
+    "When you ask from the overlay, Agott sees the app you were using." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quando você pergunta pela janelinha, o Agott vê o app que você estava usando."
+          }
+        }
+      }
+    },
+    "Where published documents go, on your Cloudflare account." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Para onde vão os documentos publicados, na sua conta Cloudflare."
+          }
+        }
+      }
+    },
     "Who needs you, and how things stand." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -5002,6 +7414,56 @@
         }
       }
     },
+    "Working demo, squared: paper and straight corners. Try Zen at the top right; Esc leaves it." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demo funcional, quadrada: papel e cantos retos. Experimente o Zen no canto de cima; Esc sai."
+          }
+        }
+      }
+    },
+    "Working out the way to %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calculando o caminho até %@"
+          }
+        }
+      }
+    },
+    "Working proof of concept in Liquid Glass: a drifting sky, the mascot in a glass bubble, answers on glass." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prova de conceito funcional em Liquid Glass: céu que se move, o mascote numa bolha de vidro, respostas em vidro."
+          }
+        }
+      }
+    },
+    "works on" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "trabalha em"
+          }
+        }
+      }
+    },
+    "works with" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "trabalha com"
+          }
+        }
+      }
+    },
     "wrangler could not deploy: %@" : {
       "comment" : "A description of an error that might occur when publishing artifacts. The argument is the output from running `wrangler deploy`.",
       "isCommentAutoGenerated" : true,
@@ -5064,6 +7526,19 @@
         }
       }
     },
+    "X" : {
+      "shouldTranslate" : false
+    },
+    "Yesterday" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ontem"
+          }
+        }
+      }
+    },
     "You" : {
       "localizations" : {
         "pt-BR" : {
@@ -5100,6 +7575,37 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Você escreve"
+          }
+        }
+      }
+    },
+    "Your calendar isn't connected" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sua agenda não está conectada"
+          }
+        }
+      }
+    },
+    "Your conversations with Agott will show up here." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suas conversas com o Agott aparecem aqui."
+          }
+        }
+      }
+    },
+    "your copilot" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "seu copiloto"
           }
         }
       }
@@ -5161,6 +7667,122 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sua musa auto-hospedada. Lembra das suas conversas, vê sua tela e usa seu Mac — tudo na sua máquina, com o modelo que você escolher."
+          }
+        }
+      }
+    },
+    "Your story" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A história de vocês"
+          }
+        }
+      }
+    },
+    "Zen" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zen"
+          }
+        }
+      }
+    },
+    "zen.sample.1" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I'm a bit down today"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "tô meio pra baixo hoje"
+          }
+        }
+      }
+    },
+    "zen.sample.2" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I figured. You were quiet in the group and didn't answer Ana. Want to talk about what weighed on you?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "imaginei. você ficou quieto no grupo e não respondeu a Ana. quer falar do que pesou?"
+          }
+        }
+      }
+    },
+    "zen.sample.3" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I think it's college, I feel behind on everything"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "acho que é a faculdade, sinto que tô atrasado em tudo"
+          }
+        }
+      }
+    },
+    "zen.sample.4" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That makes sense, it was a heavy week: three deliveries and Friday's call.\n\nBut look: you finished two. One is left, and it fits tomorrow morning, calmly."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "faz sentido, a semana foi puxada: três entregas e a call de sexta.\n\nmas olha: você terminou duas. falta uma, e dá pra fazer amanhã de manhã, com calma."
+          }
+        }
+      }
+    },
+    "zen.sample.5" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "yeah… thanks"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "é… valeu"
+          }
+        }
+      }
+    },
+    "zen.sample.6" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I'm here. Want me to remind you at 9 tomorrow, or would you rather just rest now?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "tô aqui. quer que eu te lembre amanhã às 9, ou prefere só descansar agora?"
           }
         }
       }

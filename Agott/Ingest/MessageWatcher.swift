@@ -86,6 +86,13 @@ final class MessageWatcher {
                             await Remembering.save(memorable, from: name, probability: result.memorability)
                         }
                     }
+                    // Something set up for a time: a reminder with an alert.
+                    if result.reminder >= AutoReminders.threshold {
+                        let recent = context + messages
+                        Task(priority: .utility) {
+                            await AutoReminders.create(from: recent, with: name, probability: result.reminder)
+                        }
+                    }
                 }
             }
             HookStore.shared.fire(

@@ -145,6 +145,24 @@ enum DemoData {
         await Indexer.shared.refreshTotals()
     }
 
+    /// Made-up chats for the sidebar, the first being the open one.
+    static func conversations(current: UUID) -> [ConversationInfo] {
+        let now = Date()
+        func info(_ id: UUID, _ subject: String, _ preview: String, _ people: [String], _ hoursAgo: Double) -> ConversationInfo {
+            var item = ConversationInfo(id: id, title: subject, preview: preview, updated: now.addingTimeInterval(-hoursAgo * 3600))
+            item.subject = subject
+            item.people = people
+            return item
+        }
+        return [
+            info(current, "Ana e a viagem", "amanhã tá tranquilo, só a call da turma à noite", ["Ana Souza"], 0),
+            info(UUID(), "Presente pra mãe", "que tal um livro de receitas da vó?", [], 2),
+            info(UUID(), "Rolê de sexta", "o Lucas topou, falta a Rafa", ["Lucas", "Rafa", "João"], 26),
+            info(UUID(), "Estudar pra prova", "montei um plano de três dias", [], 50),
+            info(UUID(), "Como responder o Bruno", "manda curto e sincero", ["Bruno Reis"], 100),
+        ]
+    }
+
     static func turns() -> [Turn] {
         let explanation = Card.Explanation(
             term: "tô de boa na lagoa",

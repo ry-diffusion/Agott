@@ -6,10 +6,10 @@ struct MarkdownView: View {
     var text: String
     var size: Size = .body
 
-    enum Size { case body, document }
+    enum Size { case body, document, zen }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: size == .document ? 14 : 10) {
+        VStack(alignment: .leading, spacing: size == .body ? 10 : 14) {
             ForEach(Array(MarkdownBlock.parse(text).enumerated()), id: \.offset) { _, block in
                 view(for: block)
             }
@@ -27,11 +27,18 @@ struct MarkdownView: View {
                 .foregroundStyle(Ink.text)
                 .padding(.top, level == 1 ? 6 : 2)
         case .paragraph(let text):
-            Text(Self.inline(text))
-                .font(bodyFont)
-                .foregroundStyle(Ink.text)
-                .lineSpacing(3)
-                .fixedSize(horizontal: false, vertical: true)
+            if Self.mentionsPeople(text) {
+                // People named here become chips with their avatar and card.
+                MentionParagraph(text: text)
+                    .font(bodyFont)
+                    .foregroundStyle(Ink.text)
+            } else {
+                Text(Self.inline(text))
+                    .font(bodyFont)
+                    .foregroundStyle(Ink.text)
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         case .list(let ordered, let items):
             VStack(alignment: .leading, spacing: 6) {
                 ForEach(Array(items.enumerated()), id: \.offset) { index, item in
@@ -40,11 +47,17 @@ struct MarkdownView: View {
                             .font(bodyFont.monospacedDigit())
                             .foregroundStyle(Ink.muted)
                             .frame(minWidth: 14, alignment: .trailing)
-                        Text(Self.inline(item.text))
-                            .font(bodyFont)
-                            .foregroundStyle(Ink.text)
-                            .lineSpacing(3)
-                            .fixedSize(horizontal: false, vertical: true)
+                        if Self.mentionsPeople(item.text) {
+                            MentionParagraph(text: item.text)
+                                .font(bodyFont)
+                                .foregroundStyle(Ink.text)
+                        } else {
+                            Text(Self.inline(item.text))
+                                .font(bodyFont)
+                                .foregroundStyle(Ink.text)
+                                .lineSpacing(3)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                     .padding(.leading, CGFloat(item.depth) * 18)
                 }
@@ -66,23 +79,41 @@ struct MarkdownView: View {
         }
     }
 
-    private var bodyFont: Font { size == .document ? .system(size: 15) : .body }
+    private var bodyFont: Font {
+        switch size {
+        case .body: .body
+        case .document: .system(size: 15)
+        case .zen: .system(size: 16)
+        }
+    }
 
     private func headingFont(_ level: Int) -> Font {
         switch (size, level) {
         case (.document, 1): .system(size: 26, weight: .bold)
         case (.document, 2): .system(size: 20, weight: .bold)
+        case (.zen, 1): .system(size: 24, weight: .bold)
+        case (.zen, _): .system(size: 20, weight: .semibold)
         case (_, 1): .title3.weight(.bold)
         case (_, 2): .headline
         default: .subheadline.weight(.semibold)
         }
     }
 
+    /// Whether a block names people with tags (`<e id=12/>`).
+    static func mentionsPeople(_ text: String) -> Bool {
+        text.contains("<e id=")
+    }
+
     static func inline(_ text: String) -> AttributedString {
-        (try? AttributedString(
-            markdown: text,
+        // People and groups arrive as tags; they become pink names (or
+        // "Person 12" with names hidden).
+        let prepared = EntityText.markdown(text, hidden: AppSettings.shared.hideNames)
+        var result = (try? AttributedString(
+            markdown: prepared,
             options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace, failurePolicy: .returnPartiallyParsedIfPossible)))
-            ?? AttributedString(text)
+            ?? AttributedString(prepared)
+        EntityText.style(&result)
+        return result
     }
 }
 

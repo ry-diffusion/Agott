@@ -124,6 +124,45 @@ enum ModelHub {
         }
     }
 
+    /// Whether an error means the model could not be reached (network,
+    /// blocked site, missing key, an overloaded server), as opposed to an
+    /// answer that came back wrong. Reading must stop and wait on the first
+    /// kind, not skip what it was reading.
+    nonisolated static func isConnectionProblem(_ error: Error) -> Bool {
+        if error is URLError || error is CancellationError { return true }
+        if let executor = error as? OpenCodeExecutor.ExecutorError {
+            switch executor {
+            case .unreachable, .missingKey: return true
+            case .http(let code, _): return code >= 500 || [401, 403, 408, 409, 425, 429].contains(code)
+            default: return false
+            }
+        }
+        // Jev busy, down or without a key is TypeSafe being unreachable too.
+        if let jev = error as? Jev.JevError {
+            switch jev {
+            case .missingKey: return true
+            case .http(let code, _): return code >= 500 || [401, 403, 408, 429].contains(code)
+            }
+        }
+        let ns = error as NSError
+        if ns.domain == NSURLErrorDomain { return true }
+        if let underlying = ns.userInfo[NSUnderlyingErrorKey] as? Error { return isConnectionProblem(underlying) }
+        let text = "\(error)".lowercased()
+        return text.contains("nsurlerrordomain") || text.contains("urlerror") || text.contains("unreachable")
+    }
+
+    /// The request itself can never work as set up (a model that does not
+    /// exist, no credit, an endpoint that is wrong): every try fails the same
+    /// way, so work should stop and keep what is unread for later.
+    nonisolated static func isConfigurationProblem(_ error: Error) -> Bool {
+        guard let executor = error as? OpenCodeExecutor.ExecutorError else { return false }
+        switch executor {
+        case .badURL, .missingKey: return true
+        case .http(let code, _): return [400, 402, 404, 405, 410, 413, 415, 422].contains(code)
+        default: return false
+        }
+    }
+
     static func text(_ prompt: String, instructions: String, provider: ModelProvider? = nil) async throws -> String {
         let session = session(provider: provider, instructions: instructions)
         return try await session.respond(to: prompt).content

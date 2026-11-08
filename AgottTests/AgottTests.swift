@@ -6,6 +6,7 @@
 import Foundation
 import FoundationModels
 import Testing
+import SwiftUI
 @testable import Agott
 
 @MainActor
@@ -650,5 +651,583 @@ struct LiveSourceSmokeTests {
                 print("\(source.kind.rawValue): \(error.localizedDescription)")
             }
         }
+    }
+}
+
+/// Draws chat pieces offscreen when AGOTT_SNAPSHOT_DIR is set, to look at
+/// them without opening a window.
+@MainActor
+struct SnapshotTests {
+    @Test func chatPieces() throws {
+        guard let dir = ProcessInfo.processInfo.environment["AGOTT_SNAPSHOT_DIR"] else { return }
+        let now = Date()
+        let view = VStack(alignment: .leading, spacing: 3) {
+            HStack { Spacer(); MessageBubble(outgoing: true, joinsBelow: true) {
+                TextWithTime(text: "oi, tudo bem?", time: now, outgoing: true) } }
+            HStack { Spacer(); MessageBubble(outgoing: true, joinsAbove: true) {
+                TextWithTime(text: "me responde em texto sem ter que usar o doc", time: now, outgoing: true) } }
+            HStack { MessageBubble(outgoing: false, joinsBelow: true) {
+                TextWithTime(text: "tá aqui, com data e hora.", time: now, outgoing: false) }; Spacer() }
+            HStack { MessageBubble(outgoing: false, joinsAbove: true) {
+                DocumentRow(symbol: "doc.richtext", title: "Como lidar com as crises", detail: "Documento · 3 min de leitura") }; Spacer() }
+            HStack(spacing: 10) {
+                InitialsAvatar(text: "Crises de bipolaridade", size: 46)
+                InitialsAvatar(text: "Como foi meu dia", size: 46)
+                InitialsAvatar(text: "qm eu mais odeio", size: 46)
+                PeopleAvatar(people: ["Hellen", "Pamela", "Carol"], size: 46)
+            }
+            .padding(.top, 12)
+            TypingDots().padding(.top, 12)
+        }
+        .padding(24)
+        .frame(width: 520)
+        .background(Ink.canvas)
+        .environment(\.colorScheme, .dark)
+        let renderer = ImageRenderer(content: view)
+        renderer.scale = 2
+        guard let image = renderer.cgImage else { Issue.record("no image"); return }
+        let url = URL(fileURLWithPath: dir).appending(path: "chat-pieces.png")
+        let destination = try #require(CGImageDestinationCreateWithURL(url as CFURL, "public.png" as CFString, 1, nil))
+        CGImageDestinationAddImage(destination, image, nil)
+        #expect(CGImageDestinationFinalize(destination))
+    }
+
+    @Test func rankedChart() throws {
+        guard let dir = ProcessInfo.processInfo.environment["AGOTT_SNAPSHOT_DIR"] else { return }
+        let chart = Card.ChartData(
+            title: "Suas bandas e artistas mais tocados", subtitle: "últimos 14 dias · 209 faixas no total",
+            kind: .horizontalBar,
+            labels: ["O Grilo", "FOTO EM GRUPO", "Venere Vai Venus", "Lua Dultra", "kenji", "Israel Paixão"],
+            series: [.init(name: "Faixas", values: [33, 18, 17, 13, 10, 9])], unit: "faixas")
+        let view = ChartCardView(chart: chart)
+            .padding(24)
+            .frame(width: 700)
+            .background(Color(.sRGB, red: 0.2, green: 0.1, blue: 0.2))
+            .environment(\.colorScheme, .dark)
+        let renderer = ImageRenderer(content: view)
+        renderer.scale = 2
+        guard let image = renderer.cgImage else { Issue.record("no image"); return }
+        let url = URL(fileURLWithPath: dir).appending(path: "ranked-chart.png")
+        let destination = try #require(CGImageDestinationCreateWithURL(url as CFURL, "public.png" as CFString, 1, nil))
+        CGImageDestinationAddImage(destination, image, nil)
+        #expect(CGImageDestinationFinalize(destination))
+    }
+}
+
+
+/// Jev's answers become lookups; code owns the thresholds.
+struct RecallPlannerTests {
+    @Test func picksPersonPeriodAndLookups() {
+        let answers: [String: Jev.Answer] = [
+            "person": .init(choice: "c3"),
+            "period": .init(choice: "yesterday"),
+            "read_chat": .init(probability: 0.7),
+            "relationship": .init(probability: 0.2),
+            "overview": .init(probability: 0.9),
+            "calendar": .init(choice: "day"),
+        ]
+        let plan = RecallPlanner.plan(from: answers, names: ["c3": "Clara"])
+        #expect(plan.person == "Clara")
+        #expect(plan.since == Calendar.current.date(byAdding: .day, value: -1, to: Calendar.current.startOfDay(for: .now)))
+        #expect(plan.readChat)
+        #expect(!plan.relationship)
+        // About one person, so not about everyone.
+        #expect(!plan.overview)
+        #expect(plan.calendarDays == 2)
+    }
+
+    @Test func nobodyAndNoTimeIsAnEmptyPlan() {
+        let answers: [String: Jev.Answer] = [
+            "person": .init(choice: "none"),
+            "period": .init(choice: "any"),
+            "read_chat": .init(probability: 0.9),
+            "overview": .init(probability: 0.1),
+            "calendar": .init(choice: "none"),
+        ]
+        let plan = RecallPlanner.plan(from: answers, names: [:])
+        #expect(plan.isEmpty)
+        // Reading a chat needs someone to read.
+        #expect(!plan.readChat)
+    }
+
+    @Test func everyQuestionHasItsOptions() {
+        let questions = RecallPlanner.questions(candidates: ["none": "Nobody.", "c0": "Clara."])
+        #expect(Set(questions.keys) == ["person", "period", "read_chat", "relationship", "overview", "calendar"])
+    }
+}
+
+
+/// "Ligia" is the person, not the class group named after a teacher.
+struct NameResolutionTests {
+    private func chat(_ name: String, group: Bool, count: Int = 10) -> ChatSummary {
+        ChatSummary(source: .whatsapp, chatID: name, name: name, isGroup: group, messageCount: count, myCount: 0,
+                    firstDate: .now, lastDate: .now, lastFromMe: false, lastText: "")
+    }
+
+    @Test func personBeforeGroupNamedAfterThem() {
+        let all = [chat("bio a ligia", group: true, count: 1200), chat("Lígia", group: false, count: 19)]
+        let target = MemoryStore.target(for: "Ligia", in: all)
+        #expect(target.chats.map(\.name) == ["Lígia"])
+        #expect(target.spellings.contains("Lígia"))
+    }
+
+    @Test func groupByItsOwnName() {
+        let all = [chat("bio a ligia", group: true), chat("Lígia", group: false)]
+        #expect(MemoryStore.target(for: "bio a ligia", in: all).chats.map(\.name) == ["bio a ligia"])
+    }
+
+    @Test func wholeWordsOnly() {
+        let all = [chat("Analu", group: false), chat("Ana Souza", group: false)]
+        #expect(MemoryStore.target(for: "ana", in: all).chats.map(\.name) == ["Ana Souza"])
+    }
+
+    @Test func ambiguousNamesAreSpelledOut() {
+        let line = Retriever.Recall.whoIsWho(name: "Ligia", chats: [chat("Lígia", group: false), chat("bio a ligia", group: true)])
+        #expect(line?.contains("the group \"bio a ligia\"") == true)
+        #expect(Retriever.Recall.whoIsWho(name: "Ligia", chats: [chat("Lígia", group: false)]) == nil)
+    }
+}
+
+
+/// Facts carry odds and proof; sensitive ones need both.
+struct FactProofTests {
+    let moment = "Alexsander: eu sou bi, todo mundo sabe kkk\nYasmin: aff"
+
+    @Test func selfStatedWithProofIsKept() {
+        let kept = KnowledgeGraph.vetted(confidence: 0.9, evidence: "eu sou bi", in: moment, selfStated: true, sensitive: true)
+        #expect(kept?.confidence == 0.9)
+        #expect(kept?.evidence == "eu sou bi")
+    }
+
+    @Test func sensitiveWithoutRealProofIsDropped() {
+        #expect(KnowledgeGraph.vetted(confidence: 0.9, evidence: "ele é gay", in: moment, selfStated: true, sensitive: true) == nil)
+    }
+
+    @Test func sensitiveGuessIsCappedAsAMaybe() {
+        let kept = KnowledgeGraph.vetted(confidence: 0.9, evidence: "todo mundo sabe", in: moment, selfStated: false, sensitive: true)
+        #expect(kept?.confidence == 0.5)
+    }
+
+    @Test func ordinaryFactWithoutProofLosesOdds() {
+        let kept = KnowledgeGraph.vetted(confidence: 0.8, evidence: "não está aqui", in: moment, selfStated: false, sensitive: false)
+        #expect(kept != nil && kept!.confidence < 0.8 && kept!.evidence == nil)
+    }
+
+    @Test func nicknamesBecomeTheSender() {
+        let chunk = MemoryChunk(id: 1, source: .whatsapp, chatID: "g", chatName: "bio a ligia", start: .now, end: .now,
+                                text: "", participants: ["Alexsander Lima", "Yasmin"], isGroup: true)
+        #expect(KnowledgeGraph.canonicalName("Alexsander", in: chunk) == "Alexsander Lima")
+        #expect(KnowledgeGraph.canonicalName("alex", in: chunk) == "Alexsander Lima")
+        #expect(KnowledgeGraph.canonicalName("Lígia", in: chunk) == "Lígia")
+    }
+
+    @Test func proofIsSpelledOutForTheModel() {
+        let fact = MemoryFact(id: 1, subject: "Alexsander", predicate: "is", object: "bisexual", confidence: 0.9,
+                              source: .whatsapp, date: .now, evidence: "eu sou bi", selfStated: true,
+                              sensitive: true, chatName: "bio a ligia", inGroup: true)
+        #expect(fact.withProof.contains("90%"))
+        #expect(fact.withProof.contains("said by Alexsander themselves"))
+        #expect(fact.withProof.contains("the group \"bio a ligia\""))
+        #expect(fact.withProof.contains("“eu sou bi”"))
+    }
+}
+
+
+/// People and groups by id: a person never merges with the group named
+/// after someone, and names travel as tags.
+@MainActor
+struct PeopleDirectoryTests {
+    private func raw(_ id: Int, chat: String, name: String, group: Bool, sender: String, me: Bool = false) -> RawMessage {
+        RawMessage(source: .whatsapp, externalID: "p\(id)", chatID: chat, chatName: name, isGroup: group,
+                   sender: sender, isFromMe: me, date: Date(timeIntervalSince1970: 1_800_000_000 + Double(id) * 60), text: "oi \(id)")
+    }
+
+    @Test func personGroupAndMembersAreSeparate() async throws {
+        let store = MemoryStore(url: FileManager.default.temporaryDirectory.appending(path: "agott-people-\(UUID().uuidString).sqlite"))
+        try await store.ingest([
+            raw(1, chat: "dm-ligia", name: "Lígia", group: false, sender: "Lígia"),
+            raw(2, chat: "g-bio", name: "bio a ligia", group: true, sender: "Alexsander Lima"),
+            raw(3, chat: "g-bio", name: "bio a ligia", group: true, sender: "Yasmin"),
+            raw(4, chat: "dm-ale", name: "Alexsander Lima", group: false, sender: "Alexsander Lima"),
+        ])
+        #expect(try await store.syncPeople() > 0)
+
+        let ligia = try await store.resolvePeople("Ligia")
+        #expect(ligia.map(\.name) == ["Lígia"])
+        #expect(ligia.first?.kind == .person)
+
+        let group = try await store.resolvePeople("bio a ligia")
+        #expect(group.map(\.kind) == [.group])
+
+        // One Alexsander, from the direct chat and the group alike, found by first name.
+        let ale = try await store.resolvePeople("Alexsander")
+        #expect(ale.count == 1)
+        let links = try await store.connections(of: ale[0])
+        #expect(links.direct.map(\.name) == ["Alexsander Lima"])
+        #expect(links.others.map(\.name) == ["bio a ligia"])
+
+        let lookalikes = try await store.groupsNamed(containing: "ligia")
+        #expect(lookalikes.map(\.name) == ["bio a ligia"])
+    }
+
+    @Test func plainNamesBecomeTags() {
+        let ana = PersonRef(id: 3, kind: .person, name: "Ana Souza")
+        let group = PersonRef(id: 9, kind: .group, name: "bio a ligia")
+        let text = PeopleDirectory.tagNames("a Ana falou no bio a ligia, e Ana Souza riu", people: [ana, group])
+        #expect(text == "a <e id=3/> falou no <e id=9/>, e <e id=3/> riu")
+        #expect(PeopleDirectory.tags(in: text) == [3, 9, 3])
+    }
+}
+
+
+/// Nicknames and links between people, only with proof.
+@MainActor
+struct LearnedPeopleTests {
+    private let chunk = MemoryChunk(
+        id: 1, source: .whatsapp, chatID: "g", chatName: "bio a ligia", start: .now, end: .now,
+        text: "Yasmin: valeu ale\nAlexsander Lima: de nada mano\nYasmin: o gustavo vem buscar, meu namorado é pontual",
+        participants: ["Yasmin", "Alexsander Lima"], isGroup: true)
+
+    @Test func realNicknamesOnly() {
+        #expect(MemoryStore.nicknameIsProven("Ale", person: "Alexsander Lima", in: chunk))
+        // Everyone is "mano".
+        #expect(!MemoryStore.nicknameIsProven("mano", person: "Alexsander Lima", in: chunk))
+        // Not written in the moment.
+        #expect(!MemoryStore.nicknameIsProven("Xande", person: "Alexsander Lima", in: chunk))
+        // Not in this chat.
+        #expect(!MemoryStore.nicknameIsProven("Ale", person: "Lígia", in: chunk))
+    }
+
+    @Test func linksAreStoredOnceAndReadBothWays() async throws {
+        let store = MemoryStore(url: FileManager.default.temporaryDirectory.appending(path: "agott-links-\(UUID().uuidString).sqlite"))
+        _ = try await store.syncPeople()
+        let yasmin = try #require(try await store.ensurePerson("Yasmin"))
+        let gustavo = try #require(try await store.ensurePerson("Gustavo"))
+        #expect(try await store.ensurePerson("gustavo") == gustavo)
+        try await store.link(gustavo, yasmin, kind: .partner, detail: "namorado", confidence: 0.8,
+                             evidence: "meu namorado é pontual", chunkID: 1, at: .now)
+        try await store.link(yasmin, gustavo, kind: .partner, detail: nil, confidence: 0.9, evidence: nil, chunkID: 2, at: .now)
+        let fromYasmin = try await store.links(of: yasmin)
+        #expect(fromYasmin.count == 1)
+        #expect(fromYasmin.first?.other.name == "Gustavo")
+        #expect(fromYasmin.first?.line.contains("is dating <e id=\(gustavo)/> Gustavo") == true)
+        #expect(fromYasmin.first?.evidence == "meu namorado é pontual")
+        #expect((fromYasmin.first?.confidence ?? 0) > 0.9)
+        #expect(try await store.links(of: gustavo).first?.other.name == "Yasmin")
+    }
+}
+
+
+/// Rereading people: only WhatsApp and iMessage, groups you only read
+/// included, and deep conversations rewritten in place.
+@MainActor
+struct RereadPeopleTests {
+    @Test func rereadsPeopleNotClaude() async throws {
+        let store = MemoryStore(url: FileManager.default.temporaryDirectory.appending(path: "agott-reread-\(UUID().uuidString).sqlite"))
+        let long = String(repeating: "eu sou bi e todo mundo sabe disso faz tempo. ", count: 10)
+        func raw(_ id: Int, source: MemorySource, chat: String, group: Bool, sender: String) -> RawMessage {
+            RawMessage(source: source, externalID: "r\(id)", chatID: chat, chatName: chat, isGroup: group, sender: sender,
+                       isFromMe: false, date: Date(timeIntervalSince1970: 1_800_000_000 + Double(id) * 60), text: long)
+        }
+        try await store.ingest([
+            // A group where the user never wrote.
+            raw(1, source: .whatsapp, chat: "bio a ligia", group: true, sender: "Alexsander Lima"),
+            raw(2, source: .claude, chat: "Agott — memory", group: false, sender: "Claude"),
+        ])
+        let all = try await store.learningCandidateIDs(me: "Moizes", limit: 50)
+        try await store.markLearned(all)
+        #expect(try await store.learningCandidateIDs(me: "Moizes", limit: 50).isEmpty)
+
+        try await store.resetPeopleLearning()
+        let again = try await store.chunks(ids: try await store.learningCandidateIDs(me: "Moizes", limit: 50))
+        #expect(again.map(\.source) == [.whatsapp])
+        #expect(try await store.peopleRelearnSize().moments == 1)
+    }
+
+    @Test func reflectionsAreRewrittenNotDuplicated() async throws {
+        let store = MemoryStore(url: FileManager.default.temporaryDirectory.appending(path: "agott-refl-\(UUID().uuidString).sqlite"))
+        try await store.addReflection(chunkID: 7, source: .whatsapp, chat: "bio a ligia", title: "Old", summary: "Lígia disse",
+                                      people: [], feeling: "calm", depth: 2, date: .now)
+        try await store.addReflection(chunkID: 7, source: .whatsapp, chat: "bio a ligia", title: "New", summary: "No grupo, Alexsander disse",
+                                      people: [], feeling: "calm", depth: 2.5, date: .now)
+        let found = try await store.searchReflections("Alexsander", limit: 5)
+        #expect(found.map(\.title) == ["New"])
+        #expect(try await store.searchReflections("Old", limit: 5).isEmpty)
+    }
+}
+
+
+/// Each learning batch carries who is who, so the model connects what it
+/// reads to the people already known.
+@MainActor
+struct LearningCrossReferenceTests {
+    @Test func whoIsWhoForABatch() async throws {
+        let store = MemoryStore(url: FileManager.default.temporaryDirectory.appending(path: "agott-xref-\(UUID().uuidString).sqlite"))
+        func raw(_ id: Int, chat: String, name: String, group: Bool, sender: String, _ text: String) -> RawMessage {
+            RawMessage(source: .whatsapp, externalID: "x\(id)", chatID: chat, chatName: name, isGroup: group, sender: sender,
+                       isFromMe: false, date: Date(timeIntervalSince1970: 1_800_000_000 + Double(id) * 60), text: text)
+        }
+        try await store.ingest([
+            raw(1, chat: "dm-g", name: "Gustavo Fernandes", group: false, sender: "Gustavo Fernandes", "e ai"),
+            raw(2, chat: "g-bio", name: "bio a ligia", group: true, sender: "Yasmin Costa", "o gustavo vem me buscar hoje"),
+        ])
+        _ = try await store.syncPeople()
+        let yasmin = try #require(try await store.ensurePerson("Yasmin Costa"))
+        let gustavo = try #require(try await store.ensurePerson("Gustavo Fernandes"))
+        try await store.link(yasmin, gustavo, kind: .partner, detail: "namorado", confidence: 0.85, evidence: nil, chunkID: nil, at: .now)
+        try await store.learnNickname("Yas", for: "Yasmin Costa", evidence: nil)
+
+        let chunk = MemoryChunk(id: 1, source: .whatsapp, chatID: "g-bio", chatName: "bio a ligia", start: .now, end: .now,
+                                text: "Yasmin Costa: o gustavo vem me buscar hoje", participants: ["Yasmin Costa"], isGroup: true)
+        let card = try await store.whoIsWho(for: [chunk], budget: 2000)
+        #expect(card.contains("\"bio a ligia\" is a group chat, not a person"))
+        #expect(card.contains("Yasmin Costa (also called Yas, Yasmin): is dating Gustavo Fernandes (85%)"), "\(card)")
+        // Mentioned only by first name, still recognised.
+        #expect(card.contains("- Gustavo Fernandes"))
+        #expect(try await store.whoIsWho(for: [chunk], budget: 100).isEmpty)
+    }
+}
+
+@MainActor
+struct WebToolsTests {
+    @Test func parsesDuckDuckGoResults() {
+        let html = """
+        <div class="result"><h2 class="result__title"><a rel="nofollow" class="result__a" href="https://www.imdb.com/title/tt1196946/">The <b>Mentalist</b> (TV Series 2008&#x2013;2015)</a></h2>
+        <a class="result__snippet" href="https://www.imdb.com/title/tt1196946/">A famous &quot;psychic&quot; outs himself.</a></div>
+        <div class="result"><h2 class="result__title"><a rel="nofollow" class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fpt.wikipedia.org%2Fwiki%2FThe_Mentalist&amp;rut=x">O Mentalista</a></h2>
+        <a class="result__snippet" href="x">Série americana.</a></div>
+        """
+        let results = WebSearch.parse(html, limit: 5)
+        #expect(results.count == 2)
+        #expect(results[0].url == "https://www.imdb.com/title/tt1196946/")
+        #expect(results[0].title == "The Mentalist (TV Series 2008–2015)")
+        #expect(results[0].snippet == "A famous \"psychic\" outs himself.")
+        #expect(results[1].url == "https://pt.wikipedia.org/wiki/The_Mentalist")
+    }
+
+    @Test func rendersIMDbTitle() {
+        let title: [String: Any] = [
+            "titleText": ["text": "O Mentalista"], "originalTitleText": ["text": "The Mentalist"],
+            "titleType": ["text": "TV Series"], "releaseYear": ["year": 2008, "endYear": 2015],
+            "ratingsSummary": ["aggregateRating": 8.2, "voteCount": 261485],
+            "genres": ["genres": [["text": "Policial"], ["text": "Drama"]]],
+            "plot": ["plotText": ["plainText": "Um famoso psíquico."]],
+            "episodes": ["seasons": [["number": 1], ["number": 2]]],
+            "principalCredits": [["category": ["text": "Stars"], "credits": [["name": ["nameText": ["text": "Simon Baker"]]]]]],
+        ]
+        let text = IMDb.render(title, id: "tt1196946")
+        #expect(text.hasPrefix("O Mentalista (The Mentalist), TV Series, 2008–2015"))
+        #expect(text.contains("IMDb rating 8.2/10"))
+        #expect(text.contains("Genres: Policial, Drama"))
+        #expect(text.contains("2 seasons"))
+        #expect(text.contains("Stars: Simon Baker"))
+    }
+
+    @Test func newToolsAreOffered() {
+        let names = Persona.tools(for: .openCode).map(\.name)
+        for name in ["web_search", "read_web_page", "find_place", "nearby_places", "movie_info"] {
+            #expect(names.contains(name))
+        }
+    }
+}
+
+@MainActor
+struct FactLanguageTests {
+    @Test func rewritesEnglishVerbsUpToTheMark() async throws {
+        let store = MemoryStore(url: FileManager.default.temporaryDirectory.appending(path: "agott-words-\(UUID().uuidString).sqlite"))
+        let now = Date()
+        try await store.addFact(subject: "Clara", predicate: "plays", object: "Roblox", confidence: 0.9, source: .whatsapp, chunkID: nil, at: now)
+        try await store.addFact(subject: "Clara", predicate: "owns", object: "um gato", confidence: 0.8, source: .whatsapp, chunkID: nil, at: now)
+        try await store.addFact(subject: "Clara", predicate: "has", object: "um gato", confidence: 0.7, source: .whatsapp, chunkID: nil, at: now)
+        let mark = try await store.predicateMark()
+        // Learned after the switch, already in Portuguese: left alone.
+        try await store.addFact(subject: "Clara", predicate: "is", object: "legal", confidence: 0.6, source: .whatsapp, chunkID: nil, at: now)
+        let english = try await store.predicates(through: mark)
+        #expect(Set(english) == ["plays", "owns", "has"])
+        try await store.renamePredicates(english.reduce(into: [:]) { $0[$1] = FactWords.portuguese[$1] }, through: mark)
+        let facts = try await store.facts(about: "Clara")
+        let predicates = facts.map(\.predicate).sorted()
+        // "owns" and "has" both become "tem": one fact stays.
+        #expect(predicates == ["is", "joga", "tem"])
+    }
+
+    @Test func linksReadInTheUsersLanguage() {
+        #expect(!MemoryStore.LinkKind.partner.phrase(outgoing: true).isEmpty)
+        #expect(MemoryStore.LinkKind.parent.phrase(outgoing: true) != MemoryStore.LinkKind.parent.phrase(outgoing: false))
+    }
+}
+
+struct ShortChatStatsTests {
+    @Test func countsMessagesPerDay() {
+        let now = Date()
+        let lines = (0..<30).map { index in
+            ChatLine(id: Int64(index), sender: index.isMultiple(of: 2) ? "me" : "Clara", isFromMe: index.isMultiple(of: 2),
+                     date: now.addingTimeInterval(Double(index - 30) * 60), text: "oi")
+        }
+        let stats = RelationshipAnalyzer.compute(lines, now: now)
+        #expect(stats.daily.count == 14)
+        #expect(stats.daily.reduce(0, +) == 30)
+        #expect(stats.daily.last! + stats.daily[12] == 30)
+    }
+}
+
+@MainActor
+struct WhatsAppIDNamesTests {
+    @Test func idsBecomeTheirNamesAndMergeWithTheSamePerson() async throws {
+        let store = MemoryStore(url: FileManager.default.temporaryDirectory.appending(path: "agott-lid-\(UUID().uuidString).sqlite"))
+        let now = Date()
+        let real = try #require(try await store.ensurePerson("Dayvid Albuquerque"))
+        let id = try #require(try await store.ensurePerson("+224064970952769"))
+        let friend = try #require(try await store.ensurePerson("Carol"))
+        try await store.link(id, friend, kind: .coworker, detail: nil, confidence: 0.8, evidence: nil, chunkID: nil, at: now)
+        try await store.addFact(subject: "+224064970952769", predicate: "precisa de", object: "WORM na AWS",
+                                confidence: 90, source: .whatsapp, chunkID: nil, at: now, subjectID: id)
+        try await store.addFact(subject: "+135686757822712", predicate: "gosta de", object: "drones FPV",
+                                confidence: 0.8, source: .whatsapp, chunkID: nil, at: now)
+        let names = ["+224064970952769": "Dayvid Albuquerque", "+135686757822712": "Bruno Reis"]
+        try await store.renameInFacts(names)
+        try await store.renamePeople(names)
+
+        let facts = try await store.facts(limit: 10)
+        #expect(Set(facts.map(\.subject)) == ["Dayvid Albuquerque", "Bruno Reis"])
+        // A model's "90" is stored as 0.9.
+        #expect(facts.first { $0.subject == "Dayvid Albuquerque" }?.confidence == 0.9)
+        // The id merged into the person who already had that name, links and all.
+        let gone = try await store.person(id: id)
+        #expect(gone == nil)
+        let links: [MemoryStore.PersonLink] = try await store.links(of: real)
+        let moved = links.contains { link in link.other.id == friend && link.kind == .coworker }
+        #expect(moved)
+    }
+
+    @Test func numbersAreNotNames() {
+        #expect(!WhatsAppSource.isName("+55 11 98888-7777"))
+        #expect(!WhatsAppSource.isName(""))
+        #expect(WhatsAppSource.isName("Dayvid"))
+        #expect(MemoryStore.odds(90) == 0.9)
+        #expect(MemoryStore.odds(0.7) == 0.7)
+    }
+}
+
+struct DictationJoinTests {
+    @Test func sentencesKeepTheirSpace() {
+        #expect(Dictation.join("tudo bem.", "E você?") == "tudo bem. E você?")
+        #expect(Dictation.join("tudo bem. ", "E você?") == "tudo bem. E você?")
+        #expect(Dictation.join("ok", ", então") == "ok, então")
+        #expect(Dictation.join("", "oi") == "oi")
+        #expect(Dictation.join("oi", "") == "oi")
+    }
+}
+
+/// The orbs and the activity line, drawn offscreen when AGOTT_SNAPSHOT_DIR is set.
+@MainActor
+struct ThinkingSnapshotTests {
+    @Test func orbsAndActivity() throws {
+        guard let dir = ProcessInfo.processInfo.environment["AGOTT_SNAPSHOT_DIR"] else { return }
+        let start = Date().addingTimeInterval(-7)
+        let steps = [
+            Step(id: "t", kind: .thinking, title: "Thinking", symbol: "sparkle", state: .done,
+                 detail: "Ela perguntou do fim de semana. Vale olhar a agenda e a última conversa com a Ana antes de responder.",
+                 started: start, ended: start.addingTimeInterval(4)),
+            Step(id: "m", kind: .tool, title: "Remembering “viagem”", symbol: "brain.head.profile", state: .running, started: start),
+        ]
+        let view = VStack(alignment: .leading, spacing: 18) {
+            HStack(spacing: 18) {
+                ForEach(Array(ThinkingOrb.Mode.allCases.enumerated()), id: \.offset) { _, mode in
+                    ThinkingOrb(mode: mode, size: 64, active: false)
+                }
+            }
+            HStack(spacing: 18) {
+                ForEach(Array(ThinkingOrb.Mode.allCases.enumerated()), id: \.offset) { _, mode in
+                    ThinkingOrb(mode: mode, size: 18, active: false)
+                }
+            }
+            StepsView(steps: steps, isStreaming: true, started: start)
+            StepsView(steps: Array(steps.prefix(1)), isStreaming: false, started: start)
+        }
+        .padding(24)
+        .frame(width: 520, alignment: .leading)
+        .background(Ink.canvas)
+        .environment(\.colorScheme, .dark)
+        let renderer = ImageRenderer(content: view)
+        renderer.scale = 2
+        guard let image = renderer.cgImage else { Issue.record("no image"); return }
+        let url = URL(fileURLWithPath: dir).appending(path: "thinking.png")
+        let destination = try #require(CGImageDestinationCreateWithURL(url as CFURL, "public.png" as CFString, 1, nil))
+        CGImageDestinationAddImage(destination, image, nil)
+        #expect(CGImageDestinationFinalize(destination))
+    }
+}
+
+struct FactKindTests {
+    @Test func wordsInEitherLanguageMeanOneKind() {
+        #expect(FactKind.guess("gosta de") == .likes)
+        #expect(FactKind.guess("likes") == .likes)
+        #expect(FactKind.guess("não gosta de") == .dislikes)
+        #expect(FactKind.guess("faz aniversário em") == .birthday)
+        #expect(FactKind.guess("joga") == .plays)
+        #expect(FactKind.guess("trabalha em") == .works)
+        #expect(FactKind.guess("mora em") == .livesIn)
+        #expect(FactKind.guess("xyz") == .other)
+    }
+
+    @Test func graphRelationsKeepTheirStoredNames() {
+        #expect(GraphRelation.talksWith.rawValue == "talks with")
+        #expect(GraphRelation.memberOf.rawValue == "member of")
+        #expect(MemoryStore.structuralRelations.contains("knows"))
+    }
+
+    @Test func factsGetAKindAndShowItsLabel() async throws {
+        let store = MemoryStore(url: FileManager.default.temporaryDirectory.appending(path: "agott-kind-\(UUID().uuidString).sqlite"))
+        try await store.addFact(subject: "Ana", predicate: "curte muito", object: "Roblox", confidence: 0.8,
+                                source: .whatsapp, chunkID: nil, at: .now, kind: .plays)
+        try await store.addFact(subject: "Ana", predicate: "mora em", object: "Goiânia", confidence: 0.8,
+                                source: .whatsapp, chunkID: nil, at: .now)
+        let facts = try await store.facts(about: "Ana", limit: 10)
+        #expect(facts.first { $0.object == "Roblox" }?.kind == .plays)
+        #expect(facts.first { $0.object == "Goiânia" }?.kind == .livesIn)
+        #expect(try await store.backfillFactKinds() == 0)
+    }
+}
+
+@MainActor
+struct ReviewFixTests {
+    private func chunk(_ participants: [String], group: Bool = true) -> MemoryChunk {
+        MemoryChunk(id: 1, source: .whatsapp, chatID: "g", chatName: "Turma", start: .now, end: .now,
+                    text: "", participants: participants, isGroup: group)
+    }
+
+    @Test func ambiguousFirstNamesStayAsWritten() {
+        let both = chunk(["Ana Souza", "Ana Clara", "Bruno"])
+        #expect(KnowledgeGraph.canonicalName("Ana", in: both) == "Ana")
+        #expect(KnowledgeGraph.canonicalName("Ana Clara", in: both) == "Ana Clara")
+        #expect(KnowledgeGraph.canonicalName("Bru", in: both) == "Bruno")
+        let one = chunk(["Ana Souza", "Bruno"])
+        #expect(KnowledgeGraph.canonicalName("Ana", in: one) == "Ana Souza")
+    }
+
+    @Test func setupErrorsStopInsteadOfSkipping() {
+        #expect(ModelHub.isConfigurationProblem(OpenCodeExecutor.ExecutorError.http(404, "no such model")))
+        #expect(ModelHub.isConfigurationProblem(OpenCodeExecutor.ExecutorError.http(402, "no credit")))
+        #expect(!ModelHub.isConfigurationProblem(OpenCodeExecutor.ExecutorError.streamFailed("filtered")))
+        #expect(!ModelHub.isConnectionProblem(OpenCodeExecutor.ExecutorError.streamFailed("filtered")))
+        #expect(ModelHub.isConnectionProblem(Jev.JevError.http(429, "busy")))
+    }
+
+    @Test func meaningHitsRespectTheFilter() async throws {
+        let store = MemoryStore(url: FileManager.default.temporaryDirectory.appending(path: "agott-filter-\(UUID().uuidString).sqlite"))
+        let old = Date(timeIntervalSince1970: 1_700_000_000)
+        _ = try await store.ingest([
+            RawMessage(source: .whatsapp, externalID: "a", chatID: "ana", chatName: "Ana", isGroup: false,
+                       sender: "Ana", isFromMe: false, date: old, text: "vamos pra praia"),
+            RawMessage(source: .whatsapp, externalID: "b", chatID: "bia", chatName: "Bia", isGroup: false,
+                       sender: "Bia", isFromMe: false, date: .now, text: "vamos pra praia hoje"),
+        ])
+        let all = try await store.recentChunkIDs(filter: .none, limit: 10)
+        var recent = MemoryStore.Filter()
+        recent.since = Date().addingTimeInterval(-86400)
+        let kept = try await store.chunkIDs(all, matching: recent)
+        #expect(kept.count == 1)
+        #expect(try await store.chunkIDs(all, matching: .none) == all)
     }
 }

@@ -20,24 +20,47 @@ struct AgottApp: App {
     var body: some Scene {
         #if os(macOS)
         WindowGroup {
-            RootView()
-                .tint(Ink.accent)
-                .frame(minWidth: 860, minHeight: 560)
+            Group {
+                if LaunchOptions.arguments.contains("-AgottLab") { DesignLab() } else { RootView() }
+            }
+            .tint(Ink.accent)
+            .frame(minWidth: 860, minHeight: 560)
         }
         .windowStyle(.hiddenTitleBar)
         .defaultLaunchBehavior(.presented)
         .commands {
+            // ⌘N starts a conversation (not a second window), and ⌘, opens
+            // Settings inside the window.
+            CommandGroup(replacing: .newItem) {
+                Button("New Conversation") {
+                    Navigator.shared.settingsPage = nil
+                    Navigator.shared.section = .chat
+                    Agent.shared.newConversation()
+                }
+                .keyboardShortcut("n", modifiers: .command)
+            }
+            CommandGroup(replacing: .appSettings) {
+                Button("Settings…") { Navigator.shared.settingsPage = .preferences }
+                    .keyboardShortcut(",", modifiers: .command)
+            }
             CommandGroup(after: .newItem) {
                 Button("Ask Agott…") { Copilot.shared.beginTyping() }
                     .keyboardShortcut(.space, modifiers: [.option, .command])
                 Button("Update Memory") { Indexer.shared.run() }
                     .keyboardShortcut("r", modifiers: [.command, .shift])
             }
+            CommandGroup(after: .windowArrangement) {
+                OpenDesignLab()
+            }
         }
 
-        Settings {
-            SettingsView()
+        // Three zen directions to compare, live.
+        Window("Design Lab", id: "design-lab") {
+            DesignLab()
+                .tint(Ink.accent)
+                .frame(minWidth: 820, minHeight: 620)
         }
+        .windowStyle(.hiddenTitleBar)
 
         MenuBarExtra {
             MenuBarContent()
@@ -80,6 +103,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 await DemoData.seed()
                 if LaunchOptions.showOverlay { Copilot.shared.showDemoOverlay() }
             }
+            MusicListener.shared.showDemo(
+                Play(date: .now, track: "Desleixado", artist: "KARNIVAL", album: "", app: "Spotify"),
+                mood: TrackMood(mood: "playful", energy: 70, valence: 65, genre: "pop rock"))
+            if LaunchOptions.arguments.contains("-AgottOffscreen") { Self.showOffscreen() }
             return
         }
         if AppSettings.shared.hasOnboarded { Copilot.shared.start() }
@@ -88,12 +115,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task(priority: .utility) { await ModelCatalog.shared.refresh() }
         Task(priority: .utility) {
             await MemoryRepair.shared.runIfNeeded()
+            // Facts learned with English verbs, rewritten in Portuguese once:
+            // after the repair, which redraws the graph from the facts.
+            await FactWords.migrate()
+            // Every fact gets a kind, once; new ones come with theirs.
+            _ = try? await MemoryStore.shared.backfillFactKinds()
             Indexer.shared.startAutomatic()
         }
         RemoteHost.shared.start()
+        // Where the Mac is, so "here" means here. Asks for permission once.
+        Whereabouts.shared.refresh()
         // New messages within seconds: hooks, follow-ups, what to remember.
         Notifier.start()
+        // Who is who, by id, before the first question.
+        Task {
+            _ = try? await MemoryStore.shared.syncPeople()
+            await PeopleDirectory.shared.refresh()
+            await ContactPhotos.shared.refresh()
+        }
         MessageWatcher.shared.start()
+    }
+
+    /// Demo screenshots without taking your focus: the window is put on
+    /// screen far outside the visible area, never activated, so it can be
+    /// captured by its window number.
+    private static func showOffscreen() {
+        Task { @MainActor in
+            for _ in 0..<40 {
+                if let window = NSApp.windows.first(where: { $0.canBecomeMain }) {
+                    window.setContentSize(NSSize(width: 1320, height: 820))
+                    window.setFrameOrigin(NSPoint(x: -6000, y: 200))
+                    window.orderFrontRegardless()
+                    return
+                }
+                try? await Task.sleep(for: .milliseconds(250))
+            }
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
@@ -109,6 +166,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         {
             Indexer.shared.run()
         }
+    }
+}
+
+private struct OpenDesignLab: View {
+    @Environment(\.openWindow) private var openWindow
+    var body: some View {
+        Button("Design Lab") { openWindow(id: "design-lab") }
+            .keyboardShortcut("l", modifiers: [.command, .option])
     }
 }
 
@@ -131,7 +196,11 @@ private struct MenuBarContent: View {
             NSApp.activate()
             NSApp.windows.first { $0.canBecomeMain }?.makeKeyAndOrderFront(nil)
         }
-        SettingsLink { Text("Settings…") }
+        Button("Settings…") {
+            NSApp.activate()
+            NSApp.windows.first { $0.canBecomeMain }?.makeKeyAndOrderFront(nil)
+            Navigator.shared.settingsPage = .preferences
+        }
         Divider()
         Button("Quit Agott") { NSApp.terminate(nil) }
     }

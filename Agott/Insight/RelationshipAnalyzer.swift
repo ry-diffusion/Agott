@@ -27,6 +27,8 @@ nonisolated struct RelationshipStats: Sendable, Hashable, Codable {
     var lastDate = Date.distantPast
     /// Messages per week, oldest first, for the last twelve weeks.
     var weekly: [Int] = Array(repeating: 0, count: 12)
+    /// Messages per day, oldest first, for the last fourteen days.
+    var daily: [Int] = Array(repeating: 0, count: 14)
 
     enum Trend: String, Codable, Sendable { case warming, steady, cooling, quiet }
 
@@ -90,6 +92,10 @@ enum RelationshipAnalyzer {
             // A clock that was wrong can date a message in the future; count it as this week.
             let week = max(0, Int(age / (7 * day)))
             if week < 12 { stats.weekly[11 - week] += 1 }
+            let calendar = Calendar.current
+            let days = max(0, calendar.dateComponents([.day], from: calendar.startOfDay(for: line.date),
+                                                      to: calendar.startOfDay(for: now)).day ?? 0)
+            if days < 14 { stats.daily[13 - days] += 1 }
 
             if let previous {
                 let gap = line.date.timeIntervalSince(previous.date)

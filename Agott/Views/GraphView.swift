@@ -24,6 +24,37 @@ struct GraphView: View {
     @State private var generation = 0
     @State private var lastReload = Date.distantPast
     @State private var canvasSize: CGSize = .zero
+    @State private var mode: Mode = .map
+    @State private var filter: Filter = .all
+    @State private var treeRoots: GraphTree.Roots = .people
+
+    enum Mode: String, CaseIterable, Identifiable { case map, tree; var id: String { rawValue } }
+
+    /// What the map shows: everything, or one kind of thing (and you).
+    enum Filter: String, CaseIterable, Identifiable {
+        case all, people, projects, places, topics
+        var id: String { rawValue }
+
+        var title: LocalizedStringKey {
+            switch self {
+            case .all: "Everything"
+            case .people: "People"
+            case .projects: "Projects"
+            case .places: "Places"
+            case .topics: "Topics"
+            }
+        }
+
+        var kinds: Set<EntityKind> {
+            switch self {
+            case .all: [.me, .person, .group, .place, .organization, .project, .topic]
+            case .people: [.me, .person, .group]
+            case .projects: [.me, .project, .organization, .person]
+            case .places: [.me, .place, .person]
+            case .topics: [.me, .topic, .person]
+            }
+        }
+    }
 
     struct Node: Identifiable {
         var entity: GraphEntity
@@ -36,6 +67,14 @@ struct GraphView: View {
         VStack(alignment: .leading, spacing: 18) {
             ScreenHeader(title: "Graph", subtitle: "The people and things in your life, and how they connect.", symbol: "point.3.connected.trianglepath.dotted") {
                 HStack(spacing: 8) {
+                    Picker("View", selection: $mode) {
+                        Text("Map").tag(Mode.map)
+                        Text("Tree").tag(Mode.tree)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 150)
+                    .labelsHidden()
+                    if mode == .map {
                     Picker("Size", selection: $size) {
                         Text(verbatim: "40").tag(40)
                         Text(verbatim: "80").tag(80)
@@ -48,24 +87,46 @@ struct GraphView: View {
                         .help(Text("Fit to view"))
                     CandyIconButton(symbol: "arrow.clockwise") { Task { await load() } }
                         .help(Text("Refresh"))
+                    }
                 }
             }
-            HStack(spacing: 14) {
-                canvas
-                    .clipShape(RoundedRectangle(cornerRadius: Radius.surface, style: .continuous))
-                if let selected, let node = nodes.first(where: { $0.id == selected }) {
-                    inspector(node.entity)
-                        .frame(width: 300)
-                        .panel(padding: 0)
-                        .transition(.move(edge: .trailing).combined(with: .opacity))
+            // What to show: everything or one kind (map), people or projects (tree).
+            HStack(spacing: 6) {
+                if mode == .map {
+                    ForEach(Filter.allCases) { item in
+                        FilterChip(title: item.title, selected: filter == item) { filter = item }
+                    }
+                } else {
+                    FilterChip(title: "People", selected: treeRoots == .people) { treeRoots = .people }
+                    FilterChip(title: "Projects", selected: treeRoots == .projects) { treeRoots = .projects }
                 }
             }
-            .animation(Motion.settle, value: selected)
+            if mode == .map {
+                HStack(spacing: 14) {
+                    canvas
+                        .clipShape(RoundedRectangle(cornerRadius: Radius.surface, style: .continuous))
+                    if let selected, let node = nodes.first(where: { $0.id == selected }) {
+                        inspector(node.entity)
+                            .frame(width: 300)
+                            .panel(padding: 0)
+                            .transition(.move(edge: .trailing).combined(with: .opacity))
+                    }
+                }
+                .animation(Motion.settle, value: selected)
+            } else {
+                GraphTree(roots: treeRoots)
+                    .quietSurface(RoundedRectangle(cornerRadius: Radius.surface, style: .continuous))
+            }
         }
         .padding(.horizontal, 28)
         .padding(.top, 24)
         .padding(.bottom, 24)
         .task(id: size) { await load() }
+        .onChange(of: filter) { _, new in
+            kinds = new.kinds
+            selected = nil
+            Task { await load() }
+        }
         // While indexing, the graph grows in front of you.
         .onChange(of: Indexer.shared.totals.entities) { _, _ in
             guard Date().timeIntervalSince(lastReload) > 10 else { return }
@@ -202,6 +263,12 @@ struct GraphView: View {
             Task {
                 neighbors = (try? await MemoryStore.shared.neighbors(of: entity.id, limit: 40)) ?? []
                 facts = (try? await MemoryStore.shared.facts(matching: entity.kind == .me ? nil : entity.name, limit: 30)) ?? []
+                if entity.kind == .person {
+                    // Their profile first: facts about them, however their name was written.
+                    let profile = (try? await MemoryStore.shared.profile(of: entity.name, limit: 30)) ?? []
+                    let ids = Set(profile.map(\.id))
+                    facts = profile + facts.filter { !ids.contains($0.id) }
+                }
                 if entity.kind == .me {
                     facts = (try? await MemoryStore.shared.facts(about: entity.name, limit: 30)) ?? []
                 }
@@ -226,7 +293,7 @@ struct GraphView: View {
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 7)
-        .glassEffect(.regular, in: .capsule)
+        .quietSurface(Capsule(), fill: Ink.surface)
     }
 
     private func inspector(_ entity: GraphEntity) -> some View {
@@ -248,11 +315,7 @@ struct GraphView: View {
                 if !facts.isEmpty {
                     VStack(alignment: .leading, spacing: 6) {
                         PanelTitle(title: "What Agott knows", symbol: "pin")
-                        ForEach(facts.prefix(12)) { fact in
-                            Text("\(Text(fact.subject).bold()) \(fact.predicate) \(Text(fact.object).foregroundStyle(Ink.spot))")
-                                .font(.callout).foregroundStyle(Ink.text)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
+                        ForEach(facts.prefix(12)) { fact in FactRow(fact: fact) }
                     }
                 }
 
@@ -264,16 +327,26 @@ struct GraphView: View {
                             Image(systemName: other.kind.symbol).foregroundStyle(Ink.muted).frame(width: 18)
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(other.name).font(.callout).foregroundStyle(Ink.text)
-                                Text(edge.relation).font(.caption).foregroundStyle(Ink.muted)
+                                Text(Self.relationLabel(edge.relation)).font(.caption).foregroundStyle(Ink.muted)
                             }
                             Spacer()
                             Text("×\(Int(edge.weight))").font(.caption).monospacedDigit().foregroundStyle(Ink.muted)
                         }
+                        // Every person is a link: hover for their card, click to open them.
+                        .modifier(PersonLinkIf(name: other.kind == .person || other.kind == .me ? other.name : nil))
                     }
                 }
             }
             .padding(16)
         }
+    }
+
+    /// A graph relation in the reader's language: the graph's own words
+    /// ("knows", "member of") and fact verbs alike.
+    static func relationLabel(_ relation: String) -> String {
+        if let known = GraphRelation(rawValue: relation) { return known.label }
+        guard Persona.prefersPortuguese else { return relation }
+        return FactWords.portuguese[relation.lowercased()] ?? relation
     }
 
     // MARK: Data
@@ -522,3 +595,65 @@ private struct PersonPanel: View {
         writing = false
     }
 }
+
+
+/// A fact with its odds and its proof: what was said, by whom, where.
+struct FactRow: View {
+    var fact: MemoryFact
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text("\(Text(fact.subject).bold()) \(fact.displayPredicate) \(Text(fact.object).foregroundStyle(Ink.spot))")
+                    .font(.callout).foregroundStyle(Ink.text)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 4)
+                Text("\(Int((fact.confidence * 100).rounded()))%")
+                    .font(.caption.weight(.semibold)).monospacedDigit()
+                    .foregroundStyle(fact.confidence >= 0.7 ? Ink.text : Ink.muted)
+                    .help(Text(fact.selfStated ? "Said by them" : "Inferred"))
+            }
+            if let evidence = fact.evidence, !evidence.isEmpty {
+                Text("“\(evidence)”")
+                    .font(.caption).italic()
+                    .foregroundStyle(Ink.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let chat = fact.chatName {
+                Text(fact.inGroup ? String(localized: "In the group “\(chat)”") : String(localized: "In the direct chat with \(chat)"))
+                    .font(.caption2).foregroundStyle(Ink.muted)
+            }
+        }
+    }
+}
+
+/// A rounded filter pill: filled when chosen, outlined otherwise.
+struct FilterChip: View {
+    var title: LocalizedStringKey
+    var selected: Bool
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.callout)
+                .foregroundStyle(selected ? Ink.canvas : Ink.text)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 5)
+                .background(Capsule().fill(selected ? Ink.text : .clear))
+                .overlay(Capsule().strokeBorder(Ink.hairline.opacity(selected ? 0 : 1), lineWidth: 1))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+}
+
+/// Makes a row a person link when it names a person.
+private struct PersonLinkIf: ViewModifier {
+    var name: String?
+    func body(content: Content) -> some View {
+        if let name { content.personHover(name) } else { content }
+    }
+}
+

@@ -12,7 +12,7 @@ struct YouView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 ScreenHeader(title: "You", subtitle: "Agott starts every conversation from this. Edit anything that's wrong.", symbol: "person") {
-                    MascotFace(mood: indexer.isLearning ? .thinking : .love, size: 54)
+                    if indexer.isLearning { ThinkingOrb(mode: .orbits, size: 22) }
                 }
                 PanelTitle(title: "About you", symbol: "text.quote")
 
@@ -33,7 +33,7 @@ struct YouView: View {
                 HStack {
                     if indexer.isLearning {
                         ProgressView().controlSize(.small)
-                        if case .learning(let done, let total) = indexer.phase {
+                        if case .learning(let done, let total) = indexer.learnPhase {
                             Text("Reading moment \(done) of \(total)…").foregroundStyle(Ink.muted)
                         }
                         Button("Stop") { indexer.stopLearning() }.buttonStyle(.candy(.soft, compact: true))
@@ -134,7 +134,7 @@ private struct MusicMoodSection: View {
                         }
                         Spacer()
                         if let mood = listener.nowMood {
-                            Chip(text: mood.mood.capitalized, symbol: "heart", spot: true)
+                            Chip(text: mood.moodName.capitalized, symbol: "heart", spot: true)
                         }
                     }
                     .panel(padding: 12)
@@ -145,7 +145,7 @@ private struct MusicMoodSection: View {
                         let total = max(1, summary.moods.map(\.1).reduce(0, +))
                         ForEach(summary.moods.prefix(5), id: \.0) { mood, count in
                             HStack(spacing: 10) {
-                                Text(mood.capitalized).font(.callout).foregroundStyle(Ink.text).frame(width: 96, alignment: .leading)
+                                Text(TrackMood.name(of: mood).capitalized).font(.callout).foregroundStyle(Ink.text).frame(width: 96, alignment: .leading)
                                 GeometryReader { proxy in
                                     Capsule().fill(Ink.spot)
                                         .frame(width: max(6, proxy.size.width * CGFloat(count) / CGFloat(total)))
@@ -156,7 +156,7 @@ private struct MusicMoodSection: View {
                             }
                         }
                         if let best = summary.toneByMood.first, let worst = summary.toneByMood.last, summary.toneByMood.count > 1 {
-                            Label("Your messages are warmest with \(best.0) music and coolest with \(worst.0).", systemImage: "text.bubble")
+                            Label("Your messages are warmest with \(TrackMood.name(of: best.0)) music and coolest with \(TrackMood.name(of: worst.0)).", systemImage: "text.bubble")
                                 .font(.callout).foregroundStyle(Ink.text)
                         }
                         if !summary.topArtists.isEmpty {
