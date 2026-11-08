@@ -71,6 +71,7 @@ actor Parakeet {
     private func load() async throws -> AsrManager {
         if let manager { return manager }
         if let loading { return try await loading.value }
+        await MainActor.run { ParakeetSetup.shared.isLoading = true }
         let task = Task { () throws -> AsrManager in
             let models = Self.isInstalled
                 ? try await AsrModels.load(from: Self.directory, version: Self.version)
@@ -81,8 +82,18 @@ actor Parakeet {
         }
         loading = task
         defer { loading = nil }
-        let manager = try await task.value
+        let manager: AsrManager
+        do {
+            manager = try await task.value
+        } catch {
+            await MainActor.run { ParakeetSetup.shared.isLoading = false }
+            throw error
+        }
         self.manager = manager
+        await MainActor.run {
+            ParakeetSetup.shared.isLoading = false
+            ParakeetSetup.shared.isLoaded = true
+        }
         log.info("Parakeet loaded")
         scheduleUnload()
         return manager
@@ -126,6 +137,7 @@ actor Parakeet {
         guard busy == 0, let manager else { return }
         self.manager = nil
         isWarm = false
+        await MainActor.run { ParakeetSetup.shared.isLoaded = false }
         await manager.cleanup()
         log.info("Parakeet released after being idle")
     }
@@ -145,6 +157,11 @@ final class ParakeetSetup {
     }
 
     private(set) var state: State = Parakeet.isInstalled ? .ready : .missing
+    /// The weights are being read into memory (seconds, the first time a
+    /// lot more while CoreML compiles them for the Neural Engine).
+    fileprivate(set) var isLoading = false
+    /// The weights are in memory: a press is answered at once.
+    fileprivate(set) var isLoaded = false
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var attempts = 0
 

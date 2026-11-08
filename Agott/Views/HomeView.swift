@@ -320,6 +320,7 @@ struct AskBox: View {
     var send: (String) -> Void
     @State private var draft = ""
     @State private var picks: [(symbol: String, text: String)] = []
+    @State private var dictation = Dictation.shared
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -346,7 +347,9 @@ struct AskBox: View {
                 .padding(.bottom, 6)
             }
             HStack(spacing: 8) {
-                TextField("Ask anything", text: $draft, axis: .vertical)
+                // While the mic is on, the field shows what is being heard.
+                TextField(dictation.isRunning ? dictation.hint : String(localized: "Ask anything"),
+                          text: dictation.isRunning ? .constant(dictation.transcript) : $draft, axis: .vertical)
                     .textFieldStyle(.plain)
                     .font(.system(size: 15))
                     .lineLimit(1...6)

@@ -310,7 +310,7 @@ struct ChatView: View {
                 }
                 HStack(alignment: .bottom, spacing: 4) {
                     TextField(
-                        dictation.isRunning ? String(localized: "Listening…") : String(localized: "Ask anything"),
+                        dictation.isRunning ? dictation.hint : String(localized: "Ask anything"),
                         text: dictation.isRunning ? .constant(dictation.transcript) : $draft,
                         axis: .vertical)
                         .textFieldStyle(.plain)

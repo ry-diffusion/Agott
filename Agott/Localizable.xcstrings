@@ -8210,6 +8210,16 @@
           }
         }
       }
+    },
+    "Loading the transcription model…" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carregando o modelo de transcrição…"
+          }
+        }
+      }
     }
   },
   "version" : "1.1"

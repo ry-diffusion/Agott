@@ -22,6 +22,20 @@ final class Dictation {
     /// Which engine the latest run listened with, for the log.
     private(set) var engineName = "apple"
 
+    /// What to show while nothing has been heard yet: that it listens, or
+    /// that the transcription model is still loading (or downloading).
+    var hint: String {
+        #if os(macOS)
+        if engineName == "parakeet", !ParakeetSetup.shared.isLoaded {
+            return String(localized: "Loading the transcription model…")
+        }
+        if let notice = ParakeetSetup.shared.notice {
+            return String(localized: "Listening") + " · " + notice
+        }
+        #endif
+        return String(localized: "Listening…")
+    }
+
     var transcript: String {
         Self.join(finalized, volatile).trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -101,9 +115,9 @@ final class Dictation {
             self.capture = capture
             preview = Task { [weak self] in
                 while !Task.isCancelled {
-                    try? await Task.sleep(for: .milliseconds(600))
+                    try? await Task.sleep(for: .milliseconds(350))
                     let samples = capture.recent(seconds: 12)
-                    guard samples.count >= Parakeet.minimumSamples / 2, await Parakeet.shared.isLoaded else { continue }
+                    guard samples.count >= Parakeet.minimumSamples / 3, await Parakeet.shared.isLoaded else { continue }
                     let text = try? await Parakeet.shared.transcribe(samples, language: language)
                     guard !Task.isCancelled, let text, let self else { continue }
                     self.volatile = text
