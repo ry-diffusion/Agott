@@ -654,10 +654,25 @@ struct HoldToTalkButton: View {
 
     private var live: Bool { dictation.isRunning }
 
+    /// The transcription model is still loading: the mic waits, with a spinner.
+    private var waiting: Bool {
+        #if os(macOS)
+        !live && ParakeetSetup.shared.micMustWait
+        #else
+        false
+        #endif
+    }
+
     var body: some View {
-        Image(systemName: live ? "waveform" : "mic.fill")
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(live ? AnyShapeStyle(Ink.onSpot) : AnyShapeStyle(Ink.text))
+        ZStack {
+            if waiting {
+                ProgressView().controlSize(.small)
+            } else {
+                Image(systemName: live ? "waveform" : "mic.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(live ? AnyShapeStyle(Ink.onSpot) : AnyShapeStyle(Ink.text))
+            }
+        }
             .frame(width: ChatView.inputHeight, height: ChatView.inputHeight)
             .background(Circle().fill(live ? Ink.spot : Ink.raised))
             .scaleEffect(live ? 1.05 + CGFloat(dictation.level) * 0.2 : 1)
@@ -666,7 +681,7 @@ struct HoldToTalkButton: View {
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { _ in
-                        guard pressedAt == nil else { return }
+                        guard pressedAt == nil, !waiting else { return }
                         pressedAt = .now
                         if !live {
                             Agent.shared.setMood(.listening)
@@ -674,6 +689,7 @@ struct HoldToTalkButton: View {
                         }
                     }
                     .onEnded { _ in
+                        guard pressedAt != nil else { return }
                         let held = pressedAt.map { Date().timeIntervalSince($0) } ?? 0
                         pressedAt = nil
                         // A tap on a quiet mic keeps it listening until the next tap.
@@ -690,7 +706,10 @@ struct HoldToTalkButton: View {
             // Leaving with the mic on keeps what was said instead of
             // recording forever.
             .onDisappear { if live { finish() } }
-            .tip(live ? (handsFree ? "Tap to send" : "Release to send") : "Hold to talk, or tap to talk hands-free", edge: .top)
+            #if os(macOS)
+            .task(id: waiting) { if waiting { ParakeetSetup.shared.loadIfNeeded() } }
+            #endif
+            .tip(waiting ? "Loading the transcription model…" : (live ? (handsFree ? "Tap to send" : "Release to send") : "Hold to talk, or tap to talk hands-free"), edge: .top)
             .accessibilityLabel(Text(live ? "Stop listening and send" : "Talk"))
     }
 

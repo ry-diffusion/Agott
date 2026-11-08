@@ -87,6 +87,7 @@ final class Dictation {
         // Parakeet when chosen and on this Mac; Apple's engine otherwise, so
         // a missing model never means a silent download mid-press.
         parakeetRun = AppSettings.shared.speechEngine == SpeechEngine.parakeet.rawValue && Parakeet.isInstalled
+            && !ParakeetSetup.shared.failedToLoad
         engineName = parakeetRun ? "parakeet" : "apple"
         if parakeetRun {
             starting = Task { try await beginParakeet() }
