@@ -139,8 +139,11 @@ private struct SidebarRow: View {
                     .lineLimit(1)
                 Spacer(minLength: 0)
                 if live {
-                    // A reply is being written in this conversation.
-                    Circle().fill(Ink.spot).frame(width: 6, height: 6)
+                    // Agott is working in this conversation: a spinner, like a tab loading.
+                    ProgressView()
+                        .controlSize(.mini)
+                        .tint(Ink.spot)
+                        .accessibilityLabel(Text("Working"))
                 }
             }
             .padding(.horizontal, 10)
