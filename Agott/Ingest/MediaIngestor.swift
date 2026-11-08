@@ -23,6 +23,10 @@ enum MediaIngestor {
         var caption: String?
     }
 
+    /// Batches read in one indexing run (30 each): about 90 items, a few
+    /// minutes of voice notes at most.
+    static let batchesPerRun = 3
+
     /// How far it has read, in WhatsApp's own clock.
     private static let cursorKey = "media.whatsapp.after"
     static let root = URL.homeDirectory

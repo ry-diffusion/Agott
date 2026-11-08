@@ -157,12 +157,18 @@ final class Indexer {
             await read(source)
         }
         // WhatsApp voice notes and photos, as words, in their conversations.
+        // A few batches per run: the first time there are thousands, and the
+        // graph and people should not wait half an hour behind them. The
+        // rest come in over the next runs.
         if AppSettings.shared.enabledSources.contains(.whatsapp),
            AppSettings.shared.transcribeVoiceNotes || AppSettings.shared.describePhotos {
             var done = 0
+            var batches = 0
             phase = .media(done: 0)
-            while !Task.isCancelled, let added = await MediaIngestor.run(contacts: contacts) {
+            while !Task.isCancelled, batches < MediaIngestor.batchesPerRun,
+                  let added = await MediaIngestor.run(contacts: contacts) {
                 done += added
+                batches += 1
                 phase = .media(done: done)
                 await Task.yield()
             }
