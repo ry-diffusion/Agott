@@ -73,9 +73,11 @@ final class Copilot {
                 beginTyping()
                 return
             }
+            let releasedAt = ContinuousClock.now
             let text = await Dictation.shared.stop()
+            let heard = ContinuousClock.now - releasedAt
             // Lengths only, never the words.
-            log.notice("Dictation stopped after \(duration, format: .fixed(precision: 1))s: \(text.count) characters, problem: \(Dictation.shared.problem ?? "none", privacy: .public)")
+            log.notice("Dictation (\(Dictation.shared.engineName, privacy: .public)) stopped after \(duration, format: .fixed(precision: 1))s, transcribed in \(heard.description, privacy: .public): \(text.count) characters, problem: \(Dictation.shared.problem ?? "none", privacy: .public)")
             guard !text.isEmpty else {
                 notice = Dictation.shared.problem ?? String(localized: "I didn't catch that.")
                 Agent.shared.setMood(.confused)
@@ -89,10 +91,13 @@ final class Copilot {
             case .dictate:
                 mode = .inserting
                 Agent.shared.setMood(.working)
-                let polished = await Rambler.polish(text)
+                // The clean-up is a nicety: never worth more than two seconds
+                // of "Typing it for you…". Parakeet already punctuates.
+                let started = ContinuousClock.now
+                let polished = await Rambler.polish(text, within: .seconds(2))
                 do {
                     try TextInsertion.insert(polished)
-                    log.notice("Dictation typed \(polished.count) characters")
+                    log.notice("Dictation typed \(polished.count) characters, cleaned up in \((ContinuousClock.now - started).description, privacy: .public)")
                     Agent.shared.setMood(.happy)
                 } catch {
                     log.error("Dictation could not type: \(error.localizedDescription, privacy: .public)")

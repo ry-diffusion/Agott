@@ -10,6 +10,20 @@ import NaturalLanguage
 /// every day. The same rule holds, though: nothing the model returns is
 /// trusted until it is checked against what was said.
 enum Rambler {
+    /// `polish`, or the raw words when it takes longer than `limit`.
+    static func polish(_ raw: String, within limit: Duration) async -> String {
+        await withTaskGroup(of: String?.self) { group in
+            group.addTask { await polish(raw) }
+            group.addTask {
+                try? await Task.sleep(for: limit)
+                return nil
+            }
+            let first = await group.next() ?? nil
+            group.cancelAll()
+            return first ?? raw
+        }
+    }
+
     static func polish(_ raw: String) async -> String {
         let words = raw.split(whereSeparator: \.isWhitespace).count
         guard words >= 5, ModelHub.isAvailable(.onDevice) else { return raw }

@@ -19,6 +19,8 @@ final class Dictation {
     private(set) var volatile = ""
     private(set) var level: Float = 0
     private(set) var problem: String?
+    /// Which engine the latest run listened with, for the log.
+    private(set) var engineName = "apple"
 
     var transcript: String {
         Self.join(finalized, volatile).trimmingCharacters(in: .whitespacesAndNewlines)
@@ -71,6 +73,7 @@ final class Dictation {
         // Parakeet when chosen and on this Mac; Apple's engine otherwise, so
         // a missing model never means a silent download mid-press.
         parakeetRun = AppSettings.shared.speechEngine == SpeechEngine.parakeet.rawValue && Parakeet.isInstalled
+        engineName = parakeetRun ? "parakeet" : "apple"
         if parakeetRun {
             starting = Task { try await beginParakeet() }
             return

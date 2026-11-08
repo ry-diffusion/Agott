@@ -37,8 +37,10 @@ actor Parakeet {
 
     /// The decoder rejects anything shorter than a second.
     nonisolated static let minimumSamples = 16_000
-    /// How long the weights stay in memory after the last use.
-    private static let idle: Duration = .seconds(10 * 60)
+    /// How long the weights stay in memory after the last use. Loading them
+    /// again costs CoreML ~20 s of compiling for the Neural Engine, which a
+    /// press of the dictation key must never wait for, so this is long.
+    private static let idle: Duration = .seconds(2 * 60 * 60)
 
     private let log = Logger(subsystem: "br.com.zesmoi.Agott", category: "parakeet")
     private var manager: AsrManager?
@@ -158,7 +160,12 @@ final class ParakeetSetup {
     /// Starts the download if Parakeet is the engine and is not here yet.
     func start() {
         guard AppSettings.shared.speechEngine == SpeechEngine.parakeet.rawValue else { return }
-        if Parakeet.isInstalled { state = .ready; return }
+        if Parakeet.isInstalled {
+            state = .ready
+            // Loaded and warmed now, so the first press is as fast as any.
+            Task.detached(priority: .utility) { try? await Parakeet.shared.prepare() }
+            return
+        }
         guard task == nil else { return }
         attempts += 1
         // A second try starts clean: a broken first one left half a folder.
@@ -179,8 +186,11 @@ final class ParakeetSetup {
                 state = .failed(error.localizedDescription)
             }
             task = nil
-            // Voice notes waited for it.
-            if state == .ready { Indexer.shared.run() }
+            // Voice notes waited for it; dictation should not wait for the load.
+            if state == .ready {
+                Indexer.shared.run()
+                Task.detached(priority: .utility) { try? await Parakeet.shared.prepare() }
+            }
         }
     }
 }
