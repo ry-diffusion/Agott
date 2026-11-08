@@ -58,6 +58,22 @@ final class AppSettings {
     var lookWithVision: Bool { didSet { save(lookWithVision, "lookWithVision") } }
     var myName: String { didSet { save(myName, "myName") } }
     var speechLocale: String { didSet { save(speechLocale, "speechLocale") } }
+
+    /// The languages speech can be heard in (Parakeet's, which Apple's engine
+    /// mostly shares), "auto" first.
+    static let speechLanguages = ["auto", "pt-BR", "en-US", "es", "fr", "de", "it", "nl", "pl", "ru", "uk",
+                                  "sv", "da", "fi", "cs", "sk", "ro", "hu", "el", "bg", "hr", "sl", "lt", "lv", "et"]
+
+    /// The language for Apple's engine, which needs one: "auto" is the Mac's.
+    var speechLocaleForApple: Locale {
+        speechLocale == "auto" ? Locale.current : Locale(identifier: speechLocale)
+    }
+
+    /// "Automatic", or the language's own name in the reader's language.
+    static func speechLanguageName(_ code: String) -> String {
+        if code == "auto" { return String(localized: "Automatic") }
+        return Locale.current.localizedString(forIdentifier: code)?.capitalized(with: .current) ?? code
+    }
     /// What tidies dictation before it is typed: "off", "apple" (the model on
     /// this Mac) or a chat model's id (DeepSeek and the like).
     var dictationCleanup: String { didSet { save(dictationCleanup, "dictationCleanup") } }

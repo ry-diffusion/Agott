@@ -235,10 +235,12 @@ struct SettingsPageView: View {
                     }
                     .labelsHidden().fixedSize()
                 }
-                SettingsRow(symbol: "globe", title: "Speech language", detail: "The language you speak to Agott in.") {
+                SettingsRow(symbol: "globe", title: "Speech language",
+                            detail: "The main language you speak in, for dictation and voice notes. Automatic lets Parakeet tell; Portuguese with English words mixed in works either way.") {
                     Picker("", selection: $settings.speechLocale) {
-                        Text(verbatim: "Português (Brasil)").tag("pt-BR")
-                        Text(verbatim: "English (US)").tag("en-US")
+                        ForEach(AppSettings.speechLanguages, id: \.self) { code in
+                            Text(verbatim: AppSettings.speechLanguageName(code)).tag(code)
+                        }
                     }
                     .labelsHidden().fixedSize()
                 }

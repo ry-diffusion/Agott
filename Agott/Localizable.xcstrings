@@ -8344,6 +8344,26 @@
           }
         }
       }
+    },
+    "Automatic" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automático"
+          }
+        }
+      }
+    },
+    "The main language you speak in, for dictation and voice notes. Automatic lets Parakeet tell; Portuguese with English words mixed in works either way." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O idioma principal em que você fala, para a ditação e os áudios. Automático deixa o Parakeet descobrir; português com palavras em inglês funciona de qualquer jeito."
+          }
+        }
+      }
     }
   },
   "version" : "1.1"

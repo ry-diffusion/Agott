@@ -180,7 +180,7 @@ final class Dictation {
     private func begin() async throws {
         do {
             guard await AVAudioApplication.requestRecordPermission() else { throw Failure.microphoneDenied }
-            let requested = Locale(identifier: AppSettings.shared.speechLocale)
+            let requested = AppSettings.shared.speechLocaleForApple
             guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: requested) else {
                 throw Failure.unsupportedLanguage
             }

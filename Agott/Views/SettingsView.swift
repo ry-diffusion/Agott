@@ -48,8 +48,9 @@ struct SettingsView: View {
             Section("You") {
                 TextField("Your name", text: $settings.myName)
                 Picker("Speech language", selection: $settings.speechLocale) {
-                    Text("Português (Brasil)").tag("pt-BR")
-                    Text("English (US)").tag("en-US")
+                    ForEach(AppSettings.speechLanguages, id: \.self) { code in
+                        Text(verbatim: AppSettings.speechLanguageName(code)).tag(code)
+                    }
                 }
             }
 
