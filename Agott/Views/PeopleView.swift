@@ -648,9 +648,9 @@ private struct PersonDetail: View {
         .quietSurface(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    /// Ink.spot as a concrete colour, which Charts needs.
+    /// Ink.spot (the system purple) as a concrete colour, which Charts needs.
     private var spot: Color {
-        scheme == .dark ? Color(.sRGB, red: 0.871, green: 0.596, blue: 0.671) : Color(.sRGB, red: 0.659, green: 0.306, blue: 0.420)
+        scheme == .dark ? Color(.sRGB, red: 0.749, green: 0.353, blue: 0.949) : Color(.sRGB, red: 0.686, green: 0.322, blue: 0.871)
     }
 
     private func minutes(_ value: Double?) -> String {

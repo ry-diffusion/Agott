@@ -11,7 +11,7 @@ import UIKit
 /// Neutral greys, near-white type, a serif for page headlines and the
 /// system face for everything else. Surfaces are a step lighter than the
 /// page with a hairline around them; nothing floats, nothing glows. One
-/// muted rose is the only colour, kept for what is selected or live.
+/// colour, the system purple, is kept for what is selected or live.
 enum Ink {
     // MARK: Colour
 
@@ -29,8 +29,14 @@ enum Ink {
     static let text = dynamic(dark: (0.925, 0.925, 0.910), light: (0.110, 0.110, 0.106))
     static let muted = dynamic(dark: (0.600, 0.600, 0.588), light: (0.455, 0.455, 0.443))
     static let hairline = dynamic(dark: (0.262, 0.262, 0.262), light: (0.878, 0.878, 0.867))
-    /// The one colour: a muted rose, for what is selected or live.
-    static let spot = dynamic(dark: (0.871, 0.596, 0.671), light: (0.659, 0.306, 0.420))
+    /// The one colour: the system's purple, for what is selected or live.
+    /// It is the purple Liquid Glass is tinted with across macOS, and it
+    /// adjusts itself between light and dark.
+    #if os(macOS)
+    static let spot = Color(nsColor: .systemPurple)
+    #else
+    static let spot = Color(uiColor: .systemPurple)
+    #endif
     /// Text that sits on the spot colour.
     static let onSpot = Color.white
     /// Paper that stays paper in dark mode, under the black-ink mascot.
