@@ -141,7 +141,7 @@ private struct StepRow: View {
                     if opens { open.toggle() }
                 } label: {
                     HStack(spacing: 6) {
-                        Text(step.title)
+                        Text(EntityText.readable(step.title))
                             .font(.callout)
                             .foregroundStyle(step.state == .running ? Ink.text : Ink.muted)
                             .lineLimit(1)
@@ -241,7 +241,7 @@ private struct DetailText: View {
     }
 
     private func label(_ text: String) -> some View {
-        Text(text.trimmingCharacters(in: .whitespacesAndNewlines))
+        Text(EntityText.readable(text).trimmingCharacters(in: .whitespacesAndNewlines))
             .font(thinking ? .callout : .caption)
             .foregroundStyle(Ink.muted)
             .lineSpacing(2)
@@ -269,13 +269,13 @@ private struct FoundList: View {
                         .padding(.top, 2)
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 6) {
-                            Text(item.title).font(.callout.weight(.semibold)).foregroundStyle(Ink.text).lineLimit(1)
+                            Text(EntityText.readable(item.title)).font(.callout.weight(.semibold)).foregroundStyle(Ink.text).lineLimit(1)
                             if let subtitle = item.subtitle {
-                                Text(subtitle).font(.caption).foregroundStyle(Ink.muted).lineLimit(1)
+                                Text(EntityText.readable(subtitle)).font(.caption).foregroundStyle(Ink.muted).lineLimit(1)
                             }
                         }
                         if let snippet = item.snippet {
-                            Text(snippet)
+                            Text(EntityText.readable(snippet))
                                 .font(.caption)
                                 .foregroundStyle(Ink.muted)
                                 .lineLimit(2)

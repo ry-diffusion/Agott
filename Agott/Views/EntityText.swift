@@ -62,6 +62,19 @@ enum EntityText {
     }
 }
 
+extension EntityText {
+    /// Text written for the model, made readable for a person: the note
+    /// that tells the model how to write tags is dropped, and every tag is
+    /// the person's name (or "Person 12" with names hidden). Only the final
+    /// answer keeps tags, which become chips there.
+    static func readable(_ text: String) -> String {
+        let lines = text.components(separatedBy: "\n").filter { line in
+            !line.hasPrefix("People and groups, by tag.") && !line.hasPrefix("group is never a person")
+        }
+        return plain(lines.joined(separator: "\n"), hidden: AppSettings.shared.hideNames)
+    }
+}
+
 extension Card.Artifact {
     /// The artifact as it leaves Agott (copied, saved, published): people's
     /// tags turned into their names.
