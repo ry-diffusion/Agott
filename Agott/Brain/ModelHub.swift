@@ -1,15 +1,18 @@
 import Foundation
+import Observation
 import FoundationModels
 
 /// The one place that knows which model is answering.
 enum ModelHub {
     static var settings: AppSettings { .shared }
 
+    /// Whether a provider can answer. Apple's two are answered from a cache:
+    /// asking the system blocks, and Private Cloud Compute asks the network
+    /// for its details, so a check on the main thread froze the window.
     static func isAvailable(_ provider: ModelProvider) -> Bool {
         switch provider {
         case .openCode: settings.hasAPIKey
-        case .privateCloud: PrivateCloudComputeLanguageModel().isAvailable
-        case .onDevice: SystemLanguageModel.default.isAvailable
+        case .privateCloud, .onDevice: ModelAvailability.cached(provider)
         }
     }
 
@@ -191,4 +194,56 @@ enum ModelHub {
     static var learningProvider: ModelProvider {
         resolved(settings.learningProvider)
     }
+}
+
+/// Apple's models, checked away from the main thread and remembered for a
+/// couple of minutes. Until the first check lands they count as unavailable,
+/// and the screens that show them redraw when it does.
+nonisolated enum ModelAvailability {
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var known: [ModelProvider: (available: Bool, at: Date)] = [:]
+    nonisolated(unsafe) private static var checking: Set<ModelProvider> = []
+    private static let freshness: TimeInterval = 120
+
+    static func cached(_ provider: ModelProvider) -> Bool {
+        lock.lock()
+        let entry = known[provider]
+        let stale = entry.map { Date().timeIntervalSince($0.at) > freshness } ?? true
+        lock.unlock()
+        if stale { refresh(provider) }
+        return entry?.available ?? false
+    }
+
+    /// Checks both at launch, so the first question finds an answer waiting.
+    static func warm() {
+        refresh(.onDevice)
+        refresh(.privateCloud)
+    }
+
+    private static func refresh(_ provider: ModelProvider) {
+        lock.lock()
+        guard !checking.contains(provider) else { lock.unlock(); return }
+        checking.insert(provider)
+        lock.unlock()
+        Task.detached(priority: .utility) {
+            let available: Bool = switch provider {
+            case .privateCloud: PrivateCloudComputeLanguageModel().isAvailable
+            case .onDevice: SystemLanguageModel.default.isAvailable
+            case .openCode: false
+            }
+            lock.lock()
+            let changed = known[provider]?.available != available
+            known[provider] = (available, Date())
+            checking.remove(provider)
+            lock.unlock()
+            if changed { await MainActor.run { ModelAvailabilityTick.shared.count += 1 } }
+        }
+    }
+}
+
+/// Bumped when an availability answer changes, so views that show it redraw.
+@MainActor @Observable
+final class ModelAvailabilityTick {
+    static let shared = ModelAvailabilityTick()
+    var count = 0
 }

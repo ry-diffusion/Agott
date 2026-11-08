@@ -104,6 +104,8 @@ struct ModelPicker: View {
     /// Apple's models, chosen as models in their own right.
     private func appleRow(_ option: ModelProvider, symbol: String) -> some View {
         let selected = provider == option
+        // Read the tick so this row redraws when the background check lands.
+        _ = ModelAvailabilityTick.shared.count
         let available = ModelHub.isAvailable(option)
         return Button {
             provider = option

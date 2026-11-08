@@ -110,6 +110,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         if AppSettings.shared.hasOnboarded { Copilot.shared.start() }
+        // Apple's models are checked in the background, never on the main thread.
+        ModelAvailability.warm()
         #if os(macOS)
         // The fast transcription model, fetched once in the background;
         // Apple's engine stands in until it is here.
