@@ -139,14 +139,15 @@ struct ChatView: View {
                                 .font(.caption.weight(.medium))
                                 .foregroundStyle(Ink.muted)
                                 .frame(maxWidth: .infinity)
-                                .padding(.top, 18)
+                                // The first day sits right under the bar.
+                                .padding(.top, row.isFirst ? 4 : 18)
                                 .padding(.bottom, 8)
                         }
                         TurnRow(turn: turn, joinsAbove: row.joinsAbove, joinsBelow: row.joinsBelow,
                                 isEditing: editing?.id == turn.id) { startEditing(turn) }
                             .id(turn.id)
                             // Grouped messages sit close; a new speaker gets air.
-                            .padding(.top, row.isFirst ? 24 : (row.joinsAbove ? 10 : 28))
+                            .padding(.top, row.isFirst ? (row.label == nil ? 8 : 4) : (row.joinsAbove ? 10 : 28))
                             .transition(.asymmetric(insertion: .offset(y: 12).combined(with: .opacity), removal: .opacity))
                     }
                     // After a finished answer, a nudge to keep going.

@@ -303,12 +303,12 @@ private struct ConversationLine: View {
 }
 
 /// Brings the sidebar back when it is tucked away.
+/// Room in a top bar for the sidebar and search buttons that stay beside
+/// the window buttons while the sidebar is hidden (drawn by the window).
 struct SidebarToggle: View {
+    static let width: CGFloat = 150
     var body: some View {
-        Button { Navigator.shared.zen = false } label: { Image(systemName: "sidebar.left") }
-            .buttonStyle(HoverIconStyle(size: 28))
-            .padding(.leading, 84)
-            .tip("Show the sidebar", edge: .bottom)
+        Color.clear.frame(width: Self.width, height: 1)
     }
 }
 

@@ -17,9 +17,11 @@ struct Sidebar: View {
             // The close, minimise and zoom buttons sit on the left of this row.
             HStack(spacing: 2) {
                 Spacer().frame(width: 84)
-                Button { navigator.zen = true } label: { Image(systemName: "sidebar.left") }
-                    .buttonStyle(HoverIconStyle(size: 28))
-                    .tip("Hide the sidebar", edge: .bottom)
+                Button { withAnimation(.easeInOut(duration: 0.3)) { navigator.zen = true } } label: {
+                    Image(systemName: "sidebar.left")
+                }
+                .buttonStyle(HoverIconStyle(size: 28))
+                .tip("Hide the sidebar (⌃⌘S)", edge: .bottom)
                 Button { searching = true } label: { Image(systemName: "magnifyingglass") }
                     .buttonStyle(HoverIconStyle(size: 28))
                     .keyboardShortcut("k", modifiers: .command)
@@ -215,6 +217,32 @@ struct ConversationSearch: View {
         Navigator.shared.section = .chat
         withAnimation(Motion.settle) { agent.open(item.id) }
         done()
+    }
+}
+
+/// With the sidebar hidden, what stays of it beside the window buttons, the
+/// way notebook apps do: bring the sidebar back, and search.
+struct CollapsedChrome: View {
+    @State private var searching = false
+
+    var body: some View {
+        HStack(spacing: 2) {
+            Button { withAnimation(.easeInOut(duration: 0.3)) { Navigator.shared.zen = false } } label: {
+                Image(systemName: "sidebar.left")
+            }
+            .buttonStyle(HoverIconStyle(size: 28))
+            .tip("Show the sidebar (⌃⌘S)", edge: .bottom)
+            Button { searching = true } label: { Image(systemName: "magnifyingglass") }
+                .buttonStyle(HoverIconStyle(size: 28))
+                .keyboardShortcut("k", modifiers: .command)
+                .tip("Search conversations (⌘K)", edge: .bottom)
+                .popover(isPresented: $searching, arrowEdge: .bottom) {
+                    ConversationSearch { searching = false }
+                }
+        }
+        .font(.system(size: 14))
+        .padding(.leading, 84)
+        .frame(height: WindowBar.height)
     }
 }
 #endif

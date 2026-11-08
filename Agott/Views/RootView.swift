@@ -94,14 +94,24 @@ struct RootView: View {
             .id(section)
             }
         }
+        // Sidebar hidden: its two buttons stay beside the window buttons on
+        // every screen, so there is always a way back.
+        .overlay(alignment: .topLeading) {
+            if navigator.zen && navigator.settingsPage == nil {
+                CollapsedChrome().transition(.opacity)
+            }
+        }
         .animation(.easeInOut(duration: 0.3), value: navigator.zen)
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { windowWidth = $0 }
         // Empty space moves the window; double-click zooms it. No page colour
         // behind everything: the sidebar shows the desktop through its material.
         .background { WindowChromeArea() }
         .background {
-            // Esc brings the sidebar back.
+            // Esc brings the sidebar back; ⌃⌘S shows or hides it, as in Finder.
             Button("") { navigator.zen = false }.keyboardShortcut(.cancelAction).hidden()
+            Button("") { withAnimation(.easeInOut(duration: 0.3)) { navigator.zen.toggle() } }
+                .keyboardShortcut("s", modifiers: [.control, .command])
+                .hidden()
         }
         .ignoresSafeArea(.container, edges: .top)
         .tint(Ink.spot)

@@ -2614,11 +2614,22 @@
       }
     },
     "Hide the sidebar" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ocultar a barra lateral"
+          }
+        }
+      }
+    },
+    "Hide the sidebar (⌃⌘S)" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ocultar a barra lateral (⌃⌘S)"
           }
         }
       }
@@ -5793,11 +5804,22 @@
       }
     },
     "Show the sidebar" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mostrar a barra lateral"
+          }
+        }
+      }
+    },
+    "Show the sidebar (⌃⌘S)" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar a barra lateral (⌃⌘S)"
           }
         }
       }
