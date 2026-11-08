@@ -1303,3 +1303,13 @@ struct CollectionTests {
         #expect(!first.repeats(other))
     }
 }
+
+@Suite("Artwork")
+struct ArtworkTests {
+    @Test func artistMustMatch() {
+        #expect(ArtworkLookup.artistMatches("Matuê, Teto", "Matuê"))
+        #expect(ArtworkLookup.artistMatches("Arctic Monkeys", "Arctic Monkeys"))
+        #expect(!ArtworkLookup.artistMatches("Ultramen", "Matuê"))
+        #expect(ArtworkLookup.artistMatches("Anyone", nil))
+    }
+}

@@ -44,26 +44,29 @@ private struct MediaPeekCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Artwork(url: image, kind: media.kind, size: 160)
+            Artwork(url: image, kind: media.kind, size: 208)
             VStack(alignment: .leading, spacing: 2) {
                 Text(media.title).font(.headline).foregroundStyle(Ink.text)
                 if let by = media.by { Text(by).font(.callout).foregroundStyle(Ink.muted) }
             }
-            HStack(spacing: 8) {
-                #if os(macOS)
-                if media.isMusic, SpotifyPlayer.isInstalled {
-                    Button { Task { await media.play(link: nil) } } label: { Label("Play", systemImage: "play.fill") }
-                        .buttonStyle(.candy(.primary, compact: true))
+            #if os(macOS)
+            if media.isMusic, SpotifyPlayer.isInstalled {
+                Button { Task { await media.play(link: nil) } } label: {
+                    Label("Play", systemImage: "play.fill").frame(maxWidth: .infinity)
                 }
-                #endif
+                .buttonStyle(.candy(.primary, compact: true))
+            }
+            #endif
+            HStack(spacing: 6) {
                 ForEach(destinations, id: \.title) { destination in
                     Button(destination.title) { openURL(destination.url) }
                         .buttonStyle(.candy(.soft, compact: true))
+                        .fixedSize()
                 }
             }
         }
         .padding(16)
-        .frame(width: 220, alignment: .leading)
+        .frame(width: 240, alignment: .leading)
     }
 
     private var destinations: [(title: String, url: URL)] { media.destinations }

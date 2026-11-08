@@ -123,7 +123,17 @@ nonisolated enum ArtworkLookup {
     }
 
     static func image(kind: String, title: String, subtitle: String?) async -> URL? {
-        switch kind {
+        // Music: Spotify's own catalogue first when signed in; it knows
+        // exactly which "Máquina do Tempo" is Matuê's.
+        if ["song", "album", "artist"].contains(kind), await SpotifyAccount.shared.isConnected {
+            let type = kind == "song" ? "track" : kind
+            let query = ([title, kind == "artist" ? nil : subtitle] as [String?]).compactMap { $0 }.joined(separator: " ")
+            if let found = try? await SpotifyAccount.shared.search(query, type: type), let image = found.image,
+               kind == "artist" || subtitle == nil || artistMatches(found.subtitle, subtitle) {
+                return image
+            }
+        }
+        return switch kind {
         case "song": await itunes(term: title, artist: subtitle, media: "music", entity: "song")
         case "album": await itunes(term: title, artist: subtitle, media: "music", entity: "album")
         case "artist": await itunes(term: title, artist: nil, media: "music", entity: "album")
@@ -140,13 +150,26 @@ nonisolated enum ArtworkLookup {
         components.queryItems = [
             .init(name: "term", value: [term, artist].compactMap { $0 }.joined(separator: " ")),
             .init(name: "media", value: media), .init(name: "entity", value: entity),
-            .init(name: "limit", value: "1"), .init(name: "country", value: "BR"),
+            .init(name: "limit", value: "10"), .init(name: "country", value: "BR"),
         ]
         guard let url = components.url, let json = await fetch(url),
-              let first = (json["results"] as? [[String: Any]])?.first else { return nil }
+              let results = json["results"] as? [[String: Any]] else { return nil }
+        // The first hit for a common title is often someone else's song: take
+        // the first whose artist is the one named, and no picture over a wrong one.
+        guard let first = results.first(where: { artist == nil || artistMatches($0["artistName"] as? String ?? "", artist) })
+        else { return nil }
         let art = (first["artworkUrl512"] ?? first["artworkUrl600"] ?? first["artworkUrl100"]) as? String
         // The catalogue serves any size; ask for one that stays sharp.
         return art.map { $0.replacingOccurrences(of: "100x100bb", with: "600x600bb") }.flatMap(URL.init(string:))
+    }
+
+    /// "Matuê" matches "Matuê, Teto"; "MC Kevin" does not match "Ultramen".
+    static func artistMatches(_ found: String, _ wanted: String?) -> Bool {
+        guard let wanted, !wanted.isEmpty else { return true }
+        let have = found.folded
+        return wanted.split(whereSeparator: { ",&".contains($0) }).map { String($0).trimmingCharacters(in: .whitespaces).folded }
+            .filter { !$0.isEmpty }
+            .contains { have.contains($0) || $0.contains(have) && !have.isEmpty }
     }
 
     private static func imdb(_ title: String) async -> URL? {
