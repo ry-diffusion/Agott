@@ -32,8 +32,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
     var tint: Color {
         switch self {
         case .home: Ink.text
-        case .chat: Ink.pink
-        case .people: Color(.sRGB, red: 1.0, green: 0.38, blue: 0.48)
+        case .chat, .people: Ink.spot
         case .memory: Ink.violet
         case .graph, .library: Ink.sky
         case .you: Ink.mint

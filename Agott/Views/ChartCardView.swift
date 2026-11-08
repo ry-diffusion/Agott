@@ -8,8 +8,8 @@ struct ChartCardView: View {
     /// Concrete colours: Charts draws with resolved colours, and dynamic ones
     /// came out empty before.
     static let palette: [Color] = [
-        Color(.sRGB, red: 1.00, green: 0.36, blue: 0.66),   // pink
-        Color(.sRGB, red: 0.68, green: 0.52, blue: 1.00),   // lilac
+        Color(.sRGB, red: 0.69, green: 0.32, blue: 0.87),   // purple, the accent
+        Color(.sRGB, red: 0.40, green: 0.45, blue: 0.95),   // indigo
         Color(.sRGB, red: 0.33, green: 0.72, blue: 1.00),   // sky
         Color(.sRGB, red: 0.30, green: 0.82, blue: 0.62),   // mint
         Color(.sRGB, red: 1.00, green: 0.66, blue: 0.30),   // orange

@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Tags for people and groups (`<e id=12/>`) as the chat shows them: the
-/// name in Agott's pink, a link to the person, or "Person 12" while names
+/// name in Agott's purple, a link to the person, or "Person 12" while names
 /// are hidden.
 enum EntityText {
     /// Tags as Markdown links, ready for the inline Markdown parser. A tag
@@ -28,7 +28,7 @@ enum EntityText {
         }
     }
 
-    /// People links drawn as names: pink and bold, no underline.
+    /// People links drawn as names: purple and bold, no underline.
     static func style(_ text: inout AttributedString) {
         for run in text.runs where run.link?.scheme == "agott" {
             text[run.range].foregroundColor = Ink.spot

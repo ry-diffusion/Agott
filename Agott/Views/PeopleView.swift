@@ -626,7 +626,7 @@ private struct PersonDetail: View {
                 // Empty stretches keep a faint stub so the timeline reads as one.
                 BarMark(x: .value("Period", String(index)), y: .value("Messages", max(Double(count), Double(peak) * 0.03)),
                         width: .ratio(0.62))
-                    // Grey bars; the rose marks the period you are in now.
+                    // Grey bars; the purple marks the period you are in now.
                     .foregroundStyle(index == counts.count - 1 ? spot : (scheme == .dark ? Self.chartInkDark : Self.chartInkLight).opacity(0.32))
                     .opacity(count == 0 ? 0.5 : 1)
                     .cornerRadius(3)
