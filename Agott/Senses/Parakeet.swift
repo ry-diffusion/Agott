@@ -43,8 +43,12 @@ actor Parakeet {
     private static let idle: Duration = .seconds(2 * 60 * 60)
 
     private let log = Logger(subsystem: "br.com.zesmoi.Agott", category: "parakeet")
+    /// Dictation's own decoder, so a press never waits behind voice notes.
     private var manager: AsrManager?
-    private var loading: Task<AsrManager, Error>?
+    /// A second decoder over the same weights, for voice notes in the background.
+    private var backgroundManager: AsrManager?
+    private var models: AsrModels?
+    private var loading: Task<(AsrManager, AsrModels), Error>?
     private var isWarm = false
     private var busy = 0
     private var sweep: Task<Void, Never>?
@@ -70,39 +74,55 @@ actor Parakeet {
 
     private func load() async throws -> AsrManager {
         if let manager { return manager }
-        if let loading { return try await loading.value }
+        if let loading { return try await loading.value.0 }
         await MainActor.run { ParakeetSetup.shared.isLoading = true }
-        let task = Task { () throws -> AsrManager in
+        let task = Task { () throws -> (AsrManager, AsrModels) in
             let models = Self.isInstalled
                 ? try await AsrModels.load(from: Self.directory, version: Self.version)
                 : try await AsrModels.downloadAndLoad(version: Self.version)
             let manager = AsrManager(config: .default)
             try await manager.loadModels(models)
-            return manager
+            return (manager, models)
         }
         loading = task
         defer { loading = nil }
         let manager: AsrManager
         do {
-            manager = try await task.value
+            (manager, models) = try await task.value
         } catch {
-            await MainActor.run { ParakeetSetup.shared.isLoading = false }
+            await MainActor.run {
+                ParakeetSetup.shared.isLoading = false
+                ParakeetSetup.shared.failedToLoad = true
+            }
+            log.error("Parakeet could not load: \(error.localizedDescription, privacy: .public)")
             throw error
         }
         self.manager = manager
         await MainActor.run {
             ParakeetSetup.shared.isLoading = false
             ParakeetSetup.shared.isLoaded = true
+            ParakeetSetup.shared.failedToLoad = false
         }
         log.info("Parakeet loaded")
         scheduleUnload()
         return manager
     }
 
-    /// Text for 16 kHz mono samples.
-    func transcribe(_ samples: [Float], language: Language?) async throws -> String {
+    private func loadBackground() async throws -> AsrManager {
+        _ = try await load()
+        if let backgroundManager { return backgroundManager }
+        guard let models else { return try await load() }
+        let second = AsrManager(config: .default)
+        try await second.loadModels(models)
+        backgroundManager = second
+        return second
+    }
+
+    /// Text for 16 kHz mono samples. `background` work (voice notes) runs on
+    /// its own decoder, so it never holds up dictation.
+    func transcribe(_ samples: [Float], language: Language?, background: Bool = false) async throws -> String {
         guard !samples.isEmpty else { return "" }
-        let manager = try await load()
+        let manager = background ? try await loadBackground() : try await load()
         busy += 1
         defer {
             busy -= 1
@@ -118,10 +138,11 @@ actor Parakeet {
         return result.text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// Text for an audio file (a WhatsApp voice note, Ogg Opus included).
-    func transcribe(file url: URL, language: Language?) async throws -> String {
-        let samples = try AudioConverter().resampleAudioFile(url)
-        return try await transcribe(samples, language: language)
+    /// Text for an audio file (a WhatsApp voice note, Ogg Opus included),
+    /// decoded off this actor and read on the background decoder.
+    nonisolated func transcribe(file url: URL, language: Language?) async throws -> String {
+        let samples = try await Task.detached(priority: .utility) { try AudioConverter().resampleAudioFile(url) }.value
+        return try await transcribe(samples, language: language, background: true)
     }
 
     private func scheduleUnload() {
@@ -136,9 +157,13 @@ actor Parakeet {
     private func unloadIfIdle() async {
         guard busy == 0, let manager else { return }
         self.manager = nil
+        let second = backgroundManager
+        backgroundManager = nil
+        models = nil
         isWarm = false
         await MainActor.run { ParakeetSetup.shared.isLoaded = false }
         await manager.cleanup()
+        await second?.cleanup()
         log.info("Parakeet released after being idle")
     }
 }
@@ -162,6 +187,21 @@ final class ParakeetSetup {
     fileprivate(set) var isLoading = false
     /// The weights are in memory: a press is answered at once.
     fileprivate(set) var isLoaded = false
+    /// Loading failed (no disk space, a broken download): Apple's engine
+    /// stands in instead of the mic waiting forever.
+    fileprivate(set) var failedToLoad = false
+
+    /// The mic should wait: Parakeet is the engine, it is here, and it is not
+    /// in memory yet.
+    var micMustWait: Bool {
+        AppSettings.shared.speechEngine == SpeechEngine.parakeet.rawValue && state == .ready && !isLoaded && !failedToLoad
+    }
+
+    /// Starts loading if nothing has yet (after an idle unload, say).
+    func loadIfNeeded() {
+        guard micMustWait, !isLoading else { return }
+        Task.detached(priority: .userInitiated) { try? await Parakeet.shared.prepare() }
+    }
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var attempts = 0
 

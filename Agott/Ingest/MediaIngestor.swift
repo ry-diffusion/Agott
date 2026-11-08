@@ -92,6 +92,10 @@ enum MediaIngestor {
         var added = 0
         for item in items {
             guard !Task.isCancelled else { break }
+            // Dictation comes first: wait while you are talking (a minute at most).
+            for _ in 0..<120 where await MainActor.run(body: { Dictation.shared.isRunning }) {
+                try? await Task.sleep(for: .milliseconds(500))
+            }
             if FileManager.default.fileExists(atPath: item.file.path), let text = await words(for: item) {
                 var message = item.message
                 message.text = text
