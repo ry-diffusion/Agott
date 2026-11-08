@@ -144,7 +144,8 @@ nonisolated struct OpenCodeExecutor: LanguageModelExecutor {
                   let delta = choice["delta"] as? [String: Any]
             else { continue }
 
-            if let reasoning = delta["reasoning_content"] as? String, !reasoning.isEmpty {
+            // DeepSeek says "reasoning_content"; OpenRouter-style gateways say "reasoning".
+            if let reasoning = (delta["reasoning_content"] as? String) ?? (delta["reasoning"] as? String), !reasoning.isEmpty {
                 await channel.send(.reasoning(entryID: reasoningID, action: .appendText(reasoning, tokenCount: 1)))
             }
             if let content = delta["content"] as? String, !content.isEmpty {

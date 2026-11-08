@@ -8107,6 +8107,36 @@
           }
         }
       }
+    },
+    "Reading what it found" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lendo o que encontrou"
+          }
+        }
+      }
+    },
+    "Thinking about your question" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pensando na sua pergunta"
+          }
+        }
+      }
+    },
+    "Writing the answer" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escrevendo a resposta"
+          }
+        }
+      }
     }
   },
   "version" : "1.1"

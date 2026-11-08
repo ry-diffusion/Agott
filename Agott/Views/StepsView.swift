@@ -74,7 +74,8 @@ struct StepsView: View {
     /// While working: what it is doing now. Afterwards: what it did.
     private var headerText: String {
         if isStreaming {
-            return status ?? running?.title ?? String(localized: "Thinking…")
+            // Names, never tags, while it works.
+            return EntityText.readable(status ?? running?.title ?? String(localized: "Thinking…"))
         }
         let thought = steps.filter { $0.kind == .thinking }.compactMap(\.seconds).reduce(0, +)
         let remembered = steps.compactMap(\.items).map(\.count).reduce(0, +)

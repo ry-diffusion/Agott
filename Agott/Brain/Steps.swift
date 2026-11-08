@@ -125,14 +125,21 @@ enum StepTracker {
             }
             if waiting {
                 let id = "thinking-after-\(last.id)"
+                // Say what it is chewing on: what a tool just brought back,
+                // or the question itself.
+                let title: String = switch last {
+                case .toolOutput: String(localized: "Reading what it found")
+                case .prompt: String(localized: "Thinking about your question")
+                default: String(localized: "Writing the answer")
+                }
                 steps.append(Step(
-                    id: id, kind: .thinking, title: String(localized: "Thinking"), symbol: "brain",
+                    id: id, kind: .thinking, title: title, symbol: "brain",
                     state: .running, detail: nil, started: clock.start(id), ended: nil))
             }
         } else if busy && entries.isEmpty {
             let id = "thinking-start"
             steps.append(Step(
-                id: id, kind: .thinking, title: String(localized: "Thinking"), symbol: "brain",
+                id: id, kind: .thinking, title: String(localized: "Thinking about your question"), symbol: "brain",
                 state: .running, detail: nil, started: clock.start(id), ended: nil))
         }
         return steps
