@@ -115,6 +115,7 @@ enum Persona {
         <media kind="song" title="Do I Wanna Know?" by="Arctic Monkeys"/> (kind: song, album, artist, movie, show, \
         book, podcast; by: the artist, author or director), only in the final answer and only the first time; \
         the app shows it with its cover. Use the real title.
+        - To play, pause or skip music, call spotify_play (it plays in the Spotify app on this Mac).
         - Write replies in Markdown when structure helps (short headings, lists, tables, code), plain sentences \
         when it does not.
         - Show a card only when it is the answer they asked for, never as a side effect of looking something up. \
@@ -140,7 +141,7 @@ enum Persona {
             ShowListTool(), SpotifyTopTool(),
         ]
         #if os(macOS)
-        tools += [MusicMoodTool(), PressTool(), ClickTool(), TypeTextTool(), PressKeysTool(), ScrollTool(), OpenTool(),
+        tools += [MusicMoodTool(), SpotifyPlayTool(), PressTool(), ClickTool(), TypeTextTool(), PressKeysTool(), ScrollTool(), OpenTool(),
                   AppleScriptTool(), ScriptableAppsTool(), ReadMailTool(), DraftEmailTool()]
         #endif
         return tools

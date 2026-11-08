@@ -50,6 +50,12 @@ private struct MediaPeekCard: View {
                 if let by = media.by { Text(by).font(.callout).foregroundStyle(Ink.muted) }
             }
             HStack(spacing: 8) {
+                #if os(macOS)
+                if media.isMusic, SpotifyPlayer.isInstalled {
+                    Button { Task { await media.play(link: nil) } } label: { Label("Play", systemImage: "play.fill") }
+                        .buttonStyle(.candy(.primary, compact: true))
+                }
+                #endif
                 ForEach(destinations, id: \.title) { destination in
                     Button(destination.title) { openURL(destination.url) }
                         .buttonStyle(.candy(.soft, compact: true))
@@ -64,6 +70,22 @@ private struct MediaPeekCard: View {
 }
 
 extension MediaTag {
+    var isMusic: Bool { ["song", "album", "artist", "podcast"].contains(kind) }
+
+    #if os(macOS)
+    /// Plays it in the Spotify app: its own Spotify link when there is one,
+    /// else the best match for its title and artist.
+    @MainActor
+    func play(link: URL?) async {
+        if let link, let uri = SpotifyAccount.uri(from: link) {
+            try? await SpotifyPlayer.play(uri: uri)
+            return
+        }
+        let type = kind == "song" ? "track" : kind
+        _ = try? await SpotifyPlayer.play([title, by].compactMap { $0 }.joined(separator: " "), kind: type)
+    }
+    #endif
+
     /// Where to open it: Spotify and Apple Music for music, IMDb for films
     /// and series, a web search for the rest.
     var destinations: [(title: String, url: URL)] {

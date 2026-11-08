@@ -8304,6 +8304,46 @@
           }
         }
       }
+    },
+    "Playing on Spotify" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tocando no Spotify"
+          }
+        }
+      }
+    },
+    "Play" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tocar"
+          }
+        }
+      }
+    },
+    "The Spotify app is not on this Mac." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O app do Spotify não está neste Mac."
+          }
+        }
+      }
+    },
+    "the search for %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "a busca por %@"
+          }
+        }
+      }
     }
   },
   "version" : "1.1"

@@ -133,6 +133,35 @@ final class SpotifyAccount {
         }
     }
 
+    /// The best match on Spotify for something to play.
+    struct Found: Sendable {
+        var uri: String
+        var title: String
+        var subtitle: String
+        var image: URL?
+    }
+
+    /// Searches Spotify's catalogue: type is track, album, artist or playlist.
+    func search(_ query: String, type: String) async throws -> Found? {
+        let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
+        guard let json = try await get("https://api.spotify.com/v1/search?q=\(encoded)&type=\(type)&limit=1"),
+              let item = ((json[type + "s"] as? [String: Any])?["items"] as? [[String: Any]])?.compactMap({ $0 }).first,
+              let uri = item["uri"] as? String else { return nil }
+        let artists = (item["artists"] as? [[String: Any]] ?? []).compactMap { $0["name"] as? String }.joined(separator: ", ")
+        let owner = (item["owner"] as? [String: Any])?["display_name"] as? String
+        let images = (item["images"] as? [[String: Any]]) ?? ((item["album"] as? [String: Any])?["images"] as? [[String: Any]])
+        return Found(uri: uri, title: item["name"] as? String ?? query, subtitle: artists.isEmpty ? (owner ?? "") : artists,
+                     image: (images?.first?["url"] as? String).flatMap(URL.init(string:)))
+    }
+
+    /// "spotify:track:…" for an open.spotify.com link.
+    nonisolated static func uri(from link: URL) -> String? {
+        guard link.host()?.contains("spotify.com") == true else { return nil }
+        let parts = link.pathComponents.filter { $0 != "/" && !$0.hasPrefix("intl-") }
+        guard parts.count >= 2 else { return nil }
+        return "spotify:\(parts[parts.count - 2]):\(parts[parts.count - 1])"
+    }
+
     nonisolated static func track(_ item: [String: Any], at date: Date) -> (Play, URL?) {
         let artists = (item["artists"] as? [[String: Any]] ?? []).compactMap { $0["name"] as? String }
         let album = item["album"] as? [String: Any] ?? [:]

@@ -5,6 +5,7 @@ import SwiftUI
 struct CollectionCardView: View {
     var card: Card.Collection
     @Environment(\.openURL) private var openURL
+    @State private var hovered: Int?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -37,6 +38,12 @@ struct CollectionCardView: View {
                             .foregroundStyle(index < 3 ? Ink.text : Ink.muted)
                             .frame(width: 26, alignment: .trailing)
                         Artwork(url: item.image, kind: card.kind, size: 44)
+                            .overlay {
+                                if hovered == index && MediaTag(kind: card.kind, title: "", by: nil).isMusic {
+                                    RoundedRectangle(cornerRadius: 6, style: .continuous).fill(.black.opacity(0.35))
+                                    Image(systemName: "play.fill").font(.system(size: 14, weight: .bold)).foregroundStyle(.white)
+                                }
+                            }
                         VStack(alignment: .leading, spacing: 2) {
                             Text(item.title).font(.callout.weight(.semibold)).foregroundStyle(Ink.text).lineLimit(1)
                             if let subtitle = item.subtitle, !subtitle.isEmpty {
@@ -54,6 +61,7 @@ struct CollectionCardView: View {
                 }
                 .buttonStyle(.plain)
                 .hoverHighlight(cornerRadius: 10, inset: 0)
+                .onHover { inside in hovered = inside ? index : (hovered == index ? nil : hovered) }
             }
         }
     }
@@ -79,10 +87,17 @@ struct CollectionCardView: View {
         }
     }
 
-    /// The item's own link, or a search for it where it can be played or seen.
+    /// Music plays in Spotify on the Mac; everything else opens its link, or
+    /// a search for it where it can be seen.
     private func open(_ item: Card.Collection.Item) {
-        if let link = item.link { openURL(link); return }
         let media = MediaTag(kind: card.kind, title: item.title, by: item.subtitle)
+        #if os(macOS)
+        if media.isMusic, SpotifyPlayer.isInstalled {
+            Task { await media.play(link: item.link) }
+            return
+        }
+        #endif
+        if let link = item.link { openURL(link); return }
         if let place = media.destinations.first { openURL(place.url) }
     }
 }
