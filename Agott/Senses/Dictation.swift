@@ -41,6 +41,12 @@ final class Dictation {
     @ObservationIgnored private var feed: AsyncStream<AnalyzerInput>.Continuation?
     @ObservationIgnored private var results: Task<Void, Never>?
     @ObservationIgnored private var starting: Task<Void, Error>?
+    #if os(macOS)
+    /// This run listens with Parakeet: audio is kept and read on release.
+    @ObservationIgnored private var parakeetRun = false
+    @ObservationIgnored private var capture: SpeechCapture?
+    @ObservationIgnored private var preview: Task<Void, Never>?
+    #endif
 
     private init() {}
 
@@ -61,8 +67,97 @@ final class Dictation {
         finalized = ""
         volatile = ""
         problem = nil
+        #if os(macOS)
+        // Parakeet when chosen and on this Mac; Apple's engine otherwise, so
+        // a missing model never means a silent download mid-press.
+        parakeetRun = AppSettings.shared.speechEngine == SpeechEngine.parakeet.rawValue && Parakeet.isInstalled
+        if parakeetRun {
+            starting = Task { try await beginParakeet() }
+            return
+        }
+        #endif
         starting = Task { try await begin() }
     }
+
+    #if os(macOS)
+    /// Records at 16 kHz while the key is held; Parakeet loads meanwhile and
+    /// reads the last seconds now and then so the pill shows words as you go.
+    private func beginParakeet() async throws {
+        do {
+            guard await AVAudioApplication.requestRecordPermission() else { throw Failure.microphoneDenied }
+            let language = Parakeet.language(for: AppSettings.shared.speechLocale)
+            Task.detached(priority: .userInitiated) { try? await Parakeet.shared.prepare() }
+            let capture = SpeechCapture()
+            let engine = AVAudioEngine()
+            try Self.tap(engine.inputNode, capture: capture) { level in
+                Task { @MainActor in Dictation.shared.level = level }
+            }
+            engine.prepare()
+            try engine.start()
+            self.engine = engine
+            self.capture = capture
+            preview = Task { [weak self] in
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .milliseconds(600))
+                    let samples = capture.recent(seconds: 12)
+                    guard samples.count >= Parakeet.minimumSamples / 2, await Parakeet.shared.isLoaded else { continue }
+                    let text = try? await Parakeet.shared.transcribe(samples, language: language)
+                    guard !Task.isCancelled, let text, let self else { continue }
+                    self.volatile = text
+                }
+            }
+        } catch {
+            problem = error.localizedDescription
+            if !Task.isCancelled { tearDown() }
+            throw error
+        }
+    }
+
+    nonisolated private static func tap(
+        _ input: AVAudioInputNode,
+        capture: SpeechCapture,
+        level: @escaping @Sendable (Float) -> Void
+    ) throws {
+        let format = input.outputFormat(forBus: 0)
+        try input.installTap(onBus: 0, bufferSize: 2048, format: format) { buffer, _ in
+            if let samples = buffer.floatChannelData?[0] {
+                var sum: Float = 0
+                let count = Int(buffer.frameLength)
+                for index in 0..<count { sum += samples[index] * samples[index] }
+                level(min(1, sqrt(sum / Float(max(count, 1))) * 8))
+            }
+            capture.append(buffer)
+        }
+    }
+
+    /// The release pass: the whole utterance, read at once.
+    private func stopParakeet() async -> String {
+        let starting = starting
+        if await !Self.within(.seconds(3), { _ = try? await starting?.value }) { starting?.cancel() }
+        engine?.inputNode.removeTap(onBus: 0)
+        engine?.stop()
+        engine = nil
+        preview?.cancel()
+        preview = nil
+        let samples = capture?.all ?? []
+        let language = Parakeet.language(for: AppSettings.shared.speechLocale)
+        // Under a third of a second is a stray tap, not speech.
+        if samples.count > 5_000 {
+            do {
+                let text = try await Parakeet.shared.transcribe(samples, language: language)
+                finalized = text
+                volatile = ""
+            } catch {
+                problem = error.localizedDescription
+                // The last preview is better than nothing.
+                finalized = volatile
+                volatile = ""
+            }
+        }
+        tearDown()
+        return transcript
+    }
+    #endif
 
     private func begin() async throws {
         do {
@@ -150,6 +245,9 @@ final class Dictation {
     @discardableResult
     func stop() async -> String {
         guard isRunning else { return transcript }
+        #if os(macOS)
+        if parakeetRun { return await stopParakeet() }
+        #endif
         let starting = starting
         if await !Self.within(.seconds(3), { _ = try? await starting?.value }) { starting?.cancel() }
         engine?.inputNode.removeTap(onBus: 0)
@@ -182,6 +280,12 @@ final class Dictation {
         results = nil
         analyzer = nil
         starting = nil
+        #if os(macOS)
+        preview?.cancel()
+        preview = nil
+        capture = nil
+        parakeetRun = false
+        #endif
         isRunning = false
         level = 0
         #if os(iOS)

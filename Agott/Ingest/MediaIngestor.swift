@@ -27,19 +27,25 @@ enum MediaIngestor {
     /// minutes of voice notes at most.
     static let batchesPerRun = 3
 
-    /// How far it has read, in WhatsApp's own clock.
-    private static let cursorKey = "media.whatsapp.after"
+    /// How far it has read, in WhatsApp's own clock: photos and voice notes
+    /// apart, so voice notes can be read again with a better engine without
+    /// describing every photo twice.
+    private static func cursorKey(_ kind: Kind) -> String {
+        kind == .voice ? voiceCursorKey : "media.whatsapp.after"
+    }
+    /// Voice notes read with Parakeet; the Apple-engine transcripts were
+    /// thrown away when this key changed.
+    static let voiceCursorKey = "media.whatsapp.voice.parakeet.after"
     static let root = URL.homeDirectory
         .appending(path: "Library/Group Containers/group.net.whatsapp.WhatsApp.shared/Message", directoryHint: .isDirectory)
 
-    /// Voice notes and photos after the cursor that are on disk, oldest first.
-    static func pending(limit: Int, contacts: ContactBook) throws -> [Item] {
+    /// Voice notes or photos after their cursor that are on disk, oldest first.
+    static func pending(_ kind: Kind, limit: Int, contacts: ContactBook) throws -> [Item] {
         let settings = AppSettings.shared
-        var types: [Int] = []
-        if settings.transcribeVoiceNotes { types.append(Kind.voice.rawValue) }
-        if settings.describePhotos { types.append(Kind.photo.rawValue) }
-        guard !types.isEmpty, let db = try? SQLiteDB(path: WhatsAppSource.path, readOnly: true) else { return [] }
-        let after = UserDefaults.standard.double(forKey: cursorKey)
+        let wanted = kind == .voice ? settings.transcribeVoiceNotes : settings.describePhotos
+        guard wanted, let db = try? SQLiteDB(path: WhatsAppSource.path, readOnly: true) else { return [] }
+        let types = [kind.rawValue]
+        let after = UserDefaults.standard.double(forKey: cursorKey(kind))
         var items: [Item] = []
         try db.rows(
             """
@@ -67,24 +73,36 @@ enum MediaIngestor {
     /// Reads one batch into memory. Returns how many of each were added, or
     /// nil when there was nothing to read.
     static func run(contacts: ContactBook, limit: Int = 30) async -> (voice: Int, photos: Int)? {
-        guard let items = try? pending(limit: limit, contacts: contacts), !items.isEmpty else { return nil }
-        var messages: [RawMessage] = []
-        var last = UserDefaults.standard.double(forKey: cursorKey)
+        let voiceItems = (try? pending(.voice, limit: limit, contacts: contacts)) ?? []
+        let photoItems = (try? pending(.photo, limit: limit, contacts: contacts)) ?? []
+        guard !voiceItems.isEmpty || !photoItems.isEmpty else { return nil }
         var voice = 0, photos = 0
+        for (kind, items) in [(Kind.voice, voiceItems), (Kind.photo, photoItems)] where !items.isEmpty {
+            let added = await read(items, kind: kind)
+            if kind == .voice { voice += added } else { photos += added }
+        }
+        return (voice, photos)
+    }
+
+    /// Reads items of one kind into memory and moves that kind's cursor.
+    private static func read(_ items: [Item], kind: Kind) async -> Int {
+        var messages: [RawMessage] = []
+        var last = UserDefaults.standard.double(forKey: cursorKey(kind))
+        var added = 0
         for item in items {
             guard !Task.isCancelled else { break }
             if FileManager.default.fileExists(atPath: item.file.path), let text = await words(for: item) {
                 var message = item.message
                 message.text = text
                 messages.append(message)
-                if item.kind == .voice { voice += 1 } else { photos += 1 }
+                added += 1
             }
             // Read or unreadable, it is not tried again.
             last = item.message.date.timeIntervalSince1970 - appleEpochOffset
         }
         if !messages.isEmpty { _ = try? await MemoryStore.shared.ingest(messages) }
-        UserDefaults.standard.set(last, forKey: cursorKey)
-        return (voice, photos)
+        UserDefaults.standard.set(last, forKey: cursorKey(kind))
+        return added
     }
 
     /// The words a voice note or a photo stands for.
@@ -104,10 +122,16 @@ enum MediaIngestor {
         }
     }
 
-    /// A whole audio file to text, on the Mac. Gives up after a minute.
+    /// A whole audio file to text, on the Mac: Parakeet when chosen and
+    /// installed, Apple's engine otherwise. Gives up after a minute.
     static func transcribe(_ url: URL) async -> String? {
-        await withTaskGroup(of: String?.self) { group in
-            group.addTask { try? await transcription(of: url) }
+        let parakeet = AppSettings.shared.speechEngine == SpeechEngine.parakeet.rawValue && Parakeet.isInstalled
+        let language = Parakeet.language(for: AppSettings.shared.speechLocale)
+        return await withTaskGroup(of: String?.self) { group in
+            group.addTask {
+                if parakeet { return try? await Parakeet.shared.transcribe(file: url, language: language) }
+                return try? await transcription(of: url)
+            }
             group.addTask {
                 try? await Task.sleep(for: .seconds(60))
                 return nil

@@ -1247,3 +1247,28 @@ struct RunFindingsTests {
         #expect(summary.components(separatedBy: " · ").count == 3)
     }
 }
+
+@Suite("Person tags")
+struct PersonTagTests {
+    @Test func acceptsTagsWithoutSlashOrWithQuotes() {
+        #expect(PeopleDirectory.tags(in: #"<e id=13>, <e id="85"/>, <e id=50/> e <e id=7 />"#) == [13, 85, 50, 7])
+    }
+}
+
+#if os(macOS)
+@Suite("Parakeet")
+struct ParakeetTests {
+    /// Reads one real voice note when the model and WhatsApp are on this Mac;
+    /// prints only sizes and time, never the words.
+    @Test func readsAVoiceNote() async throws {
+        guard Parakeet.isInstalled else { return }
+        let root = MediaIngestor.root
+        guard let enumerator = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil),
+              let file = enumerator.compactMap({ $0 as? URL }).first(where: { $0.pathExtension == "opus" }) else { return }
+        let clock = ContinuousClock.now
+        let text = try await Parakeet.shared.transcribe(file: file, language: Parakeet.language(for: "pt-BR"))
+        print("PARAKEET words=\(text.split(separator: " ").count) seconds=\(ContinuousClock.now - clock)")
+        #expect(!text.isEmpty)
+    }
+}
+#endif

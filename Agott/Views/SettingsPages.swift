@@ -205,6 +205,20 @@ struct SettingsPageView: View {
                     Picker("", selection: $settings.dictateKey) { ForEach(HoldKey.allCases) { Text($0.title).tag($0) } }
                         .labelsHidden().fixedSize()
                 }
+                SettingsRow(symbol: "waveform.badge.mic", title: "Speech engine",
+                            detail: Parakeet.isInstalled
+                                ? "Parakeet is much faster and better with Portuguese and English mixed. Used for dictation and voice notes."
+                                : "Parakeet is not on this Mac yet: Apple's engine is used until it is downloaded.") {
+                    HStack(spacing: 8) {
+                        if !Parakeet.isInstalled && settings.speechEngine == SpeechEngine.parakeet.rawValue {
+                            ParakeetDownloadButton()
+                        }
+                        Picker("", selection: $settings.speechEngine) {
+                            ForEach(SpeechEngine.allCases) { Text($0.title).tag($0.rawValue) }
+                        }
+                        .labelsHidden().fixedSize()
+                    }
+                }
                 SettingsRow(symbol: "globe", title: "Speech language", detail: "The language you speak to Agott in.") {
                     Picker("", selection: $settings.speechLocale) {
                         Text(verbatim: "Português (Brasil)").tag("pt-BR")
@@ -327,3 +341,27 @@ struct SettingsRow<Control: View>: View {
         .padding(.vertical, 12)
     }
 }
+
+#if os(macOS)
+/// Fetches Parakeet (about 600 MB, once) when it is not on this Mac.
+private struct ParakeetDownloadButton: View {
+    @State private var working = false
+    @State private var failed: String?
+
+    var body: some View {
+        Button {
+            working = true
+            failed = nil
+            Task {
+                do { try await Parakeet.shared.prepare() } catch { failed = error.localizedDescription }
+                working = false
+            }
+        } label: {
+            if working { ProgressView().controlSize(.small) } else { Text("Download (~600 MB)") }
+        }
+        .buttonStyle(.candy(.soft, compact: true))
+        .disabled(working)
+        .help(failed.map { Text($0) } ?? Text("Downloads Parakeet from Hugging Face, once."))
+    }
+}
+#endif

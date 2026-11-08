@@ -999,7 +999,14 @@
       }
     },
     "Apple" : {
-      "shouldTranslate" : false
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple"
+          }
+        }
+      }
     },
     "Apple Intelligence on your Mac. Fully offline, best for short tasks." : {
       "localizations" : {
@@ -8047,6 +8054,56 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "tô aqui. quer que eu te lembre amanhã às 9, ou prefere só descansar agora?"
+          }
+        }
+      }
+    },
+    "Speech engine" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Motor de fala"
+          }
+        }
+      }
+    },
+    "Parakeet is much faster and better with Portuguese and English mixed. Used for dictation and voice notes." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Parakeet é muito mais rápido e melhor com português e inglês misturados. Usado na ditação e nos áudios."
+          }
+        }
+      }
+    },
+    "Parakeet is not on this Mac yet: Apple's engine is used until it is downloaded." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Parakeet ainda não está neste Mac: o motor da Apple é usado até ele ser baixado."
+          }
+        }
+      }
+    },
+    "Download (~600 MB)" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Baixar (~600 MB)"
+          }
+        }
+      }
+    },
+    "Downloads Parakeet from Hugging Face, once." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Baixa o Parakeet do Hugging Face, uma vez só."
           }
         }
       }

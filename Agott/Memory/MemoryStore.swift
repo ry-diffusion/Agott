@@ -646,6 +646,30 @@ actor MemoryStore {
         return (count, result)
     }
 
+    /// Throws away every voice note read so far (photos stay), and rebuilds
+    /// the moments they were in, so they can be read again with a better
+    /// engine. Returns how many were removed.
+    func forgetVoiceNotes() throws -> Int {
+        let db = try open()
+        let match = "source = 'whatsapp' AND ext_id LIKE 'media-%' AND (text LIKE '[voice note]%' OR text LIKE '[áudio]%')"
+        var chats: [(String, Double, Double)] = []
+        try db.rows("SELECT chat_id, MIN(ts), MAX(ts) FROM messages WHERE \(match) GROUP BY chat_id") {
+            chats.append(($0.text(0) ?? "", $0.double(1), $0.double(2)))
+        }
+        guard !chats.isEmpty else { return 0 }
+        var removed = 0
+        try db.transaction {
+            try db.execute("DELETE FROM messages WHERE \(match)")
+            removed = db.changes
+            for (chatID, earliest, latest) in chats {
+                try rechunk(db: db, source: .whatsapp, chatID: chatID, from: earliest, through: latest)
+            }
+        }
+        try refreshChats(db: db, keys: chats.map { (MemorySource.whatsapp, $0.0) })
+        vectorCache = nil
+        return removed
+    }
+
     func counts() throws -> [MemorySource: Int] {
         var result: [MemorySource: Int] = [:]
         try open().rows("SELECT source, COUNT(*) FROM messages GROUP BY source") { row in
