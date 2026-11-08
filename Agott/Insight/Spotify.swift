@@ -106,6 +106,33 @@ final class SpotifyAccount {
         .sorted { $0.date < $1.date }
     }
 
+    /// One of your most played tracks or artists, with its picture.
+    struct TopItem: Sendable {
+        var title: String
+        var subtitle: String
+        var image: URL?
+        var link: URL?
+    }
+
+    /// Your top tracks or artists over the last four weeks (short_term), six
+    /// months (medium_term) or years (long_term).
+    func top(artists: Bool, range: String, limit: Int) async throws -> [TopItem] {
+        let path = artists ? "artists" : "tracks"
+        guard let json = try await get("https://api.spotify.com/v1/me/top/\(path)?time_range=\(range)&limit=\(max(1, min(limit, 50)))"),
+              let items = json["items"] as? [[String: Any]] else { return [] }
+        return items.map { item in
+            let link = (item["external_urls"] as? [String: Any])?["spotify"] as? String
+            if artists {
+                let genres = (item["genres"] as? [String] ?? []).prefix(2).joined(separator: ", ")
+                let image = (item["images"] as? [[String: Any]])?.first?["url"] as? String
+                return TopItem(title: item["name"] as? String ?? "", subtitle: genres,
+                               image: image.flatMap(URL.init(string:)), link: link.flatMap(URL.init(string:)))
+            }
+            let (play, image) = Self.track(item, at: .now)
+            return TopItem(title: play.track, subtitle: play.artist, image: image, link: link.flatMap(URL.init(string:)))
+        }
+    }
+
     nonisolated static func track(_ item: [String: Any], at date: Date) -> (Play, URL?) {
         let artists = (item["artists"] as? [[String: Any]] ?? []).compactMap { $0["name"] as? String }
         let album = item["album"] as? [String: Any] ?? [:]

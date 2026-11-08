@@ -194,6 +194,7 @@ struct CardView: View {
         case .consistency(let consistency): ConsistencyCard(card: consistency)
         case .artifact(let artifact): ArtifactCard(artifact: artifact)
         case .chart(let chart): ChartCardView(chart: chart)
+        case .collection(let collection): CollectionCardView(card: collection)
         }
     }
 }

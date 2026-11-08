@@ -235,6 +235,8 @@ enum StepTracker {
         case "suggest_replies": return (String(localized: "Drafting replies"), "bubble.left.and.text.bubble.right")
         case "show_checklist": return (String(localized: "Making a checklist"), "checklist")
         case "show_chart": return (String(localized: "Drawing a chart"), "chart.bar.xaxis")
+        case "show_list": return (String(localized: "Putting the list together"), "list.number")
+        case "spotify_top": return (String(localized: "Looking at your Spotify"), "music.note.list")
         case "artifact": return (String(localized: "Writing “\(arg("title"))”"), "doc.richtext")
         case "music_mood": return (String(localized: "Listening back to your music"), "music.note")
         case "web_search": return (String(localized: "Searching the web for “\(arg("query"))”"), "magnifyingglass")

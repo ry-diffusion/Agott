@@ -18,6 +18,7 @@ nonisolated enum Card: Identifiable, Hashable, Sendable, Codable {
     case consistency(Consistency)
     case artifact(Artifact)
     case chart(ChartData)
+    case collection(Collection)
 
     var id: UUID {
         switch self {
@@ -31,10 +32,35 @@ nonisolated enum Card: Identifiable, Hashable, Sendable, Codable {
         case .consistency(let c): c.id
         case .artifact(let c): c.id
         case .chart(let c): c.id
+        case .collection(let c): c.id
         }
     }
 
     /// A chart in the conversation: one or more series over shared labels.
+    /// Things worth seeing, not just reading: a ranking of songs with their
+    /// covers, a grid of films with their posters.
+    struct Collection: Hashable, Sendable, Codable {
+        enum Style: String, Hashable, Sendable, Codable { case ranking, grid }
+
+        struct Item: Hashable, Sendable, Codable {
+            var title: String
+            var subtitle: String?
+            /// A short fact on the right: plays, a score, a year.
+            var detail: String?
+            var image: URL?
+            var link: URL?
+        }
+
+        var id = UUID()
+        var title: String
+        var subtitle: String?
+        var style: Style
+        /// song, album, artist, movie, show, book, app, podcast, place, other:
+        /// what to draw while a picture is missing.
+        var kind: String
+        var items: [Item]
+    }
+
     struct ChartData: Hashable, Sendable, Codable {
         enum Kind: String, Hashable, Sendable, Codable, CaseIterable {
             case bar, horizontalBar, stackedBar, line, area, pie, donut, scatter
