@@ -493,28 +493,34 @@ private struct PersonDetail: View {
             VStack(alignment: .leading, spacing: 14) {
                 // Who, and what you can do about it: the same header as Home
                 // and the chat, actions on the right.
-                HStack(alignment: .center, spacing: 14) {
-                    Avatar(name: row.chat.name, size: 56)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(row.chat.name)
-                            .font(Lettering.display(30, relativeTo: .title))
-                            .foregroundStyle(Ink.text)
-                            .lineLimit(1)
-                        Text("\(row.chat.source.displayName) · \(row.chat.messageCount) messages since \(row.chat.firstDate.formatted(.dateTime.month().year()))")
-                            .font(.callout).foregroundStyle(Ink.muted)
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack(alignment: .center, spacing: 16) {
+                        Avatar(name: row.chat.name, size: 68)
+                            .overlay(Circle().strokeBorder(Ink.hairline, lineWidth: 1))
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(row.chat.name)
+                                .font(Lettering.display(32, relativeTo: .title))
+                                .foregroundStyle(Ink.text)
+                                .lineLimit(1)
+                            Text("\(row.chat.source.displayName) · \(row.chat.messageCount) messages since \(row.chat.firstDate.formatted(.dateTime.month().year()))")
+                                .font(.callout).foregroundStyle(Ink.muted)
+                        }
                     }
-                    Spacer(minLength: 12)
-                    Button { Task { await runConsistency() } } label: {
-                        Label(consistency == nil ? "Face to face vs behind their back" : "Check again", systemImage: "theatermasks")
+                    // What you can do, on its own line instead of crowding the name.
+                    HStack(spacing: 8) {
+                        Button { Task { await runRead() } } label: {
+                            Label(read == nil ? "Read our story" : "Read again", systemImage: "sparkles")
+                        }
+                        .buttonStyle(.candy(.primary, compact: true))
+                        Button { Task { await runConsistency() } } label: {
+                            Label(consistency == nil ? "Face to face vs behind their back" : "Check again", systemImage: "theatermasks")
+                        }
+                        .buttonStyle(.candy(.soft, compact: true))
+                        .help(Text("Compare how you talk to them with how you talk about them elsewhere"))
                     }
-                    .buttonStyle(.candy(.soft, compact: true))
-                    .help(Text("Compare how you talk to them with how you talk about them elsewhere"))
-                    Button { Task { await runRead() } } label: {
-                        Label(read == nil ? "Read our story" : "Read again", systemImage: "sparkles")
-                    }
-                    .buttonStyle(.candy(.primary, compact: true))
                 }
-                .padding(.bottom, 4)
+                .padding(.top, 20)
+                .padding(.bottom, 10)
 
                 if let working {
                     HStack(spacing: 8) {
@@ -528,13 +534,23 @@ private struct PersonDetail: View {
                 }
 
                 if row.stats.awaitingMyReply {
-                    SettingsCard {
-                        SettingsRow(symbol: "clock",
-                                    title: "Waiting for your reply since \(row.stats.waitingSince ?? .now, format: .relative(presentation: .named))",
-                                    verbatim: row.stats.lastQuestionFromThem.map { "“\($0)”" } ?? String(localized: "Their last message is still unanswered.")) {
-                            Circle().fill(Ink.spot).frame(width: 8, height: 8)
+                    // A nudge, so it reads as one: the accent, not another grey card.
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: "clock.badge.exclamationmark")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(Ink.spot)
+                            .frame(width: 22)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Waiting for your reply since \(row.stats.waitingSince ?? .now, format: .relative(presentation: .named))")
+                                .font(.callout.weight(.semibold)).foregroundStyle(Ink.text)
+                            Text(verbatim: row.stats.lastQuestionFromThem.map { "“\($0)”" } ?? String(localized: "Their last message is still unanswered."))
+                                .font(.callout).foregroundStyle(Ink.muted).lineLimit(2)
                         }
+                        Spacer(minLength: 0)
                     }
+                    .padding(14)
+                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Ink.spot.opacity(0.07)))
+                    .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Ink.spot.opacity(0.22), lineWidth: 1))
                 }
 
                 SectionHeading(title: "How you talk")
@@ -573,9 +589,11 @@ private struct PersonDetail: View {
                     ConsistencyCard(card: consistency)
                 }
             }
-            .padding(.bottom, 30)
-            .frame(maxWidth: 820, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 28)
+            .padding(.bottom, 36)
+            .frame(maxWidth: 760, alignment: .leading)
+            // One centred column, like Home and the chat.
+            .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.never)
         .disabled(working != nil)
@@ -598,20 +616,12 @@ private struct PersonDetail: View {
             ("hand.wave", "Who starts", "\(stats.myInitiations) : \(stats.theirInitiations)"),
             (mood(feeling ?? stats.theirSentiment), "Mood", moodWord(feeling ?? stats.theirSentiment)),
         ]
-        return Grid(alignment: .leading, horizontalSpacing: 0, verticalSpacing: 0) {
-            ForEach(0..<3, id: \.self) { line in
-                if line > 0 {
-                    Rectangle().fill(Ink.hairline).frame(height: 1).gridCellUnsizedAxes(.horizontal)
-                }
-                GridRow {
-                    Metric(symbol: pairs[line * 2].0, title: pairs[line * 2].1, value: pairs[line * 2].2)
-                    Rectangle().fill(Ink.hairline).frame(width: 1).gridCellUnsizedAxes(.vertical)
-                    Metric(symbol: pairs[line * 2 + 1].0, title: pairs[line * 2 + 1].1, value: pairs[line * 2 + 1].2)
-                }
+        // Six tiles, the number first: what you look at, then what it is.
+        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
+            ForEach(pairs.indices, id: \.self) { index in
+                Metric(symbol: pairs[index].0, title: pairs[index].1, value: pairs[index].2)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .quietSurface(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private var activityChart: some View {
@@ -708,15 +718,20 @@ private struct Metric: View {
     var value: String
 
     var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: symbol).font(.system(size: 13)).foregroundStyle(Ink.muted).frame(width: 18)
-            Text(title).font(.callout).foregroundStyle(Ink.muted)
-            Spacer(minLength: 8)
-            Text(value).font(.callout.weight(.medium)).monospacedDigit().foregroundStyle(Ink.text)
+        VStack(alignment: .leading, spacing: 6) {
+            Image(systemName: symbol).font(.system(size: 13)).foregroundStyle(Ink.muted)
+            Text(value)
+                .font(Lettering.display(22, relativeTo: .title3))
+                .monospacedDigit()
+                .foregroundStyle(Ink.text)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text(title).font(.caption).foregroundStyle(Ink.muted).lineLimit(1)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .frame(maxWidth: .infinity)
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .quietSurface(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .accessibilityElement(children: .combine)
     }
 }
 
