@@ -101,7 +101,7 @@ struct MarkdownView: View {
 
     /// Whether a block names people with tags (`<e id=12/>`).
     static func mentionsPeople(_ text: String) -> Bool {
-        text.contains("<e id=")
+        text.contains("<e id=") || text.contains("<media")
     }
 
     static func inline(_ text: String) -> AttributedString {
@@ -270,30 +270,131 @@ struct CodeBlock: View {
     }
 }
 
+/// A Markdown table drawn as a table: a header band, hairline rows,
+/// numbers right-aligned, a leading rank column quieted, pictures in cells
+/// (`![](url)`) shown as thumbnails, and a copy button on hover.
 private struct TableBlock: View {
     var header: [String]
     var rows: [[String]]
+    @State private var hovering = false
+    @State private var copied = false
+    @State private var width: CGFloat = 0
+    @State private var headerHeight: CGFloat = 0
+
+    private var columns: Int { max(header.count, rows.map(\.count).max() ?? 0) }
 
     var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
         ScrollView(.horizontal) {
-            Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 8) {
+            Grid(alignment: .leading, horizontalSpacing: 0, verticalSpacing: 0) {
                 GridRow {
-                    ForEach(Array(header.enumerated()), id: \.offset) { _, cell in
-                        Text(MarkdownView.inline(cell)).font(.callout.weight(.semibold)).foregroundStyle(Ink.text)
+                    ForEach(0..<columns, id: \.self) { column in
+                        cell(header[safe: column] ?? "", column: column, isHeader: true)
                     }
                 }
-                Divider().gridCellUnsizedAxes(.horizontal)
-                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
+                    Rectangle().fill(Ink.hairline).frame(height: 1).gridCellUnsizedAxes(.horizontal)
                     GridRow {
-                        ForEach(Array(row.enumerated()), id: \.offset) { _, cell in
-                            Text(MarkdownView.inline(cell)).font(.callout).foregroundStyle(Ink.text)
+                        ForEach(0..<columns, id: \.self) { column in
+                            cell(row[safe: column] ?? "", column: column, isHeader: false)
                         }
                     }
                 }
             }
-            .padding(12)
+            // At least as wide as the card, so the header band and the rows
+            // reach its edge; wider tables scroll.
+            .frame(minWidth: width, alignment: .leading)
+            // One band behind the whole header row, not one per cell.
+            .background(alignment: .top) { Ink.raised.frame(height: headerHeight) }
         }
         .scrollIndicators(.never)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Ink.surface))
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+        .clipShape(shape)
+        .quietSurface(shape)
+        .overlay(alignment: .topTrailing) {
+            if hovering {
+                Button {
+                    Clipboard.copy(markdown)
+                    copied = true
+                    Task { try? await Task.sleep(for: .seconds(1.2)); copied = false }
+                } label: {
+                    Image(systemName: copied ? "checkmark" : "doc.on.doc").font(.caption)
+                }
+                .buttonStyle(HoverIconStyle(size: 24))
+                .padding(4)
+                .help(Text("Copy table"))
+                .transition(.opacity)
+            }
+        }
+        .onHover { inside in withAnimation(.easeOut(duration: 0.15)) { hovering = inside } }
     }
+
+    @ViewBuilder
+    private func cell(_ text: String, column: Int, isHeader: Bool) -> some View {
+        let rankColumn = column == 0 && isRankColumn
+        let numeric = numericColumns.contains(column) && !rankColumn
+        let rank = !isHeader && rankColumn
+        Group {
+            if !isHeader, let image = Self.image(in: text) {
+                HStack(spacing: 8) {
+                    Artwork(url: image.url, kind: "other", size: 36)
+                    if !image.rest.isEmpty { Text(MarkdownView.inline(image.rest)) }
+                }
+            } else {
+                Text(MarkdownView.inline(text))
+            }
+        }
+        .font(isHeader ? .caption.weight(.semibold) : (rank ? Lettering.display(15, relativeTo: .callout) : .callout))
+        .monospacedDigit()
+        .foregroundStyle(isHeader || rank ? Ink.muted : Ink.text)
+        // Only text columns take the spare width; a rank stays a narrow
+        // gutter and numbers stay as wide as they are, right-aligned.
+        .frame(maxWidth: rankColumn || numeric ? nil : .infinity, alignment: numeric ? .trailing : .leading)
+        .fixedSize(horizontal: rankColumn || numeric, vertical: false)
+        .gridColumnAlignment(numeric ? .trailing : .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, isHeader ? 7 : 9)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+            if isHeader { headerHeight = max(headerHeight, height) }
+        }
+    }
+
+    /// Columns whose every filled cell reads as a number ("12", "3,5", "R$ 40", "87%").
+    private var numericColumns: Set<Int> {
+        Set((0..<columns).filter { column in
+            let values = rows.compactMap { $0[safe: column] }.filter { !$0.isEmpty }
+            return !values.isEmpty && values.allSatisfy(Self.isNumber)
+        })
+    }
+
+    /// A first column that just counts 1, 2, 3…
+    private var isRankColumn: Bool {
+        rows.count > 1 && rows.enumerated().allSatisfy { index, row in
+            (row.first ?? "").trimmingCharacters(in: CharacterSet(charactersIn: " .º°#")) == "\(index + 1)"
+        }
+    }
+
+    static func isNumber(_ text: String) -> Bool {
+        let core = text.replacingOccurrences(of: "R$", with: "").replacingOccurrences(of: "US$", with: "")
+            .trimmingCharacters(in: CharacterSet(charactersIn: " %$€£+-*x×h"))
+        return !core.isEmpty && core.allSatisfy { $0.isNumber || ".,: ".contains($0) }
+    }
+
+    /// `![alt](url) rest` in a cell: the picture and what follows it.
+    static func image(in text: String) -> (url: URL, rest: String)? {
+        guard let match = text.firstMatch(of: /!\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/),
+              let url = URL(string: String(match.1)) else { return nil }
+        var rest = text
+        rest.removeSubrange(match.range)
+        return (url, rest.trimmingCharacters(in: .whitespaces))
+    }
+
+    private var markdown: String {
+        let line = { (cells: [String]) in "| " + cells.joined(separator: " | ") + " |" }
+        return ([line(header), line(header.map { _ in "---" })] + rows.map(line)).joined(separator: "\n")
+    }
+}
+
+private extension Array {
+    subscript(safe index: Int) -> Element? { indices.contains(index) ? self[index] : nil }
 }
