@@ -140,6 +140,26 @@
         }
       }
     },
+    "%lld conversations remembered" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld conversas guardadas"
+          }
+        }
+      }
+    },
+    "%lld facts learned" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld fatos aprendidos"
+          }
+        }
+      }
+    },
     "%lld memories" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -191,6 +211,26 @@
         }
       }
     },
+    "%lld new messages" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld mensagens novas"
+          }
+        }
+      }
+    },
+    "%lld new people" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld pessoas novas"
+          }
+        }
+      }
+    },
     "%lld pages" : {
       "localizations" : {
         "pt-BR" : {
@@ -211,12 +251,32 @@
         }
       }
     },
+    "%lld photos read" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld fotos lidas"
+          }
+        }
+      }
+    },
     "%lld steps" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld passos"
+          }
+        }
+      }
+    },
+    "%lld voice notes transcribed" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld áudios transcritos"
           }
         }
       }
@@ -279,6 +339,66 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "×%lld"
+          }
+        }
+      }
+    },
+    "1 conversation remembered" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 conversa guardada"
+          }
+        }
+      }
+    },
+    "1 fact learned" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 fato aprendido"
+          }
+        }
+      }
+    },
+    "1 new message" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 mensagem nova"
+          }
+        }
+      }
+    },
+    "1 new person" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 pessoa nova"
+          }
+        }
+      }
+    },
+    "1 photo read" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 foto lida"
+          }
+        }
+      }
+    },
+    "1 voice note transcribed" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 áudio transcrito"
           }
         }
       }
@@ -1624,6 +1744,16 @@
         }
       }
     },
+    "Continue the current one" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continuar a atual"
+          }
+        }
+      }
+    },
     "Conversations" : {
       "localizations" : {
         "pt-BR" : {
@@ -1742,6 +1872,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Criar um app"
+          }
+        }
+      }
+    },
+    "Current conversation" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conversa atual"
           }
         }
       }
@@ -1983,6 +2123,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Escrevendo respostas"
+          }
+        }
+      }
+    },
+    "Drag to capture part of the screen" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arraste para capturar uma parte da tela"
+          }
+        }
+      }
+    },
+    "Drag to capture part of the screen, or send a window" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arraste para capturar uma parte da tela, ou envie uma janela"
           }
         }
       }
@@ -2695,7 +2855,18 @@
         }
       }
     },
+    "Hold, speak, let go: Agott answers over what you are doing. Tap it to type and send screenshots instead." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Segure, fale, solte: o Agott responde por cima do que você está fazendo. Toque para escrever e enviar capturas de tela."
+          }
+        }
+      }
+    },
     "Hold, speak, let go: Agott answers over what you are doing. Tap to type instead." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -2741,6 +2912,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Como o Agott te chama e te encontra nas suas conversas."
+          }
+        }
+      }
+    },
+    "How can I help you today?" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Como posso ajudar você hoje?"
           }
         }
       }
@@ -3151,6 +3332,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Última mensagem"
+          }
+        }
+      }
+    },
+    "Last run found" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Na última leitura"
           }
         }
       }
@@ -4120,6 +4311,17 @@
         }
       }
     },
+    "Nothing new since the last run." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nada de novo desde a última leitura."
+          }
+        }
+      }
+    },
     "Nothing yet. Let Agott read your Claude history and messages, or write about yourself here." : {
       "localizations" : {
         "pt-BR" : {
@@ -4349,6 +4551,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Abrindo %@…"
+          }
+        }
+      }
+    },
+    "Opens Agott over any app: type a question, send a screenshot of a window or part of the screen." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre o Agott sobre qualquer app: escreva uma pergunta, envie a captura de uma janela ou de parte da tela."
           }
         }
       }
@@ -5623,6 +5835,16 @@
         }
       }
     },
+    "Send a screenshot of %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar uma captura de tela de %@"
+          }
+        }
+      }
+    },
     "Send after this answer" : {
       "localizations" : {
         "pt-BR" : {
@@ -5729,6 +5951,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ela está brincando com a pousada perto da lagoa; explicar a gíria com dois exemplos."
+          }
+        }
+      }
+    },
+    "Shortcut to type" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atalho para escrever"
           }
         }
       }
@@ -6483,6 +6715,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Esta semana"
+          }
+        }
+      }
+    },
+    "this window" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "esta janela"
           }
         }
       }
@@ -7805,246 +8047,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "tô aqui. quer que eu te lembre amanhã às 9, ou prefere só descansar agora?"
-          }
-        }
-      }
-    },
-    "How can I help you today?" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Como posso ajudar você hoje?"
-          }
-        }
-      }
-    },
-    "Drag to capture part of the screen" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Arraste para capturar uma parte da tela"
-          }
-        }
-      }
-    },
-    "Drag to capture part of the screen, or send a window" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Arraste para capturar uma parte da tela, ou envie uma janela"
-          }
-        }
-      }
-    },
-    "Send a screenshot of %@" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Enviar uma captura de tela de %@"
-          }
-        }
-      }
-    },
-    "Continue the current one" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Continuar a atual"
-          }
-        }
-      }
-    },
-    "Current conversation" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Conversa atual"
-          }
-        }
-      }
-    },
-    "this window" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "esta janela"
-          }
-        }
-      }
-    },
-    "Shortcut to type" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Atalho para escrever"
-          }
-        }
-      }
-    },
-    "Opens Agott over any app: type a question, send a screenshot of a window or part of the screen." : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Abre o Agott sobre qualquer app: escreva uma pergunta, envie a captura de uma janela ou de parte da tela."
-          }
-        }
-      }
-    },
-    "Hold, speak, let go: Agott answers over what you are doing. Tap it to type and send screenshots instead." : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Segure, fale, solte: o Agott responde por cima do que você está fazendo. Toque para escrever e enviar capturas de tela."
-          }
-        }
-      }
-    },
-    "1 new message" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1 mensagem nova"
-          }
-        }
-      }
-    },
-    "%lld new messages" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld mensagens novas"
-          }
-        }
-      }
-    },
-    "1 voice note transcribed" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1 áudio transcrito"
-          }
-        }
-      }
-    },
-    "%lld voice notes transcribed" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld áudios transcritos"
-          }
-        }
-      }
-    },
-    "1 photo read" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1 foto lida"
-          }
-        }
-      }
-    },
-    "%lld photos read" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld fotos lidas"
-          }
-        }
-      }
-    },
-    "1 new person" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1 pessoa nova"
-          }
-        }
-      }
-    },
-    "%lld new people" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld pessoas novas"
-          }
-        }
-      }
-    },
-    "1 fact learned" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1 fato aprendido"
-          }
-        }
-      }
-    },
-    "%lld facts learned" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld fatos aprendidos"
-          }
-        }
-      }
-    },
-    "1 conversation remembered" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1 conversa guardada"
-          }
-        }
-      }
-    },
-    "%lld conversations remembered" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld conversas guardadas"
-          }
-        }
-      }
-    },
-    "Last run found" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Na última leitura"
-          }
-        }
-      }
-    },
-    "Nothing new since the last run." : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nada de novo desde a última leitura."
           }
         }
       }
