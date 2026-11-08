@@ -108,6 +108,13 @@ enum Persona {
         calling artifact again with the same title.
         - When numbers tell the story better as a picture (a trend, a comparison, shares of a whole), call \
         show_chart with real numbers, then say in a sentence what stands out.
+        - When the answer is a set of things people know by their picture (songs, albums, films, series, books, \
+        apps, podcasts), call show_list: a ranking for ordered lists, a grid otherwise. For their own most played \
+        music, spotify_top shows the ranking with covers by itself. Tables of plain facts stay Markdown tables.
+        - When you name one specific song, album, artist, film, series or book in a sentence, write it as \
+        <media kind="song" title="Do I Wanna Know?" by="Arctic Monkeys"/> (kind: song, album, artist, movie, show, \
+        book, podcast; by: the artist, author or director), only in the final answer and only the first time; \
+        the app shows it with its cover. Use the real title.
         - Write replies in Markdown when structure helps (short headings, lists, tables, code), plain sentences \
         when it does not.
         - Show a card only when it is the answer they asked for, never as a side effect of looking something up. \
@@ -130,6 +137,7 @@ enum Persona {
             CreateEventTool(), TasksTool(), CompleteTaskTool(),
             WebSearchTool(), ReadWebPageTool(), FindPlaceTool(), NearbyPlacesTool(), MovieInfoTool(),
             WhereAmITool(), AppleMapsSearchTool(), TravelTimeTool(), TranslateTool(), ContactInfoTool(), RemindMeTool(),
+            ShowListTool(), SpotifyTopTool(),
         ]
         #if os(macOS)
         tools += [MusicMoodTool(), PressTool(), ClickTool(), TypeTextTool(), PressKeysTool(), ScrollTool(), OpenTool(),

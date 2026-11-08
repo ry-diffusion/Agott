@@ -8220,6 +8220,86 @@
           }
         }
       }
+    },
+    "Putting the list together" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Montando a lista"
+          }
+        }
+      }
+    },
+    "Looking at your Spotify" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Olhando seu Spotify"
+          }
+        }
+      }
+    },
+    "Your top artists" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seus artistas mais ouvidos"
+          }
+        }
+      }
+    },
+    "Your top songs" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suas músicas mais ouvidas"
+          }
+        }
+      }
+    },
+    "Last 4 weeks" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Últimas 4 semanas"
+          }
+        }
+      }
+    },
+    "Last 6 months" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Últimos 6 meses"
+          }
+        }
+      }
+    },
+    "All time" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De todos os tempos"
+          }
+        }
+      }
+    },
+    "Copy table" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copiar tabela"
+          }
+        }
+      }
     }
   },
   "version" : "1.1"

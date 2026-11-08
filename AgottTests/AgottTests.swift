@@ -1272,3 +1272,20 @@ struct ParakeetTests {
     }
 }
 #endif
+
+@Suite("Media tags")
+struct MediaTagTests {
+    @Test func parsesAndBecomesALink() throws {
+        let media = try #require(MediaTag(#"<media kind="song" title="Do I Wanna Know?" by="Arctic Monkeys"/>"#))
+        #expect(media.kind == "song")
+        #expect(media.title == "Do I Wanna Know?")
+        #expect(media.by == "Arctic Monkeys")
+        #expect(MediaTag(link: media.link) == media)
+    }
+
+    @MainActor @Test func plainTextReadsTheTitle() {
+        let text = #"meu chute é <media kind="song" title="Do I Wanna Know?" by="Arctic Monkeys"/> — aquele riff"#
+        #expect(EntityText.plain(text, hidden: false) == "meu chute é “Do I Wanna Know?” — Arctic Monkeys — aquele riff")
+        #expect(EntityText.markdown(text, hidden: false).contains("agott://media/song?title="))
+    }
+}

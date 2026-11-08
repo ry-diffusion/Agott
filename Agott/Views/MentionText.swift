@@ -14,6 +14,7 @@ struct MentionParagraph: View {
     enum Token {
         case words(AttributedString)
         case mention(Int64)
+        case media(MediaTag)
     }
 
     var body: some View {
@@ -25,6 +26,7 @@ struct MentionParagraph: View {
                         switch token {
                         case .words(let words): Text(words)
                         case .mention(let id): MentionChip(id: id)
+                        case .media(let media): MediaChip(media: media)
                         }
                     }
                 }
@@ -41,6 +43,10 @@ struct MentionParagraph: View {
             if let url = run.link, url.scheme == "agott", url.host() == "person",
                let id = Int64(url.lastPathComponent) {
                 lines[lines.count - 1].append(.mention(id))
+                continue
+            }
+            if let url = run.link, let media = MediaTag(link: url) {
+                lines[lines.count - 1].append(.media(media))
                 continue
             }
             let slice = attributed[run.range]

@@ -211,6 +211,20 @@ enum DemoData {
             Turn(role: .assistant, text: "", cards: [.person(person)]),
             Turn(role: .user, text: "o que tenho amanhã? e toca algo tranquilo"),
             Turn(role: .assistant, text: String(localized: "tomorrow's light, just the class call at night\n\nputting something chill on. just confirm:"), cards: [.events(events), .approval(approval)]),
+            Turn(role: .user, text: "qual música eu mais ouvi esse mês?"),
+            Turn(role: .assistant, text: """
+                então meu chute é <media kind="song" title="Do I Wanna Know?" by="Arctic Monkeys"/> — aquele riff é literalmente uma linha de baixo do tamanho de um prédio.
+
+                | # | Música | Artista | Plays |
+                |---|---|---|---|
+                | 1 | Do I Wanna Know? | Arctic Monkeys | 42 |
+                | 2 | Desleixado | KARNIVAL | 31 |
+                | 3 | Pink + White | Frank Ocean | 18 |
+                """, cards: [.collection(.init(
+                    title: "Seu top do mês", subtitle: "Spotify · Últimas 4 semanas", style: .ranking, kind: "song",
+                    items: [.init(title: "Do I Wanna Know?", subtitle: "Arctic Monkeys", detail: "42 plays"),
+                            .init(title: "Desleixado", subtitle: "KARNIVAL", detail: "31 plays"),
+                            .init(title: "Pink + White", subtitle: "Frank Ocean", detail: "18 plays")]))]),
         ]
     }
 }
