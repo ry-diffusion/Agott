@@ -201,8 +201,7 @@ final class Indexer {
             // Once, on moving to Parakeet: the Apple-engine transcripts go,
             // and the voice notes are read again from the start (their
             // cursor key is new).
-            if AppSettings.shared.speechEngine == SpeechEngine.parakeet.rawValue, Parakeet.isInstalled,
-               !UserDefaults.standard.bool(forKey: "voiceNotes.parakeet.purged") {
+            if Parakeet.isInstalled, !UserDefaults.standard.bool(forKey: "voiceNotes.parakeet.purged") {
                 let removed = (try? await MemoryStore.shared.forgetVoiceNotes()) ?? 0
                 UserDefaults.standard.set(true, forKey: "voiceNotes.parakeet.purged")
                 log.notice("Removed \(removed) voice notes read with the Apple engine")

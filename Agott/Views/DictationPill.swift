@@ -215,10 +215,14 @@ struct DictationPill: View {
 
     private var inserting: Bool { copilot.mode == .inserting }
 
-    /// The last words heard, or the hint before the first.
+    /// The last words heard, or the hint before the first (and, while the
+    /// fast model is still coming in, that it is).
     private var tail: String {
         let words = dictation.transcript.split(separator: " ")
-        guard !words.isEmpty else { return String(localized: "Listening…") }
+        guard !words.isEmpty else {
+            if let notice = ParakeetSetup.shared.notice { return String(localized: "Listening") + " · " + notice }
+            return String(localized: "Listening…")
+        }
         return words.suffix(8).joined(separator: " ")
     }
 

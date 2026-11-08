@@ -196,9 +196,18 @@ struct ActivityButton: View {
     var openMemory: () -> Void
     @State private var indexer = Indexer.shared
     @State private var repair = MemoryRepair.shared
+    @State private var parakeet = ParakeetSetup.shared
     @State private var showing = false
 
-    private var active: Bool { indexer.isRunning || indexer.isLearning || repair.note != nil }
+    private var active: Bool { indexer.isRunning || indexer.isLearning || repair.note != nil || parakeet.isDownloading }
+
+    private var downloadFraction: Double? {
+        if case .downloading(let fraction) = parakeet.state { return fraction }
+        return nil
+    }
+
+    /// The line on the ring: a repair, the model download, or memory's status.
+    private var line: String { repair.note ?? (indexer.isRunning || indexer.isLearning ? nil : parakeet.notice) ?? indexer.statusText }
 
     var body: some View {
         if active || indexer.isPaused {
@@ -207,7 +216,7 @@ struct ActivityButton: View {
                     Circle().stroke(Ink.muted.opacity(0.25), lineWidth: 2.5)
                     if indexer.isPaused && !active {
                         Image(systemName: "pause.fill").font(.system(size: 10, weight: .bold))
-                    } else if let progress = indexer.progress {
+                    } else if let progress = indexer.progress ?? downloadFraction {
                         Circle()
                             .trim(from: 0, to: max(0.03, progress))
                             .stroke(Ink.spot, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
@@ -221,7 +230,7 @@ struct ActivityButton: View {
                 .frame(width: 36, height: 36)
             }
             .buttonStyle(HoverIconStyle(size: 36))
-            .help(Text(repair.note ?? indexer.statusText))
+            .help(Text(line))
             .popover(isPresented: $showing, arrowEdge: .trailing) { details }
             .transition(.opacity.combined(with: .scale(scale: 0.8)))
         }
@@ -229,12 +238,21 @@ struct ActivityButton: View {
 
     private var details: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(repair.note ?? indexer.statusText)
+            Text(line)
                 .font(.callout.weight(.semibold))
                 .foregroundStyle(Ink.text)
                 .monospacedDigit()
             if let progress = indexer.progress {
                 ProgressView(value: progress).tint(Ink.spot)
+            }
+            // The fast transcription model, while it comes in alongside indexing.
+            if let notice = parakeet.notice, line != notice, case .downloading(let fraction) = parakeet.state {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(notice).font(.caption).foregroundStyle(Ink.muted)
+                    ProgressView(value: fraction).tint(Ink.spot)
+                }
+            } else if case .downloading(let fraction) = parakeet.state, line == parakeet.notice {
+                ProgressView(value: fraction).tint(Ink.spot)
             }
             if !indexer.findings.isEmpty {
                 RunFindingsView(findings: indexer.findings, examples: 3)

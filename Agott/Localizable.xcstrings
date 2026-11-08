@@ -8137,6 +8137,46 @@
           }
         }
       }
+    },
+    "Downloading the fast transcription model… %lld%%" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Baixando o modelo de transcrição rápida… %lld%%"
+          }
+        }
+      }
+    },
+    "Download" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Baixar"
+          }
+        }
+      }
+    },
+    "The download finished incomplete." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O download terminou incompleto."
+          }
+        }
+      }
+    },
+    "Parakeet is much faster and better with Portuguese and English mixed. Voice notes are only read with it; until it is downloaded, dictation uses Apple's engine." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Parakeet é muito mais rápido e melhor com português e inglês misturados. Os áudios só são lidos com ele; até ele ser baixado, a ditação usa o motor da Apple."
+          }
+        }
+      }
     }
   },
   "version" : "1.1"

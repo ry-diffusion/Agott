@@ -110,6 +110,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         if AppSettings.shared.hasOnboarded { Copilot.shared.start() }
+        #if os(macOS)
+        // The fast transcription model, fetched once in the background;
+        // Apple's engine stands in until it is here.
+        ParakeetSetup.shared.start()
+        #endif
         // Repair what older versions wrote, then keep indexing.
         MusicListener.shared.start()
         Task(priority: .utility) { await ModelCatalog.shared.refresh() }

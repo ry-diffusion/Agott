@@ -1,7 +1,6 @@
 #if os(macOS)
 import AVFoundation
 import Foundation
-import Speech
 
 /// Voice notes and photos from WhatsApp, turned into words memory can read.
 ///
@@ -42,7 +41,9 @@ enum MediaIngestor {
     /// Voice notes or photos after their cursor that are on disk, oldest first.
     static func pending(_ kind: Kind, limit: Int, contacts: ContactBook) throws -> [Item] {
         let settings = AppSettings.shared
-        let wanted = kind == .voice ? settings.transcribeVoiceNotes : settings.describePhotos
+        // Voice notes are only read with Parakeet: anything else would be
+        // thrown away and read again once it is here.
+        let wanted = kind == .voice ? settings.transcribeVoiceNotes && Parakeet.isInstalled : settings.describePhotos
         guard wanted, let db = try? SQLiteDB(path: WhatsAppSource.path, readOnly: true) else { return [] }
         let types = [kind.rawValue]
         let after = UserDefaults.standard.double(forKey: cursorKey(kind))
@@ -125,13 +126,10 @@ enum MediaIngestor {
     /// A whole audio file to text, on the Mac: Parakeet when chosen and
     /// installed, Apple's engine otherwise. Gives up after a minute.
     static func transcribe(_ url: URL) async -> String? {
-        let parakeet = AppSettings.shared.speechEngine == SpeechEngine.parakeet.rawValue && Parakeet.isInstalled
+        guard Parakeet.isInstalled else { return nil }
         let language = Parakeet.language(for: AppSettings.shared.speechLocale)
         return await withTaskGroup(of: String?.self) { group in
-            group.addTask {
-                if parakeet { return try? await Parakeet.shared.transcribe(file: url, language: language) }
-                return try? await transcription(of: url)
-            }
+            group.addTask { try? await Parakeet.shared.transcribe(file: url, language: language) }
             group.addTask {
                 try? await Task.sleep(for: .seconds(60))
                 return nil
@@ -140,26 +138,6 @@ enum MediaIngestor {
             group.cancelAll()
             return first
         }
-    }
-
-    private static func transcription(of url: URL) async throws -> String? {
-        let requested = Locale(identifier: AppSettings.shared.speechLocale)
-        guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: requested) else { return nil }
-        let transcriber = SpeechTranscriber(locale: locale, preset: .transcription)
-        if let install = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
-            try await install.downloadAndInstall()
-        }
-        let file = try AVAudioFile(forReading: url)
-        let collect = Task {
-            var text = ""
-            for try await result in transcriber.results where result.isFinal {
-                text = Dictation.join(text, String(result.text.characters))
-            }
-            return text
-        }
-        _ = try await SpeechAnalyzer(inputAudioFile: file, modules: [transcriber], finishAfterFile: true)
-        let text = try await collect.value
-        return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 #endif

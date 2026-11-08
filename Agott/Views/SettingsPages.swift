@@ -206,12 +206,10 @@ struct SettingsPageView: View {
                         .labelsHidden().fixedSize()
                 }
                 SettingsRow(symbol: "waveform.badge.mic", title: "Speech engine",
-                            detail: Parakeet.isInstalled
-                                ? "Parakeet is much faster and better with Portuguese and English mixed. Used for dictation and voice notes."
-                                : "Parakeet is not on this Mac yet: Apple's engine is used until it is downloaded.") {
+                            detail: "Parakeet is much faster and better with Portuguese and English mixed. Voice notes are only read with it; until it is downloaded, dictation uses Apple's engine.") {
                     HStack(spacing: 8) {
-                        if !Parakeet.isInstalled && settings.speechEngine == SpeechEngine.parakeet.rawValue {
-                            ParakeetDownloadButton()
+                        if settings.speechEngine == SpeechEngine.parakeet.rawValue {
+                            ParakeetStatus()
                         }
                         Picker("", selection: $settings.speechEngine) {
                             ForEach(SpeechEngine.allCases) { Text($0.title).tag($0.rawValue) }
@@ -343,25 +341,27 @@ struct SettingsRow<Control: View>: View {
 }
 
 #if os(macOS)
-/// Fetches Parakeet (about 600 MB, once) when it is not on this Mac.
-private struct ParakeetDownloadButton: View {
-    @State private var working = false
-    @State private var failed: String?
+/// Where the Parakeet download stands: a progress ring while it comes in,
+/// a way to try again when it failed.
+private struct ParakeetStatus: View {
+    @State private var setup = ParakeetSetup.shared
 
     var body: some View {
-        Button {
-            working = true
-            failed = nil
-            Task {
-                do { try await Parakeet.shared.prepare() } catch { failed = error.localizedDescription }
-                working = false
+        switch setup.state {
+        case .ready:
+            EmptyView()
+        case .downloading(let fraction):
+            HStack(spacing: 6) {
+                ProgressView(value: fraction).progressViewStyle(.circular).controlSize(.small)
+                Text(fraction, format: .percent.precision(.fractionLength(0)))
+                    .font(.callout).monospacedDigit().foregroundStyle(Ink.muted)
             }
-        } label: {
-            if working { ProgressView().controlSize(.small) } else { Text("Download (~600 MB)") }
+            .help(Text(setup.notice ?? ""))
+        case .missing, .failed:
+            Button("Download") { setup.start() }
+                .buttonStyle(.candy(.soft, compact: true))
+                .help({ if case .failed(let reason) = setup.state { Text(reason) } else { Text("Downloads Parakeet from Hugging Face, once.") } }())
         }
-        .buttonStyle(.candy(.soft, compact: true))
-        .disabled(working)
-        .help(failed.map { Text($0) } ?? Text("Downloads Parakeet from Hugging Face, once."))
     }
 }
 #endif

@@ -59,7 +59,14 @@ final class AppSettings {
     var myName: String { didSet { save(myName, "myName") } }
     var speechLocale: String { didSet { save(speechLocale, "speechLocale") } }
     /// The speech engine on the Mac (a SpeechEngine raw value).
-    var speechEngine: String { didSet { save(speechEngine, "speechEngine") } }
+    var speechEngine: String {
+        didSet {
+            save(speechEngine, "speechEngine")
+            #if os(macOS)
+            ParakeetSetup.shared.start()
+            #endif
+        }
+    }
     var askKey: HoldKey { didSet { save(askKey.rawValue, "askKey") } }
     /// The key combination that opens quick entry to type (a TextShortcut raw value).
     var textShortcut: String {

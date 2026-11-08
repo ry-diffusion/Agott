@@ -129,6 +129,62 @@ actor Parakeet {
     }
 }
 
+/// Fetches Parakeet once, in the background, and says how far along it is.
+/// Until it is here, dictation uses Apple's engine and voice notes wait.
+@MainActor @Observable
+final class ParakeetSetup {
+    static let shared = ParakeetSetup()
+
+    enum State: Equatable {
+        case missing
+        case downloading(Double)
+        case ready
+        case failed(String)
+    }
+
+    private(set) var state: State = Parakeet.isInstalled ? .ready : .missing
+    @ObservationIgnored private var task: Task<Void, Never>?
+    @ObservationIgnored private var attempts = 0
+
+    var isReady: Bool { state == .ready }
+    var isDownloading: Bool { if case .downloading = state { true } else { false } }
+
+    /// "Downloading the fast transcription model… 42%", while it does.
+    var notice: String? {
+        guard case .downloading(let fraction) = state else { return nil }
+        return String(localized: "Downloading the fast transcription model… \(Int((fraction * 100).rounded()))%")
+    }
+
+    /// Starts the download if Parakeet is the engine and is not here yet.
+    func start() {
+        guard AppSettings.shared.speechEngine == SpeechEngine.parakeet.rawValue else { return }
+        if Parakeet.isInstalled { state = .ready; return }
+        guard task == nil else { return }
+        attempts += 1
+        // A second try starts clean: a broken first one left half a folder.
+        let force = attempts > 1
+        state = .downloading(0)
+        task = Task {
+            do {
+                _ = try await AsrModels.download(force: force, version: Parakeet.version) { progress in
+                    let fraction = progress.fractionCompleted
+                    Task { @MainActor in
+                        if case .downloading = ParakeetSetup.shared.state {
+                            ParakeetSetup.shared.state = .downloading(fraction)
+                        }
+                    }
+                }
+                state = Parakeet.isInstalled ? .ready : .failed(String(localized: "The download finished incomplete."))
+            } catch {
+                state = .failed(error.localizedDescription)
+            }
+            task = nil
+            // Voice notes waited for it.
+            if state == .ready { Indexer.shared.run() }
+        }
+    }
+}
+
 /// The microphone at 16 kHz, kept whole while the key is held. Written from
 /// the audio thread, read from anywhere.
 nonisolated final class SpeechCapture: @unchecked Sendable {
