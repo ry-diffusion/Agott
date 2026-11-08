@@ -41,7 +41,7 @@ struct SettingsSidebar: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 2) {
-                Spacer().frame(width: 84)
+                Spacer().frame(width: WindowBar.afterButtons)
                 Button { navigator.settingsPage = nil } label: {
                     Image(systemName: "chevron.left")
                 }

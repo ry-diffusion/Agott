@@ -306,7 +306,7 @@ private struct ConversationLine: View {
 /// Room in a top bar for the sidebar and search buttons that stay beside
 /// the window buttons while the sidebar is hidden (drawn by the window).
 struct SidebarToggle: View {
-    static let width: CGFloat = 150
+    static let width: CGFloat = WindowBar.afterButtons + 66
     var body: some View {
         Color.clear.frame(width: Self.width, height: 1)
     }

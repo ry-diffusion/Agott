@@ -77,7 +77,11 @@ enum Ink {
 /// The strip across the top of the window: as tall as the line the window
 /// buttons sit on, so every top bar lines up with them.
 enum WindowBar {
-    static let height: CGFloat = 30
+    static let height: CGFloat = 40
+    /// How far the window buttons sit from the window's left edge.
+    static let buttonsInset: CGFloat = 16
+    /// Where things may start after the window buttons, with room to breathe.
+    static let afterButtons: CGFloat = 92
 }
 
 enum Radius {

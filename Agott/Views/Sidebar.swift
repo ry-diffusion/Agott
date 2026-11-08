@@ -16,7 +16,7 @@ struct Sidebar: View {
         VStack(alignment: .leading, spacing: 0) {
             // The close, minimise and zoom buttons sit on the left of this row.
             HStack(spacing: 2) {
-                Spacer().frame(width: 84)
+                Spacer().frame(width: WindowBar.afterButtons)
                 Button { withAnimation(.easeInOut(duration: 0.3)) { navigator.zen = true } } label: {
                     Image(systemName: "sidebar.left")
                 }
@@ -241,7 +241,7 @@ struct CollapsedChrome: View {
                 }
         }
         .font(.system(size: 14))
-        .padding(.leading, 84)
+        .padding(.leading, WindowBar.afterButtons)
         .frame(height: WindowBar.height)
     }
 }

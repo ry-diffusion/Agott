@@ -29,6 +29,44 @@ struct WindowChromeArea: NSViewRepresentable {
             // can show the desktop behind it, blurred.
             window.isOpaque = false
             window.backgroundColor = .clear
+            placeWindowButtons()
+            // AppKit puts the buttons back on every layout; put them back
+            // where they belong each time.
+            for name in [NSWindow.didResizeNotification, NSWindow.didEndLiveResizeNotification,
+                         NSWindow.didBecomeKeyNotification, NSWindow.didExitFullScreenNotification] {
+                NotificationCenter.default.addObserver(self, selector: #selector(windowChanged), name: name, object: window)
+            }
+        }
+
+        override func layout() {
+            super.layout()
+            placeWindowButtons()
+        }
+
+        @objc private func windowChanged(_ note: Notification) {
+            DispatchQueue.main.async { [weak self] in self?.placeWindowButtons() }
+        }
+
+        /// The close, minimise and zoom buttons inset from the corner like a
+        /// notebook app's, centred on the strip every top bar is drawn in
+        /// (`WindowBar.height`), instead of crowded into the corner.
+        private func placeWindowButtons() {
+            guard let window, !window.styleMask.contains(.fullScreen),
+                  let close = window.standardWindowButton(.closeButton),
+                  let titlebar = close.superview, let container = titlebar.superview else { return }
+            let height = WindowBar.height
+            var frame = container.frame
+            if frame.height != height {
+                frame.size.height = height
+                frame.origin.y = window.frame.height - height
+                container.frame = frame
+            }
+            for (index, kind) in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton].enumerated() {
+                guard let button = window.standardWindowButton(kind) else { continue }
+                let origin = NSPoint(x: WindowBar.buttonsInset + CGFloat(index) * 20,
+                                     y: (titlebar.frame.height - button.frame.height) / 2)
+                if button.frame.origin != origin { button.setFrameOrigin(origin) }
+            }
         }
 
         override func mouseDown(with event: NSEvent) {
