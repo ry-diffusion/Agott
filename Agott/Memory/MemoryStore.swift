@@ -38,12 +38,19 @@ actor MemoryStore {
         if let db { return db }
         let db = try SQLiteDB(path: url.path)
         try db.execute(Self.schema)
-        // Columns added later; each fails harmlessly once it exists.
-        for column in ["evidence TEXT", "self_stated INTEGER NOT NULL DEFAULT 0", "sensitive INTEGER NOT NULL DEFAULT 0",
-                       "subject_id INTEGER", "kind TEXT"] {
-            try? db.execute("ALTER TABLE facts ADD COLUMN \(column)")
+        // Columns added later, added once: asking first keeps SQLite from
+        // logging a "duplicate column" error on every launch.
+        func addMissing(_ table: String, _ columns: [String]) throws {
+            var existing = Set<String>()
+            try db.rows("PRAGMA table_info(\(table))") { if let name = $0.text(1) { existing.insert(name) } }
+            for column in columns where !existing.contains(String(column.split(separator: " ")[0])) {
+                try? db.execute("ALTER TABLE \(table) ADD COLUMN \(column)")
+            }
         }
+        try addMissing("facts", ["evidence TEXT", "self_stated INTEGER NOT NULL DEFAULT 0", "sensitive INTEGER NOT NULL DEFAULT 0",
+                                 "subject_id INTEGER", "kind TEXT"])
         try db.execute(Self.peopleSchema)
+        try addMissing("person_aliases", ["evidence TEXT"])
         self.db = db
         return db
     }

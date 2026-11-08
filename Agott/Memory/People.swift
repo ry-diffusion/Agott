@@ -55,7 +55,6 @@ extension MemoryStore {
         let folded = alias.folded
         guard folded.count >= 2 else { return }
         let db = try open()
-        try? db.execute("ALTER TABLE person_aliases ADD COLUMN evidence TEXT")
         try db.run("INSERT OR IGNORE INTO person_aliases(person_id, alias, folded, kind, evidence) VALUES (?, ?, ?, ?, ?)",
                    [.int(id), .text(alias), .text(folded), .text(kind), evidence.map { .text($0) } ?? .null])
     }
