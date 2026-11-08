@@ -19,7 +19,7 @@ final class OverlayController {
 
     private func makePanel() -> OverlayPanel {
         let panel = OverlayPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 620, height: 420),
+            contentRect: NSRect(x: 0, y: 0, width: 664, height: 420),
             styleMask: [.nonactivatingPanel, .borderless, .fullSizeContentView],
             backing: .buffered, defer: false)
         panel.isFloatingPanel = true
@@ -44,8 +44,9 @@ final class OverlayController {
         let screen = NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) } ?? NSScreen.main
         if let screen, !panel.isVisible {
             let frame = screen.visibleFrame
-            let width: CGFloat = 620
-            panel.setFrameTopLeftPoint(NSPoint(x: frame.midX - width / 2, y: frame.maxY - 12))
+            let width: CGFloat = 664
+            // The card sits 32 pt inside the panel; keep it 12 pt under the menu bar.
+            panel.setFrameTopLeftPoint(NSPoint(x: frame.midX - width / 2, y: frame.maxY + 20))
         }
         panel.alphaValue = 1
         if focus {
@@ -92,9 +93,11 @@ struct OverlayView: View {
         .frame(width: 600)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Ink.hairline, lineWidth: 1))
-        .shadow(color: .black.opacity(0.18), radius: 24, y: 8)
+        .shadow(color: .black.opacity(0.14), radius: 18, y: 6)
         .tint(Ink.spot)
-        .padding(10)
+        // Room for the whole shadow inside the panel: with less, it was cut
+        // into a visible rectangle around the card.
+        .padding(32)
         .onExitCommand { copilot.dismiss() }
         .onChange(of: copilot.mode) { _, mode in
             fieldFocused = mode == .typing
@@ -124,7 +127,7 @@ struct OverlayView: View {
                 Text("Ask Agott").font(.headline)
             default:
                 if let status = agent.status {
-                    Text(status).font(.subheadline).foregroundStyle(Ink.muted)
+                    Text(EntityText.readable(status)).font(.system(size: 15)).foregroundStyle(Ink.muted).lineLimit(1)
                 } else {
                     Text(verbatim: "Agott").font(.headline)
                 }
@@ -162,15 +165,18 @@ struct OverlayView: View {
                 .onSubmit { copilot.ask(copilot.draft) }
         case .answering, .inserting, .hidden:
             if let notice = copilot.notice {
-                Text(notice).foregroundStyle(Ink.muted)
+                Text(notice).font(.system(size: 15)).foregroundStyle(Ink.muted)
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     ForEach(copilot.overlayTurns) { turn in
                         if turn.role == .user {
-                            Text(turn.text).font(.callout).foregroundStyle(Ink.muted)
+                            Text(turn.text).font(.system(size: 15)).foregroundStyle(Ink.muted)
                         } else {
+                            // Reading size, not caption size: this is the answer.
                             AssistantTurnView(turn: turn, compact: true)
+                                .font(.system(size: 16))
+                                .lineSpacing(3)
                         }
                     }
                 }
@@ -184,6 +190,7 @@ struct OverlayView: View {
                 HStack {
                     TextField("Follow up…", text: $copilot.draft)
                         .textFieldStyle(.plain)
+                        .font(.system(size: 15))
                         .onSubmit { copilot.ask(copilot.draft) }
                     Text("esc to close").font(.caption).foregroundStyle(Ink.muted)
                 }

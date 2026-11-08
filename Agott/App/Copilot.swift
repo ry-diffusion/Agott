@@ -25,6 +25,10 @@ final class Copilot {
     /// The id of the first turn of this overlay session, so the panel shows
     /// only what was asked from it.
     private(set) var sinceTurn: UUID?
+    /// When the question was asked from the overlay. The turns of a run are
+    /// added a moment after `send` returns, so the overlay shows everything
+    /// from this time on rather than looking for a turn that is not there yet.
+    private(set) var askedAt: Date?
     private(set) var notice: String?
 
     #if os(macOS)
@@ -128,10 +132,10 @@ final class Copilot {
         draft = ""
         mode = .answering
         if newChat { Agent.shared.newConversation() }
-        let before = Agent.shared.turns.count
+        askedAt = Date()
+        sinceTurn = nil
         // Screenshots sent along say what is on screen; otherwise Agott looks.
         Agent.shared.send(trimmed, lookAtScreen: attachments.isEmpty, attachments: attachments)
-        if Agent.shared.turns.count > before { sinceTurn = Agent.shared.turns[before].id }
         #if os(macOS)
         OverlayController.shared.show(focus: false)
         #endif
@@ -154,6 +158,7 @@ final class Copilot {
         if Agent.shared.isBusy { Agent.shared.cancel() }
         mode = .hidden
         sinceTurn = nil
+        askedAt = nil
         #if os(macOS)
         OverlayController.shared.hide(after: 0)
         #endif
@@ -170,6 +175,10 @@ final class Copilot {
 
     /// The turns this overlay session produced.
     var overlayTurns: [Turn] {
+        if let askedAt {
+            // A second earlier, for a clock that ticks between the two.
+            return Agent.shared.turns.filter { $0.date >= askedAt.addingTimeInterval(-1) }
+        }
         guard let sinceTurn, let index = Agent.shared.turns.firstIndex(where: { $0.id == sinceTurn }) else { return [] }
         return Array(Agent.shared.turns[index...])
     }

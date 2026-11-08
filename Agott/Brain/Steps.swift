@@ -152,7 +152,8 @@ enum StepTracker {
         let text = thought.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return nil }
         // Reasoning summaries open each part with a bold heading.
-        if let heading = text.matches(of: /\*\*([^*\n]{3,80})\*\*/).last.map({ String($0.1) }) {
+        if let heading = text.matches(of: /\*\*([^*\n]{3,80})\*\*/).last.map({ String($0.1) }),
+           heading.split(separator: " ").count >= 2 {
             return heading.trimmingCharacters(in: .whitespaces.union(.punctuationCharacters))
         }
         // Otherwise the last finished sentence (the one being written is
@@ -163,6 +164,8 @@ enum StepTracker {
         let finished = text.last.map { ".!?\n".contains($0) } == true ? sentences.last : sentences.dropLast().last
         guard let line = finished ?? sentences.last else { return nil }
         let words = line.split(separator: " ")
+        // A lone word ("Continuar") says nothing about what it is doing.
+        guard words.count >= 3 else { return nil }
         let short = words.prefix(9).joined(separator: " ")
         return words.count > 9 ? short + "…" : short
     }
