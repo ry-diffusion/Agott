@@ -143,7 +143,9 @@ final class SpotifyAccount {
 
     /// Searches Spotify's catalogue: type is track, album, artist or playlist.
     func search(_ query: String, type: String) async throws -> Found? {
-        let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
+        // Only letters, digits and -._~ go through as they are: "&", "+" or "$"
+        // in an artist's name would otherwise end or change the query.
+        let encoded = query.addingPercentEncoding(withAllowedCharacters: .alphanumerics.union(CharacterSet(charactersIn: "-._~"))) ?? query
         guard let json = try await get("https://api.spotify.com/v1/search?q=\(encoded)&type=\(type)&limit=1"),
               let item = ((json[type + "s"] as? [String: Any])?["items"] as? [[String: Any]])?.compactMap({ $0 }).first,
               let uri = item["uri"] as? String else { return nil }

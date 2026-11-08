@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 import FoundationModels
 
 /// Shows things as things: a ranking with covers, a grid with posters.
@@ -110,6 +111,8 @@ nonisolated struct SpotifyTopTool: Tool {
 /// Finds a picture for something by its name: covers from the iTunes
 /// catalogue, posters from IMDb. Nothing for places and the rest.
 nonisolated enum ArtworkLookup {
+    private static let log = Logger(subsystem: "br.com.zesmoi.Agott", category: "artwork")
+
     /// Fills in missing pictures, all at once.
     static func fill(_ items: [Card.Collection.Item], kind: String) async -> [Card.Collection.Item] {
         await withTaskGroup(of: (Int, URL?).self) { group in
@@ -127,10 +130,21 @@ nonisolated enum ArtworkLookup {
         // exactly which "Máquina do Tempo" is Matuê's.
         if ["song", "album", "artist"].contains(kind), await SpotifyAccount.shared.isConnected {
             let type = kind == "song" ? "track" : kind
-            let query = ([title, kind == "artist" ? nil : subtitle] as [String?]).compactMap { $0 }.joined(separator: " ")
-            if let found = try? await SpotifyAccount.shared.search(query, type: type), let image = found.image,
-               kind == "artist" || subtitle == nil || artistMatches(found.subtitle, subtitle) {
-                return image
+            // Spotify's own syntax first (track:… artist:…), then plain words.
+            let firstArtist = subtitle?.split(whereSeparator: { ",&".contains($0) }).first.map { String($0).trimmingCharacters(in: .whitespaces) }
+            var queries: [String] = []
+            if kind != "artist", let firstArtist { queries.append("\(type):\(title) artist:\(firstArtist)") }
+            queries.append(([title, kind == "artist" ? nil : firstArtist] as [String?]).compactMap { $0 }.joined(separator: " "))
+            for query in queries {
+                do {
+                    if let found = try await SpotifyAccount.shared.search(query, type: type), let image = found.image,
+                       kind == "artist" || subtitle == nil || artistMatches(found.subtitle, subtitle) {
+                        return image
+                    }
+                } catch {
+                    log.error("Spotify search for a cover failed: \(error.localizedDescription, privacy: .public)")
+                    break
+                }
             }
         }
         return switch kind {
