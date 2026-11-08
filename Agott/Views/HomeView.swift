@@ -42,7 +42,8 @@ struct HomeView: View {
         .scrollEdgeEffectStyle(.soft, for: .top)
         .scrollEdgeEffectHidden(true, for: .bottom)
         .safeAreaBar(edge: .top, spacing: 0) { topBar }
-        .safeAreaBar(edge: .bottom, spacing: 0) {
+        // An inset, not a bar: only the question box blurs what passes behind.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             AskBox(suggestions: true) { text in
                 navigator.section = .chat
                 agent.newConversation()

@@ -216,7 +216,9 @@ struct ChatView: View {
             #else
             .safeAreaInset(edge: .top, spacing: 0) { Color.clear.frame(height: Self.topInset) }
             #endif
-            .safeAreaBar(edge: .bottom, spacing: 0) {
+            // An inset, not a bar: a bar brings the system's edge blur with
+            // it; here only the question box blurs what passes behind it.
+            .safeAreaInset(edge: .bottom, spacing: 0) {
                 composer(centered: false)
                     .padding(.horizontal, Self.gutter)
                     .padding(.bottom, 10)
