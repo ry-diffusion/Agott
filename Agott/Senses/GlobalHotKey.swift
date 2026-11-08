@@ -4,15 +4,14 @@ import Carbon.HIToolbox
 
 /// The shortcut that opens quick entry to type, from any app.
 nonisolated enum TextShortcut: String, CaseIterable, Identifiable, Codable, Sendable {
-    case optionSpace, controlSpace, commandShiftSpace, off
+    // Only ⌥ Space: ⌘ Space is Spotlight and ⌃ Space switches input sources.
+    case optionSpace, off
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .optionSpace: "⌥ Space"
-        case .controlSpace: "⌃ Space"
-        case .commandShiftSpace: "⌘ ⇧ Space"
         case .off: String(localized: "Off")
         }
     }
@@ -21,8 +20,6 @@ nonisolated enum TextShortcut: String, CaseIterable, Identifiable, Codable, Send
     var modifiers: UInt32? {
         switch self {
         case .optionSpace: UInt32(optionKey)
-        case .controlSpace: UInt32(controlKey)
-        case .commandShiftSpace: UInt32(cmdKey | shiftKey)
         case .off: nil
         }
     }
