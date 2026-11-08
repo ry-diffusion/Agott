@@ -104,7 +104,9 @@ nonisolated struct MediaTag: Hashable, Sendable {
     var title: String
     var by: String?
 
-    nonisolated(unsafe) static let pattern = /<media\s[^>]*?\/?>/
+    /// Up to the closing "/>", so a title with quotes or ">" in it does not
+    /// cut the tag in half and leave `" by="…"/>` in the text.
+    nonisolated(unsafe) static let pattern = /<media\b.*?\/>/
 
     /// Every media tag in a text, rewritten (nil for one that cannot be read).
     static func replace(in text: String, _ transform: (MediaTag?) -> String) -> String {
@@ -114,8 +116,18 @@ nonisolated struct MediaTag: Hashable, Sendable {
     }
 
     init?(_ tag: String) {
+        // Each value runs to the next attribute (or the end), so quotes inside
+        // a title survive: title="O "Paredão"" by="Os Parazim".
         var values: [String: String] = [:]
-        for match in tag.matches(of: /(\w+)\s*=\s*"([^"]*)"/) { values[String(match.1).lowercased()] = String(match.2) }
+        let keys = tag.matches(of: /\s(kind|title|by)\s*=\s*"/)
+        for (index, key) in keys.enumerated() {
+            let end = index + 1 < keys.count ? keys[index + 1].range.lowerBound : tag.endIndex
+            var value = String(tag[key.range.upperBound..<end]).trimmingCharacters(in: .whitespaces)
+            if value.hasSuffix("/>") { value.removeLast(2) }
+            value = value.trimmingCharacters(in: .whitespaces)
+            if value.hasSuffix("\"") { value.removeLast() }
+            values[String(key.1).lowercased()] = value.trimmingCharacters(in: .whitespaces)
+        }
         guard let title = values["title"], !title.isEmpty else { return nil }
         self.kind = values["kind"] ?? "song"
         self.title = title

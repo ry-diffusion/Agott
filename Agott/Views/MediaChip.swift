@@ -10,8 +10,11 @@ struct MediaChip: View {
 
     var body: some View {
         Button { showing = true } label: {
-            HStack(spacing: 5) {
+            // Aligned on the words' baseline, so the chip sits level with the
+            // sentence around it instead of a few points lower.
+            HStack(alignment: .firstTextBaseline, spacing: 5) {
                 Artwork(url: image, kind: media.kind, size: 18)
+                    .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 4 }
                 Text(media.title).fontWeight(.semibold).foregroundStyle(Ink.text)
                 if let by = media.by {
                     Text(verbatim: "· \(by)").foregroundStyle(Ink.muted)

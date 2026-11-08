@@ -1313,3 +1313,14 @@ struct ArtworkTests {
         #expect(ArtworkLookup.artistMatches("Anyone", nil))
     }
 }
+
+@Suite("Media tags with quotes")
+struct MediaTagQuoteTests {
+    @Test func quotesInsideTheTitleSurvive() throws {
+        let media = try #require(MediaTag(#"<media kind="song" title="Bota no "Paredão"" by="Os Parazim"/>"#))
+        #expect(media.title == #"Bota no "Paredão""#)
+        #expect(media.by == "Os Parazim")
+        let text = #"Tocando <media kind="song" title="Bota no "Paredão"" by="Os Parazim"/> no Spotify."#
+        #expect(!EntityText.plain(text, hidden: false).contains("by="))
+    }
+}
