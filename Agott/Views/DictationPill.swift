@@ -11,8 +11,10 @@ nonisolated enum CaretLocator {
     static func caretRect() -> CGRect? {
         guard AXIsProcessTrusted() else { return nil }
         let system = AXUIElementCreateSystemWide()
-        // A busy app must not stall the key press.
-        AXUIElementSetMessagingTimeout(system, 0.25)
+        // A busy app must not stall the pill: a short timeout on this one
+        // element. Never on the system-wide element, where it would become
+        // the timeout of every Accessibility call Agott makes (computer
+        // use would give up on slow apps, and retry a press that landed).
         guard let element: AXUIElement = value(system, kAXFocusedUIElementAttribute) else { return nil }
         AXUIElementSetMessagingTimeout(element, 0.25)
 
