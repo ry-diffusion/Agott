@@ -36,6 +36,11 @@ final class QuickEntryController {
         panel.makeKeyAndOrderFront(nil)
     }
 
+    /// Back to the question box, after a file was chosen in another window.
+    func focus() {
+        panel?.makeKeyAndOrderFront(nil)
+    }
+
     func hide() {
         panel?.orderOut(nil)
         panel?.contentView = nil
@@ -110,6 +115,11 @@ struct QuickEntryView: View {
             }
         }
         .ignoresSafeArea()
+        // Files dragged from Finder onto the screen are attached.
+        .dropDestination(for: URL.self) { urls, _ in
+            attach(urls.filter(\.isFileURL))
+            return !urls.isEmpty
+        }
         .onAppear { focused = true }
         .task { windows = await Self.shareableWindows(on: displayID) }
         .background {
@@ -131,6 +141,9 @@ struct QuickEntryView: View {
                     .lineLimit(1...5)
                     .focused($focused)
                     .onSubmit(send)
+                Button(action: choose) { Image(systemName: "paperclip") }
+                    .buttonStyle(HoverIconStyle(size: 30))
+                    .help(Text("Attach a photo, PDF or file"))
                 Menu {
                     Button("New conversation") { newChat = true }
                     Button("Continue the current one") { newChat = false }
@@ -188,6 +201,29 @@ struct QuickEntryView: View {
         let attachments = pending
         close()
         Copilot.shared.ask(question, attachments: attachments, newChat: newChat)
+    }
+
+    // MARK: Files
+
+    /// Finder's open panel, above the dimmed screen (which floats over
+    /// every window, so a sheet or a normal panel would sit under it).
+    private func choose() {
+        let open = NSOpenPanel()
+        open.allowsMultipleSelection = true
+        open.canChooseDirectories = false
+        open.level = .modalPanel
+        NSApp.activate()
+        open.begin { response in
+            if response == .OK { attach(open.urls) }
+            QuickEntryController.shared.focus()
+            focused = true
+        }
+    }
+
+    private func attach(_ urls: [URL]) {
+        for url in urls {
+            if let attachment = try? AttachmentStore.add(url) { pending.append(attachment) }
+        }
     }
 
     // MARK: Capture

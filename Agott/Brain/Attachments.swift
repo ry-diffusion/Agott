@@ -3,17 +3,23 @@ import FoundationModels
 import PDFKit
 import UniformTypeIdentifiers
 import Vision
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
 
-/// A file you sent in the chat: a photo, a PDF, a text or code file.
+/// A file you sent in the chat: a photo, a PDF, a document (Word, RTF,
+/// OpenDocument, a web page), a text or code file.
 nonisolated struct FileAttachment: Codable, Hashable, Identifiable, Sendable {
     enum Kind: String, Codable, Sendable {
-        case image, pdf, text, file
+        case image, pdf, document, text, file
 
         var symbol: String {
             switch self {
             case .image: "photo"
             case .pdf: "doc.richtext"
-            case .text: "doc.text"
+            case .document, .text: "doc.text"
             case .file: "doc"
             }
         }
@@ -41,10 +47,21 @@ nonisolated enum AttachmentStore {
     /// Characters of a file's text that go to the model.
     static let textBudget = 40_000
 
+    /// Pages the text layer leaves empty (a scan) are read from the picture,
+    /// up to this many per PDF.
+    static let scannedPageBudget = 30
+
+    /// Formats the system reads as styled text: Word, RTF, OpenDocument and
+    /// web pages. A web page is checked here before it counts as plain text.
+    static let documentTypes: [UTType] = [.rtf, .rtfd, .flatRTFD, .html, .webArchive]
+        + ["org.openxmlformats.wordprocessingml.document", "com.microsoft.word.doc",
+           "org.oasis-open.opendocument.text"].compactMap { UTType($0) }
+
     static func kind(of url: URL) -> FileAttachment.Kind {
         guard let type = UTType(filenameExtension: url.pathExtension.lowercased()) else { return .file }
         if type.conforms(to: .image) { return .image }
         if type.conforms(to: .pdf) { return .pdf }
+        if documentTypes.contains(where: { type.conforms(to: $0) }) { return .document }
         if type.conforms(to: .text) || type.conforms(to: .sourceCode) || type.conforms(to: .json)
             || type.conforms(to: .commaSeparatedText) || type.conforms(to: .xml) { return .text }
         return .file
@@ -66,21 +83,31 @@ nonisolated enum AttachmentStore {
             pages: kind == .pdf ? PDFDocument(url: destination)?.pageCount : nil, bytes: size)
     }
 
-    /// The words in a file, for the model: a PDF's text, a text file, or what
-    /// is written in an image.
+    /// The words in a file, for the model: a PDF's text (scanned pages read
+    /// from the picture), a document's, a text file, or what is written in
+    /// an image.
     @concurrent static func text(of attachment: FileAttachment) async -> String? {
         switch attachment.kind {
         case .pdf:
             guard let document = PDFDocument(url: attachment.url) else { return nil }
             var text = ""
+            var scanned = 0
             for index in 0..<document.pageCount {
-                // A page with no text (a scan, a figure, a blank cover) is skipped,
-                // not the end of the document.
                 guard text.count < textBudget else { break }
-                guard let page = document.page(at: index)?.string else { continue }
-                text += "\n[page \(index + 1)]\n" + page
+                guard let page = document.page(at: index) else { continue }
+                var words = page.string ?? ""
+                // A page with no text layer is a scan or a figure: read the
+                // picture. A blank one is skipped, not the end of the document.
+                if words.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, scanned < scannedPageBudget {
+                    scanned += 1
+                    words = await recognizedText(in: page) ?? ""
+                }
+                guard !words.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+                text += "\n[page \(index + 1)]\n" + words
             }
             return String(text.prefix(textBudget))
+        case .document:
+            return await documentText(attachment.url).map { String($0.prefix(textBudget)) }
         case .text:
             guard let data = try? Data(contentsOf: attachment.url) else { return nil }
             return String(String(decoding: data, as: UTF8.self).prefix(textBudget))
@@ -89,6 +116,36 @@ nonisolated enum AttachmentStore {
         case .file:
             return nil
         }
+    }
+
+    /// A Word, RTF, OpenDocument or web page file as plain text. Web pages
+    /// are read through WebKit, which wants the main thread.
+    static func documentText(_ url: URL) async -> String? {
+        let type = UTType(filenameExtension: url.pathExtension.lowercased())
+        let web = type.map { $0.conforms(to: .html) || $0.conforms(to: .webArchive) } ?? false
+        func read() -> String? {
+            (try? NSAttributedString(url: url, options: [:], documentAttributes: nil))?.string
+        }
+        let text = web ? await MainActor.run { read() } : read()
+        guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        return text
+    }
+
+    /// What is written on a PDF page that has no text layer.
+    static func recognizedText(in page: PDFPage) async -> String? {
+        let bounds = page.bounds(for: .mediaBox)
+        guard bounds.width > 0, bounds.height > 0 else { return nil }
+        let scale = 2000 / max(bounds.width, bounds.height)
+        let picture = page.thumbnail(of: CGSize(width: bounds.width * scale, height: bounds.height * scale), for: .mediaBox)
+        #if os(macOS)
+        guard let image = picture.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
+        #else
+        guard let image = picture.cgImage else { return nil }
+        #endif
+        let request = RecognizeTextRequest()
+        guard let observations = try? await request.perform(on: image) else { return nil }
+        let lines = observations.compactMap { $0.topCandidates(1).first?.string }
+        return lines.isEmpty ? nil : lines.joined(separator: "\n")
     }
 
     static func recognizedText(in url: URL) async -> String? {

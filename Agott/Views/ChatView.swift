@@ -624,7 +624,7 @@ private struct ChatTopBar: View {
 #endif
 
 /// A round piece of glass with one symbol: send, stop.
-private struct CircleGlassButton: View {
+struct CircleGlassButton: View {
     var symbol: String
     var size: CGFloat
     var tinted = false

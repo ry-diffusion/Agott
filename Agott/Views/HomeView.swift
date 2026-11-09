@@ -1,5 +1,6 @@
 import EventKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Home: what is coming up on your calendar, your conversations by day, and
 /// a box to ask anything, which starts a new conversation.
@@ -44,10 +45,10 @@ struct HomeView: View {
         .safeAreaBar(edge: .top, spacing: 0) { topBar }
         // An inset, not a bar: only the question box blurs what passes behind.
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            AskBox(suggestions: true) { text in
+            AskBox(suggestions: true) { text, attachments in
                 navigator.section = .chat
                 agent.newConversation()
-                agent.send(text)
+                agent.send(text, attachments: attachments)
             }
             .frame(maxWidth: Self.column + 40)
             .padding(.horizontal, 24)
@@ -317,21 +318,28 @@ struct SidebarToggle: View {
 }
 
 /// The box you ask Agott in, on Home: suggestions above it, then a field
-/// with the model, attachments and the mic.
+/// with the model, a paperclip and the mic. Files dropped on it are attached.
 struct AskBox: View {
     var suggestions = false
-    var send: (String) -> Void
+    var send: (String, [FileAttachment]) -> Void
     @State private var draft = ""
+    @State private var pending: [FileAttachment] = []
+    @State private var importing = false
+    @State private var dropping = false
     @State private var picks: [(symbol: String, text: String)] = []
     @State private var dictation = Dictation.shared
     @FocusState private var focused: Bool
+
+    private var hasContent: Bool {
+        !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !pending.isEmpty
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             if suggestions && !picks.isEmpty {
                 HStack(spacing: 6) {
                     ForEach(picks.prefix(3), id: \.text) { item in
-                        Button { send(item.text) } label: {
+                        Button { send(item.text, []) } label: {
                             Label(item.text, systemImage: item.symbol)
                                 .font(.callout)
                                 .lineLimit(1)
@@ -349,23 +357,49 @@ struct AskBox: View {
                 .padding(.top, 8)
                 .padding(.bottom, 6)
             }
-            HStack(spacing: 8) {
-                // While the mic is on, the field shows what is being heard.
-                TextField(dictation.isRunning ? dictation.hint : String(localized: "Ask anything"),
-                          text: dictation.isRunning ? .constant(dictation.transcript) : $draft, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 15))
-                    .lineLimit(1...6)
-                    .focused($focused)
-                    .onSubmit(submit)
-                ModelButton()
-                HoldToTalkButton { text in send(text) }
+            VStack(alignment: .leading, spacing: 0) {
+                if !pending.isEmpty {
+                    PendingAttachments(attachments: $pending)
+                        .padding(.top, 10)
+                        .padding(.horizontal, 12)
+                }
+                HStack(spacing: 8) {
+                    // While the mic is on, the field shows what is being heard.
+                    TextField(dictation.isRunning ? dictation.hint : String(localized: "Ask anything"),
+                              text: dictation.isRunning ? .constant(dictation.transcript) : $draft, axis: .vertical)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 15))
+                        .lineLimit(1...6)
+                        .focused($focused)
+                        .onSubmit(submit)
+                    ModelButton()
+                    Button { importing = true } label: { Image(systemName: "paperclip") }
+                        .buttonStyle(HoverIconStyle(size: 30))
+                        .tip("Attach a photo, PDF or file", edge: .top)
+                    if hasContent && !dictation.isRunning {
+                        CircleGlassButton(symbol: "arrow.up", size: ChatView.inputHeight, tinted: true, action: submit)
+                            .tip("Send", edge: .top)
+                    } else {
+                        HoldToTalkButton { text in
+                            let attachments = pending
+                            pending = []
+                            send(text, attachments)
+                        }
+                    }
+                }
+                .padding(.leading, 18)
+                .padding(.trailing, 6)
+                .padding(.vertical, 6)
+                .frame(minHeight: 52)
             }
-            .padding(.leading, 18)
-            .padding(.trailing, 6)
-            .padding(.vertical, 6)
-            .frame(minHeight: 52)
             .frostedSurface(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay {
+                if dropping {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .strokeBorder(Ink.spot, style: StrokeStyle(lineWidth: 2, dash: [8, 6]))
+                        .allowsHitTesting(false)
+                }
+            }
         }
         .background {
             if suggestions {
@@ -373,16 +407,33 @@ struct AskBox: View {
                     .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Ink.hairline, lineWidth: 1))
             }
         }
+        .dropDestination(for: URL.self) { urls, _ in
+            attach(urls.filter(\.isFileURL))
+            return !urls.isEmpty
+        } isTargeted: { dropping = $0 }
+        .fileImporter(isPresented: $importing, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
+            if case .success(let urls) = result { attach(urls) }
+        }
+        .animation(.easeOut(duration: 0.15), value: hasContent)
         .task {
             if suggestions { picks = await ChatSuggestions.load() }
         }
     }
 
+    private func attach(_ urls: [URL]) {
+        for url in urls {
+            if let attachment = try? AttachmentStore.add(url) { pending.append(attachment) }
+        }
+        focused = true
+    }
+
     private func submit() {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
+        guard !text.isEmpty || !pending.isEmpty else { return }
+        let attachments = pending
         draft = ""
-        send(text)
+        pending = []
+        send(text, attachments)
     }
 }
 

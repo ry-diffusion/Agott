@@ -5,7 +5,11 @@
 
 import Foundation
 import FoundationModels
+import PDFKit
 import Testing
+#if os(macOS)
+import AppKit
+#endif
 import SwiftUI
 @testable import Agott
 
@@ -1394,3 +1398,53 @@ struct VoiceTests {
     }
 }
 #endif
+
+@Suite("Attachments")
+struct AttachmentTests {
+    @Test func documentsAreToldApart() {
+        func kind(_ name: String) -> FileAttachment.Kind { AttachmentStore.kind(of: URL(filePath: "/tmp/\(name)")) }
+        #expect(kind("contrato.pdf") == .pdf)
+        #expect(kind("carta.docx") == .document)
+        #expect(kind("notas.rtf") == .document)
+        #expect(kind("página.html") == .document)
+        #expect(kind("dados.csv") == .text)
+        #expect(kind("main.swift") == .text)
+        #expect(kind("foto.heic") == .image)
+        #expect(kind("planilha.xlsx") == .file)
+    }
+
+    @Test func richTextIsRead() async throws {
+        let folder = FileManager.default.temporaryDirectory.appending(path: "AgottTests-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let rtf = folder.appending(path: "carta.rtf")
+        try #"{\rtf1\ansi {\b Querido} amigo, segue o contrato.}"#.write(to: rtf, atomically: true, encoding: .utf8)
+        let text = await AttachmentStore.documentText(rtf)
+        #expect(text?.contains("Querido amigo, segue o contrato.") == true)
+    }
+
+    @Test func scannedPdfPagesAreRead() async throws {
+        #if os(macOS)
+        // A PDF whose only page is a picture of words: no text layer.
+        let folder = FileManager.default.temporaryDirectory.appending(path: "AgottTests-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let size = NSSize(width: 800, height: 400)
+        let picture = NSImage(size: size, flipped: false) { rect in
+            NSColor.white.setFill()
+            rect.fill()
+            ("Invoice total 4521" as NSString).draw(at: NSPoint(x: 60, y: 180),
+                withAttributes: [.font: NSFont.systemFont(ofSize: 56), .foregroundColor: NSColor.black])
+            return true
+        }
+        let document = PDFDocument()
+        document.insert(try #require(PDFPage(image: picture)), at: 0)
+        let url = folder.appending(path: "scan.pdf")
+        #expect(document.write(to: url))
+        let attachment = try AttachmentStore.add(url)
+        defer { try? FileManager.default.removeItem(at: attachment.url) }
+        let text = await AttachmentStore.text(of: attachment)
+        #expect(text?.contains("4521") == true)
+        #endif
+    }
+}
