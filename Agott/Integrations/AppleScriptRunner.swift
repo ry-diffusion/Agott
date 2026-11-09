@@ -41,6 +41,14 @@ nonisolated enum AppleScriptRunner {
         }
     }
 
+    /// AppleScript through `osascript`, off the main thread and really
+    /// bounded by `timeout`: for quick commands to an app that may be slow to
+    /// launch or not answering (in-process, NSAppleScript holds the main
+    /// thread for as long as the app takes, up to two minutes).
+    static func runOutOfProcess(_ source: String, timeout: TimeInterval) async throws -> String {
+        try await osascript(source, arguments: [], timeout: timeout)
+    }
+
     private static func osascript(_ source: String, arguments: [String], timeout: TimeInterval) async throws -> String {
         try await Task.detached {
             let process = Process()
@@ -56,6 +64,9 @@ nonisolated enum AppleScriptRunner {
             if process.isRunning { process.terminate(); throw Failure(message: "The script timed out.") }
             let out = String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
             let err = String(decoding: errors.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+            if process.terminationStatus != 0, err.contains("-1743") {
+                throw Failure(message: String(localized: "macOS blocked Agott from controlling that app. Allow it in System Settings → Privacy & Security → Automation."))
+            }
             guard process.terminationStatus == 0 else { throw Failure(message: err.isEmpty ? "osascript failed" : err) }
             return out.trimmingCharacters(in: .whitespacesAndNewlines)
         }.value

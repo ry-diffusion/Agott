@@ -6,7 +6,8 @@ import FoundationModels
 /// Plays through the Spotify app on this Mac: a track, album, artist or
 /// playlist by its URI, and pause, resume, next, previous. The app's own
 /// scripting does it, so no Premium and no extra Spotify permission; macOS
-/// asks once whether Agott may control Spotify.
+/// asks once whether Agott may control Spotify. Scripts run out of process,
+/// so a Spotify that is launching or hung never freezes Agott's window.
 nonisolated enum SpotifyPlayer {
     enum Failure: LocalizedError {
         case notInstalled
@@ -21,14 +22,14 @@ nonisolated enum SpotifyPlayer {
     static func play(uri: String) async throws {
         guard isInstalled else { throw Failure.notInstalled }
         let safe = uri.filter { $0.isLetter || $0.isNumber || $0 == ":" }
-        _ = try await AppleScriptRunner.run("tell application \"Spotify\" to play track \"\(safe)\"", timeout: 10)
+        _ = try await AppleScriptRunner.runOutOfProcess("tell application \"Spotify\" to play track \"\(safe)\"", timeout: 10)
     }
 
     enum Command: String { case pause, play, next = "next track", previous = "previous track", toggle = "playpause" }
 
     static func send(_ command: Command) async throws {
         guard isInstalled else { throw Failure.notInstalled }
-        _ = try await AppleScriptRunner.run("tell application \"Spotify\" to \(command.rawValue)", timeout: 10)
+        _ = try await AppleScriptRunner.runOutOfProcess("tell application \"Spotify\" to \(command.rawValue)", timeout: 10)
     }
 
     /// "Song — Artist", or nil when nothing is playing.
@@ -39,7 +40,7 @@ nonisolated enum SpotifyPlayer {
         end tell
         return ""
         """
-        let text = (try? await AppleScriptRunner.run(script, timeout: 5)) ?? ""
+        let text = (try? await AppleScriptRunner.runOutOfProcess(script, timeout: 5)) ?? ""
         return text.isEmpty ? nil : text
     }
 
