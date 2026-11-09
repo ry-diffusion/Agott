@@ -33,6 +33,9 @@ final class Copilot {
 
     #if os(macOS)
     let keys = HoldKeyMonitor()
+    /// The press that started the current dictation; a press while the last
+    /// one is still being read or typed is ignored, and so is its release.
+    @ObservationIgnored private var holding: HoldKeyMonitor.Purpose?
     @ObservationIgnored private let log = Logger(subsystem: "br.com.zesmoi.Agott", category: "dictation")
     #endif
 
@@ -62,6 +65,8 @@ final class Copilot {
     private func pressed(_ purpose: HoldKeyMonitor.Purpose) {
         notice = nil
         if purpose == .ask, Agent.shared.isBusy { return }
+        guard !Dictation.shared.isRunning, mode != .inserting else { return }
+        holding = purpose
         Dictation.shared.start()
         mode = .listening(ask: purpose == .ask)
         Agent.shared.setMood(.listening)
@@ -70,10 +75,15 @@ final class Copilot {
     }
 
     private func released(_ purpose: HoldKeyMonitor.Purpose, after duration: TimeInterval) {
+        guard holding == purpose else { return }
+        holding = nil
         Task {
-            // A tap, not a hold: open for typing.
+            // A tap, not a hold: open for typing, and put away the
+            // "Listening" overlay the press brought up.
             if duration < 0.35, purpose == .ask {
                 Dictation.shared.cancel()
+                mode = .hidden
+                OverlayController.shared.hide(after: 0)
                 beginTyping()
                 return
             }
@@ -143,6 +153,7 @@ final class Copilot {
 
     func abandon() {
         #if os(macOS)
+        holding = nil
         Dictation.shared.cancel()
         #endif
         if mode != .answering { mode = .hidden }

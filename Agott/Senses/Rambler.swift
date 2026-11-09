@@ -18,16 +18,7 @@ enum Rambler {
 
     /// `polish`, or the raw words when it takes longer than `limit`.
     static func polish(_ raw: String, within limit: Duration) async -> String {
-        await withTaskGroup(of: String?.self) { group in
-            group.addTask { await polish(raw) }
-            group.addTask {
-                try? await Task.sleep(for: limit)
-                return nil
-            }
-            let first = await group.next() ?? nil
-            group.cancelAll()
-            return first ?? raw
-        }
+        await Deadline.run(limit) { await polish(raw) } ?? raw
     }
 
     static func polish(_ raw: String) async -> String {

@@ -57,6 +57,12 @@ final class Dictation {
     @ObservationIgnored private var feed: AsyncStream<AnalyzerInput>.Continuation?
     @ObservationIgnored private var results: Task<Void, Never>?
     @ObservationIgnored private var starting: Task<Void, Error>?
+    /// Which run is current: a start still waiting on the microphone
+    /// permission after it was cancelled must not open the microphone.
+    @ObservationIgnored private var runID = 0
+    /// Stop is reading the last words; a second stop gets nothing, so the
+    /// same words are never typed twice.
+    @ObservationIgnored private var stopping = false
     #if os(macOS)
     /// This run listens with Parakeet: audio is kept and read on release.
     @ObservationIgnored private var parakeetRun = false
@@ -80,6 +86,8 @@ final class Dictation {
     func start() {
         guard !isRunning else { return }
         isRunning = true
+        runID += 1
+        let id = runID
         finalized = ""
         volatile = ""
         problem = nil
@@ -90,19 +98,26 @@ final class Dictation {
             && !ParakeetSetup.shared.failedToLoad
         engineName = parakeetRun ? "parakeet" : "apple"
         if parakeetRun {
-            starting = Task { try await beginParakeet() }
+            starting = Task { try await beginParakeet(id) }
             return
         }
         #endif
-        starting = Task { try await begin() }
+        starting = Task { try await begin(id) }
+    }
+
+    /// Throws when this run was stopped or replaced while it waited.
+    private func ensureCurrent(_ id: Int) throws {
+        try Task.checkCancellation()
+        guard runID == id, isRunning, !stopping else { throw CancellationError() }
     }
 
     #if os(macOS)
     /// Records at 16 kHz while the key is held; Parakeet loads meanwhile and
     /// reads the last seconds now and then so the pill shows words as you go.
-    private func beginParakeet() async throws {
+    private func beginParakeet(_ id: Int) async throws {
         do {
             guard await AVAudioApplication.requestRecordPermission() else { throw Failure.microphoneDenied }
+            try ensureCurrent(id)
             let language = Parakeet.language(for: AppSettings.shared.speechLocale)
             Task.detached(priority: .userInitiated) { try? await Parakeet.shared.prepare() }
             let capture = SpeechCapture()
@@ -125,8 +140,12 @@ final class Dictation {
                 }
             }
         } catch {
-            problem = error.localizedDescription
-            if !Task.isCancelled { tearDown() }
+            // A run that was stopped or replaced meanwhile is not this one's
+            // to tear down.
+            if runID == id, !(error is CancellationError), !Task.isCancelled {
+                problem = error.localizedDescription
+                tearDown()
+            }
             throw error
         }
     }
@@ -161,25 +180,32 @@ final class Dictation {
         let language = Parakeet.language(for: AppSettings.shared.speechLocale)
         // Under a third of a second is a stray tap, not speech.
         if samples.count > 5_000 {
-            do {
-                let text = try await Parakeet.shared.transcribe(samples, language: language)
-                finalized = text
-                volatile = ""
-            } catch {
-                problem = error.localizedDescription
-                // The last preview is better than nothing.
-                finalized = volatile
-                volatile = ""
+            // Bounded: a model that is still loading (or stuck) gives way to
+            // the last preview instead of holding the key's words forever.
+            let outcome = await Deadline.run(.seconds(20)) { () -> Result<String, Error> in
+                do { return .success(try await Parakeet.shared.transcribe(samples, language: language)) } catch { return .failure(error) }
             }
+            switch outcome {
+            case .success(let text):
+                finalized = text
+            case .failure(let error):
+                problem = error.localizedDescription
+                finalized = volatile
+            case nil:
+                problem = String(localized: "The transcription model took too long.")
+                finalized = volatile
+            }
+            volatile = ""
         }
         tearDown()
         return transcript
     }
     #endif
 
-    private func begin() async throws {
+    private func begin(_ id: Int) async throws {
         do {
             guard await AVAudioApplication.requestRecordPermission() else { throw Failure.microphoneDenied }
+            try ensureCurrent(id)
             let requested = AppSettings.shared.speechLocaleForApple
             guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: requested) else {
                 throw Failure.unsupportedLanguage
@@ -188,7 +214,7 @@ final class Dictation {
             if let install = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
                 try await install.downloadAndInstall()
             }
-            try Task.checkCancellation()
+            try ensureCurrent(id)
 
             let analyzer = SpeechAnalyzer(modules: [transcriber])
             let converter = try await AnalyzerInputConverter.converter(compatibleWith: [transcriber])
@@ -212,6 +238,7 @@ final class Dictation {
                 } catch {}
             }
 
+            try ensureCurrent(id)
             #if os(iOS)
             try AVAudioSession.sharedInstance().setCategory(.record, mode: .measurement, options: .duckOthers)
             try AVAudioSession.sharedInstance().setActive(true)
@@ -228,8 +255,10 @@ final class Dictation {
             // A run that could not start (no microphone, no language, the
             // model download failed) ends here instead of staying on
             // "Listening…" until someone presses the button again.
-            problem = error.localizedDescription
-            if !Task.isCancelled { tearDown() }
+            if runID == id, !(error is CancellationError), !Task.isCancelled {
+                problem = error.localizedDescription
+                tearDown()
+            }
             throw error
         }
     }
@@ -263,6 +292,8 @@ final class Dictation {
     @discardableResult
     func stop() async -> String {
         guard isRunning else { return transcript }
+        guard !stopping else { return "" }
+        stopping = true
         #if os(macOS)
         if parakeetRun { return await stopParakeet() }
         #endif
@@ -298,6 +329,7 @@ final class Dictation {
         results = nil
         analyzer = nil
         starting = nil
+        stopping = false
         #if os(macOS)
         preview?.cancel()
         preview = nil
@@ -313,12 +345,54 @@ final class Dictation {
 
     /// Runs `work`, giving up after `limit`. True when it finished in time.
     private static func within(_ limit: Duration, _ work: @escaping @Sendable () async -> Void) async -> Bool {
-        await withTaskGroup(of: Bool.self) { group in
-            group.addTask { await work(); return true }
-            group.addTask { try? await Task.sleep(for: limit); return false }
-            let first = await group.next() ?? false
-            group.cancelAll()
-            return first
+        await Deadline.run(limit) { await work(); return true } ?? false
+    }
+}
+
+/// Waits for some work at most `limit`, then goes on without it (the work is
+/// cancelled and its result dropped). A task group cannot do this: it waits
+/// for every child, so work that ignores cancellation — a model still
+/// loading — held the "timeout" for as long as it took.
+nonisolated enum Deadline {
+    static func run<T: Sendable>(_ limit: Duration, _ work: @escaping @Sendable () async -> T) async -> T? {
+        let gate = Gate<T>()
+        return await withCheckedContinuation { continuation in
+            gate.hold(continuation)
+            let timer = Task {
+                try? await Task.sleep(for: limit)
+                gate.resume(nil)
+            }
+            let worker = Task {
+                let value = await work()
+                timer.cancel()
+                gate.resume(value)
+            }
+            gate.onTimeout = { worker.cancel() }
+        }
+    }
+
+    private final class Gate<T: Sendable>: @unchecked Sendable {
+        private let lock = NSLock()
+        private var continuation: CheckedContinuation<T?, Never>?
+        var onTimeout: (@Sendable () -> Void)? {
+            get { lock.withLock { timeout } }
+            set { lock.withLock { timeout = newValue } }
+        }
+        private var timeout: (@Sendable () -> Void)?
+
+        func hold(_ continuation: CheckedContinuation<T?, Never>) {
+            lock.withLock { self.continuation = continuation }
+        }
+
+        /// The first value wins; a nil (time is up) also cancels the work.
+        func resume(_ value: T?) {
+            let (waiting, cancel) = lock.withLock { () -> (CheckedContinuation<T?, Never>?, (@Sendable () -> Void)?) in
+                defer { continuation = nil }
+                return (continuation, value == nil ? timeout : nil)
+            }
+            guard let waiting else { return }
+            waiting.resume(returning: value)
+            cancel?()
         }
     }
 }
