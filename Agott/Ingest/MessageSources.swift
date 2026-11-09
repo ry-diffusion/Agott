@@ -19,7 +19,7 @@ nonisolated protocol MessageSource: Sendable {
     func estimatedCount(after: Double, before: Double?) -> Int?
 }
 
-extension MessageSource {
+nonisolated extension MessageSource {
     var supportsNewestFirst: Bool { false }
     func estimatedCount(after: Double, before: Double?) -> Int? { nil }
 
@@ -127,7 +127,13 @@ nonisolated struct IMessageSource: MessageSource {
     }
 
     static func decodeAttributedBody(_ data: Data) -> String? {
-        if let string = NSUnarchiver.unarchiveObject(with: data) as? NSAttributedString {
+        // iMessage stores the text as an old typedstream archive, which only
+        // NSUnarchiver reads in full. It is deprecated (NSKeyedUnarchiver
+        // cannot read this format), so it is reached through the runtime:
+        // same reader, no warning, and the fallback below if it ever goes.
+        if let unarchiver = NSClassFromString("NSUnarchiver") as? NSObject.Type,
+           let object = unarchiver.perform(NSSelectorFromString("unarchiveObjectWithData:"), with: data)?.takeUnretainedValue(),
+           let string = object as? NSAttributedString {
             return string.string
         }
         // Typedstream fallback: the string follows "NSString", a few marker

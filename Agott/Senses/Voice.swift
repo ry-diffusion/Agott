@@ -124,9 +124,9 @@ actor Voice {
             let engine = AVAudioEngine()
             let player = AVAudioPlayerNode()
             engine.attach(player)
-            engine.connect(player, to: engine.mainMixerNode, format: format)
+            try engine.connectNode(player, to: engine.mainMixerNode, format: format)
             try engine.start()
-            player.play()
+            try player.playAudio()
             self.engine = engine
             self.player = player
         }

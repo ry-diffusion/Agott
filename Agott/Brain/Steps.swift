@@ -172,7 +172,7 @@ enum StepTracker {
 
     /// Memory results come back as "### Source · Chat · date" sections; each
     /// becomes an item you can scan instead of a wall of text.
-    static func items(in output: String) -> [Step.Item] {
+    nonisolated static func items(in output: String) -> [Step.Item] {
         output.components(separatedBy: "\n### ").enumerated().compactMap { index, section -> Step.Item? in
             var section = Substring(section)
             if index == 0 {
@@ -191,7 +191,7 @@ enum StepTracker {
         }
     }
 
-    static func symbol(forSource name: String) -> String {
+    nonisolated static func symbol(forSource name: String) -> String {
         MemorySource.allCases.first { $0.displayName == name }?.symbol ?? "text.bubble"
     }
 

@@ -156,14 +156,9 @@ final class Dictation {
         level: @escaping @Sendable (Float) -> Void
     ) throws {
         let format = input.outputFormat(forBus: 0)
-        try input.installTap(onBus: 0, bufferSize: 2048, format: format) { buffer, _ in
-            if let samples = buffer.floatChannelData?[0] {
-                var sum: Float = 0
-                let count = Int(buffer.frameLength)
-                for index in 0..<count { sum += samples[index] * samples[index] }
-                level(min(1, sqrt(sum / Float(max(count, 1))) * 8))
-            }
-            capture.append(buffer)
+        try input.installAudioTap(onBus: 0, bufferSize: 2048, format: format) { buffer, _ in
+            level(Self.loudness(buffer))
+            capture.append(AVAudioPCMBuffer(copying: buffer))
         }
     }
 
@@ -273,17 +268,20 @@ final class Dictation {
     ) throws {
         nonisolated(unsafe) let converter = converter
         let format = input.outputFormat(forBus: 0)
-        try input.installTap(onBus: 0, bufferSize: 2048, format: format) { buffer, time in
-            if let samples = buffer.floatChannelData?[0] {
-                var sum: Float = 0
-                let count = Int(buffer.frameLength)
-                for index in 0..<count { sum += samples[index] * samples[index] }
-                level(min(1, sqrt(sum / Float(max(count, 1))) * 8))
-            }
-            if let inputs = try? converter.convert(buffer, at: time) {
+        try input.installAudioTap(onBus: 0, bufferSize: 2048, format: format) { buffer, time in
+            level(Self.loudness(buffer))
+            if let inputs = try? converter.convert(AVAudioPCMBuffer(copying: buffer), at: time) {
                 for item in inputs { feed.yield(item) }
             }
         }
+    }
+
+    /// How loud a buffer is, 0 to 1, for the meter.
+    nonisolated private static func loudness(_ buffer: AVReadOnlyAudioPCMBuffer) -> Float {
+        guard case .float(let samples) = buffer.channelData(0), samples.count > 0 else { return 0 }
+        var sum: Float = 0
+        for index in samples.indices { sum += samples[index] * samples[index] }
+        return min(1, sqrt(sum / Float(samples.count)) * 8)
     }
 
     /// Stops listening and returns everything heard. Never hangs: each wait

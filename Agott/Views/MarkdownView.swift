@@ -374,7 +374,7 @@ private struct TableBlock: View {
         }
     }
 
-    static func isNumber(_ text: String) -> Bool {
+    nonisolated static func isNumber(_ text: String) -> Bool {
         let core = text.replacingOccurrences(of: "R$", with: "").replacingOccurrences(of: "US$", with: "")
             .trimmingCharacters(in: CharacterSet(charactersIn: " %$€£+-*x×h"))
         return !core.isEmpty && core.allSatisfy { $0.isNumber || ".,: ".contains($0) }

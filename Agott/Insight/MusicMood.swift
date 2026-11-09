@@ -234,7 +234,7 @@ enum MusicMood {
             lateNightShare: plays.isEmpty ? 0 : Double(late) / Double(plays.count))
     }
 
-    static func describe(_ summary: Summary) -> String {
+    nonisolated static func describe(_ summary: Summary) -> String {
         guard summary.plays > 0 else { return "No music listened to in this period (or listening is turned off)." }
         var lines = ["\(summary.plays) songs played."]
         lines.append("Moods: " + summary.moods.prefix(6).map { "\($0.0) ×\($0.1)" }.joined(separator: ", "))

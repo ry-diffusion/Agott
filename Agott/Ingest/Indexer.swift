@@ -252,9 +252,9 @@ final class Indexer {
 
     /// Smaller pages newest-first: the first page is what you talked about
     /// today, and it should land in seconds.
-    private static let page = 2000
+    nonisolated private static let page = 2000
     /// "No upper bound yet": the newest-first pass starts from now.
-    private static let fromNow = 9e15
+    nonisolated private static let fromNow = 9e15
 
     /// Reads one source.
     ///

@@ -60,7 +60,7 @@ final class HookStore {
 /// System notifications for hooks, and what tapping them does.
 final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     static let shared = Notifier()
-    static let replyAction = "agott.reply"
+    nonisolated static let replyAction = "agott.reply"
     static let category = "agott.message"
 
     static func start() {

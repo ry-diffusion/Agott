@@ -244,11 +244,12 @@ nonisolated enum ModelAvailability {
             case .onDevice: SystemLanguageModel.default.isAvailable
             case .openCode: false
             }
-            lock.lock()
-            let changed = known[provider]?.available != available
-            known[provider] = (available, Date())
-            checking.remove(provider)
-            lock.unlock()
+            let changed = lock.withLock {
+                let changed = known[provider]?.available != available
+                known[provider] = (available, Date())
+                checking.remove(provider)
+                return changed
+            }
             if changed { await MainActor.run { ModelAvailabilityTick.shared.count += 1 } }
         }
     }

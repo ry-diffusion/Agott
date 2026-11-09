@@ -102,7 +102,7 @@ enum DemoData {
         ])
 
         let store = MemoryStore.shared
-        try? await store.ingest(messages)
+        _ = try? await store.ingest(messages)
         _ = try? await KnowledgeGraph.link(store: store)
         let facts: [(String, String, String, Double)] = [
             (me, "works on", "Agott", 0.95), (me, "uses", "SwiftUI", 0.9), (me, "is learning", "Foundation Models", 0.8),

@@ -259,7 +259,7 @@ extension String {
     /// Markdown as plain words for one-line previews: no stars, hashes,
     /// backticks, bullets or link syntax, one line. Copes with markers cut
     /// in half by truncation ("**muito").
-    var markdownStripped: String {
+    nonisolated var markdownStripped: String {
         var text = self
         // [label](url) → label
         text = text.replacing(/\[([^\]]*)\]\([^)]*\)?/) { String($0.1) }

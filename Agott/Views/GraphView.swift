@@ -352,7 +352,7 @@ struct GraphView: View {
     // MARK: Data
 
     /// A contact known only by a number tells you nothing on a map.
-    static func isPhoneOnly(_ name: String) -> Bool {
+    nonisolated static func isPhoneOnly(_ name: String) -> Bool {
         let digits = name.filter(\.isNumber).count
         return digits >= 7 && !name.contains(where: \.isLetter)
     }

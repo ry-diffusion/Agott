@@ -15,7 +15,7 @@ final class ContactPhotos {
     private(set) var byName: [String: URL] = [:]
     @ObservationIgnored private var images: [URL: Image] = [:]
 
-    static let root = URL.homeDirectory
+    nonisolated static let root = URL.homeDirectory
         .appending(path: "Library/Group Containers/group.net.whatsapp.WhatsApp.shared", directoryHint: .isDirectory)
 
     func refresh() async {
