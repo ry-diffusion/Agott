@@ -1163,6 +1163,16 @@
         }
       }
     },
+    "Automatic" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automático"
+          }
+        }
+      }
+    },
     "Autopilot" : {
       "localizations" : {
         "pt-BR" : {
@@ -2292,6 +2302,7 @@
       }
     },
     "English (US)" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -4894,6 +4905,16 @@
         }
       }
     },
+    "Play" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tocar"
+          }
+        }
+      }
+    },
     "Play something chill in Music" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -4926,6 +4947,16 @@
         }
       }
     },
+    "Playing on Spotify" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tocando no Spotify"
+          }
+        }
+      }
+    },
     "plays" : {
       "localizations" : {
         "pt-BR" : {
@@ -4947,6 +4978,7 @@
       }
     },
     "Português (Brasil)" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -6754,11 +6786,22 @@
       }
     },
     "The language you speak to Agott in." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "O idioma em que você fala com o Agott."
+          }
+        }
+      }
+    },
+    "The main language you speak in, for dictation and voice notes. Automatic lets Parakeet tell; Portuguese with English words mixed in works either way." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O idioma principal em que você fala, para a ditação e os áudios. Automático deixa o Parakeet descobrir; português com palavras em inglês funciona de qualquer jeito."
           }
         }
       }
@@ -6819,6 +6862,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "As pessoas e coisas da sua vida, e como se conectam."
+          }
+        }
+      }
+    },
+    "the search for %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "a busca por %@"
+          }
+        }
+      }
+    },
+    "The Spotify app is not on this Mac." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O app do Spotify não está neste Mac."
           }
         }
       }
@@ -8301,66 +8364,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "tô aqui. quer que eu te lembre amanhã às 9, ou prefere só descansar agora?"
-          }
-        }
-      }
-    },
-    "Playing on Spotify" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tocando no Spotify"
-          }
-        }
-      }
-    },
-    "Play" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tocar"
-          }
-        }
-      }
-    },
-    "The Spotify app is not on this Mac." : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O app do Spotify não está neste Mac."
-          }
-        }
-      }
-    },
-    "the search for %@" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "a busca por %@"
-          }
-        }
-      }
-    },
-    "Automatic" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Automático"
-          }
-        }
-      }
-    },
-    "The main language you speak in, for dictation and voice notes. Automatic lets Parakeet tell; Portuguese with English words mixed in works either way." : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O idioma principal em que você fala, para a ditação e os áudios. Automático deixa o Parakeet descobrir; português com palavras em inglês funciona de qualquer jeito."
           }
         }
       }

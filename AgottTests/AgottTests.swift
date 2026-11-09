@@ -877,6 +877,12 @@ struct PeopleDirectoryTests {
         #expect(text == "a <e id=3/> falou no <e id=9/>, e <e id=3/> riu")
         #expect(PeopleDirectory.tags(in: text) == [3, 9, 3])
     }
+
+    @Test func mediaTagsKeepTheirNames() {
+        let ana = PersonRef(id: 3, kind: .person, name: "Ana Souza")
+        let text = PeopleDirectory.tagNames(#"Ana Souza curte <media kind="song" title="Ana Souza" by="Ana Souza"/>"#, people: [ana])
+        #expect(text == #"<e id=3/> curte <media kind="song" title="Ana Souza" by="Ana Souza"/>"#)
+    }
 }
 
 
@@ -1322,5 +1328,38 @@ struct MediaTagQuoteTests {
         #expect(media.by == "Os Parazim")
         let text = #"Tocando <media kind="song" title="Bota no "Paredão"" by="Os Parazim"/> no Spotify."#
         #expect(!EntityText.plain(text, hidden: false).contains("by="))
+    }
+}
+
+@Suite("Second review fixes")
+struct SecondReviewFixTests {
+    @Test func voiceNotesCloseTogetherShareAMoment() {
+        let spans = MemoryStore.spans([0, 60, 120, 10_000, 10_030], gap: 45 * 60)
+        #expect(spans.count == 2)
+        #expect(spans[0] == (0, 120))
+        #expect(spans[1] == (10_000, 10_030))
+    }
+
+    @Test func picturesOnlyFromCatalogues() {
+        #expect(ArtworkLookup.trusted(URL(string: "https://i.scdn.co/image/ab67")) != nil)
+        #expect(ArtworkLookup.trusted(URL(string: "https://is1-ssl.mzstatic.com/image/x.jpg")) != nil)
+        #expect(ArtworkLookup.trusted(URL(string: "https://evil.example/p.png?secret=1")) == nil)
+        #expect(ArtworkLookup.trusted(URL(string: "http://i.scdn.co/image/ab67")) == nil)
+        #expect(ArtworkLookup.trusted(URL(string: "https://scdn.co.evil.example/x")) == nil)
+        #expect(ArtworkLookup.openable(URL(string: "file:///etc/passwd")) == nil)
+        #expect(ArtworkLookup.openable(URL(string: "spotify:track:123")) != nil)
+    }
+
+    @Test func deadlineDoesNotWaitForStubbornWork() async {
+        let clock = ContinuousClock.now
+        let value: Int? = await Deadline.run(.milliseconds(100)) {
+            // Ignores cancellation, like a model still loading.
+            let end = ContinuousClock.now + .seconds(2)
+            while ContinuousClock.now < end { usleep(10_000) }
+            return 1
+        }
+        #expect(value == nil)
+        #expect(ContinuousClock.now - clock < .seconds(1))
+        #expect(await Deadline.run(.seconds(1)) { 7 } == 7)
     }
 }
