@@ -17,9 +17,12 @@ enum ModelHub {
     }
 
     /// The provider to use: the chosen one if it works, else the best that does.
+    /// One whose first check has not landed yet (just after launch) is not
+    /// passed over: falling back then would send a question meant for this
+    /// Mac to a cloud model.
     static func resolved(_ preferred: ModelProvider? = nil) -> ModelProvider {
         let first = preferred ?? settings.provider
-        if isAvailable(first) { return first }
+        if isAvailable(first) || ModelAvailability.isUnknown(first) { return first }
         return ModelProvider.allCases.first(where: { isAvailable($0) }) ?? first
     }
 
@@ -174,7 +177,7 @@ enum ModelHub {
     /// The private choice for bulk reading of your messages: on-device when it
     /// exists, the chosen model when it does not.
     static var bulkProvider: ModelProvider {
-        isAvailable(.onDevice) ? .onDevice : resolved()
+        isAvailable(.onDevice) || ModelAvailability.isUnknown(.onDevice) ? .onDevice : resolved()
     }
 
     /// Who reads your messages to learn about you: your choice in Settings,
@@ -212,6 +215,16 @@ nonisolated enum ModelAvailability {
         lock.unlock()
         if stale { refresh(provider) }
         return entry?.available ?? false
+    }
+
+    /// True until the first check of an Apple model lands (and starts one).
+    static func isUnknown(_ provider: ModelProvider) -> Bool {
+        guard provider != .openCode else { return false }
+        lock.lock()
+        let unknown = known[provider] == nil
+        lock.unlock()
+        if unknown { refresh(provider) }
+        return unknown
     }
 
     /// Checks both at launch, so the first question finds an answer waiting.
