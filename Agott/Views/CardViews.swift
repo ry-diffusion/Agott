@@ -230,10 +230,10 @@ struct ExplanationCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: "lightbulb.max").font(.title3.weight(.bold))
-                Text(card.term).font(.title3.weight(.bold))
+                Text(EntityText.plain(card.term, hidden: AppSettings.shared.hideNames)).font(.title3.weight(.bold))
             }
             .foregroundStyle(Ink.text)
-            Text(card.meaning).foregroundStyle(Ink.text).fixedSize(horizontal: false, vertical: true)
+            TaggedText(text: card.meaning).foregroundStyle(Ink.text).fixedSize(horizontal: false, vertical: true)
             VStack(alignment: .leading, spacing: 10) {
                 ForEach(Array(card.examples.enumerated()), id: \.offset) { _, example in
                     HStack(alignment: .top, spacing: 10) {
@@ -259,6 +259,20 @@ struct ExplanationCard: View {
     }
 }
 
+/// Text the model wrote for a card: people's tags become their names
+/// (chips with their card), as in the reply itself, never "<e id=243/>".
+struct TaggedText: View {
+    var text: String
+
+    var body: some View {
+        if MarkdownView.mentionsPeople(text) {
+            MentionParagraph(text: text)
+        } else {
+            Text(text)
+        }
+    }
+}
+
 struct RepliesCard: View {
     var card: Card.Replies
     @State private var used: Int?
@@ -266,14 +280,19 @@ struct RepliesCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             PanelTitle(title: "You could reply", symbol: "bubble.left.and.text.bubble.right")
-            Text(card.context).font(.callout).foregroundStyle(Ink.muted)
+            // The model names people by tag: here they become names (chips
+            // where there is room), never "<e id=243/>".
+            TaggedText(text: card.context).font(.callout).foregroundStyle(Ink.muted)
             ForEach(Array(card.options.enumerated()), id: \.offset) { index, option in
+                // What gets typed or copied is sent to someone: real names.
+                let reply = EntityText.plain(option.text, hidden: false)
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Chip(text: option.tone.capitalized, spot: index == 0)
-                        Text(option.why).font(.caption).foregroundStyle(Ink.muted).lineLimit(2)
+                        Text(EntityText.plain(option.why, hidden: AppSettings.shared.hideNames))
+                            .font(.caption).foregroundStyle(Ink.muted).lineLimit(2)
                     }
-                    Text(option.text)
+                    Text(EntityText.plain(option.text, hidden: AppSettings.shared.hideNames))
                         .font(.body.weight(.medium))
                         .foregroundStyle(Ink.text)
                         .textSelection(.enabled)
@@ -282,14 +301,14 @@ struct RepliesCard: View {
                         #if os(macOS)
                         Button {
                             used = index
-                            Clipboard.insertIntoTargetApp(option.text)
+                            Clipboard.insertIntoTargetApp(reply)
                         } label: {
                             Label(used == index ? "Inserted" : "Insert", systemImage: used == index ? "checkmark" : "text.insert")
                         }
                         .buttonStyle(.candy(.primary, compact: true))
                         #endif
                         Button {
-                            Clipboard.copy(option.text)
+                            Clipboard.copy(reply)
                         } label: {
                             Label("Copy", systemImage: "doc.on.doc")
                         }
@@ -350,13 +369,13 @@ struct PersonCard: View {
             HStack(alignment: .center, spacing: 12) {
                 Avatar(name: card.name, size: 46)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(card.name).font(.headline).foregroundStyle(Ink.text)
+                    Text(EntityText.plain(card.name, hidden: AppSettings.shared.hideNames)).font(.headline).foregroundStyle(Ink.text)
                     Text(card.vibe.capitalized).font(.callout).foregroundStyle(Ink.muted)
                 }
                 Spacer()
                 ClosenessRing(value: card.closeness)
             }
-            Text(card.summary).foregroundStyle(Ink.text).fixedSize(horizontal: false, vertical: true)
+            TaggedText(text: card.summary).foregroundStyle(Ink.text).fixedSize(horizontal: false, vertical: true)
             if !card.openLoops.isEmpty {
                 VStack(alignment: .leading, spacing: 5) {
                     Text("Left hanging").font(.callout.weight(.bold)).foregroundStyle(Ink.text)
@@ -446,13 +465,13 @@ struct EventsCard: View {
                                 .monospacedDigit()
                                 .foregroundStyle(Ink.muted)
                                 .frame(width: 40, alignment: .leading)
-                            Text(item.title)
+                            Text(EntityText.plain(item.title, hidden: AppSettings.shared.hideNames))
                                 .font(.callout)
                                 .foregroundStyle(Ink.text)
                                 .lineLimit(1)
                                 .layoutPriority(1)
                             if !item.detail.isEmpty {
-                                Text(item.detail)
+                                Text(EntityText.plain(item.detail, hidden: AppSettings.shared.hideNames))
                                     .font(.caption)
                                     .foregroundStyle(Ink.muted)
                                     .lineLimit(1)
@@ -493,7 +512,7 @@ struct NoteCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             PanelTitle(title: LocalizedStringKey(card.title), symbol: card.symbol)
-            Text(card.body).foregroundStyle(Ink.text)
+            TaggedText(text: card.body).foregroundStyle(Ink.text)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .panel()
@@ -559,23 +578,24 @@ struct ConsistencyCard: View {
                 .foregroundStyle(card.gap >= 50 ? Ink.spot : Ink.text)
                 .accessibilityLabel(Text("Gap \(card.gap) of 100"))
             }
-            Text(card.verdict).font(.body.weight(.semibold)).foregroundStyle(Ink.text).fixedSize(horizontal: false, vertical: true)
+            TaggedText(text: card.verdict).font(.body.weight(.semibold)).foregroundStyle(Ink.text).fixedSize(horizontal: false, vertical: true)
 
             HStack(alignment: .top, spacing: 12) {
-                side(title: "To \(card.name)", symbol: "person.fill.checkmark", text: card.toThem, tone: card.toneToThem)
-                side(title: "About \(card.name)", symbol: "bubble.left.and.exclamationmark.bubble.right", text: card.aboutThem, tone: card.toneAboutThem)
+                let name = EntityText.plain(card.name, hidden: AppSettings.shared.hideNames)
+                side(title: "To \(name)", symbol: "person.fill.checkmark", text: card.toThem, tone: card.toneToThem)
+                side(title: "About \(name)", symbol: "bubble.left.and.exclamationmark.bubble.right", text: card.aboutThem, tone: card.toneAboutThem)
             }
 
             if !card.quotes.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(Array(card.quotes.enumerated()), id: \.offset) { _, quote in
                         VStack(alignment: quote.direct ? .leading : .trailing, spacing: 3) {
-                            Text(quote.text)
+                            Text(EntityText.plain(quote.text, hidden: AppSettings.shared.hideNames))
                                 .font(.callout)
                                 .foregroundStyle(quote.direct ? Ink.text : Ink.onSpot)
                                 .balloon(quote.direct ? .leading : .trailing, fill: quote.direct ? Ink.raised : Ink.spot,
                                          padding: EdgeInsets(top: 7, leading: 11, bottom: 7, trailing: 11))
-                            Text(quote.context).font(.caption2).foregroundStyle(Ink.muted)
+                            TaggedText(text: quote.context).font(.caption2).foregroundStyle(Ink.muted)
                         }
                         .frame(maxWidth: .infinity, alignment: quote.direct ? .leading : .trailing)
                     }
@@ -594,7 +614,7 @@ struct ConsistencyCard: View {
     private func side(title: LocalizedStringKey, symbol: String, text: String, tone: Double) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Label(title, systemImage: symbol).font(.caption.weight(.bold)).foregroundStyle(Ink.muted)
-            Text(text).font(.callout).foregroundStyle(Ink.text).fixedSize(horizontal: false, vertical: true)
+            TaggedText(text: text).font(.callout).foregroundStyle(Ink.text).fixedSize(horizontal: false, vertical: true)
             ToneBar(value: tone)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

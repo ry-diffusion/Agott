@@ -55,7 +55,7 @@ nonisolated struct SuggestRepliesTool: Tool {
 
         @Generable
         struct Option {
-            @Guide(description: "The reply exactly as it would be sent")
+            @Guide(description: "The reply exactly as it would be sent, in plain words: names written out, never a <e id=…/> tag")
             var text: String
             @Guide(description: "Tone in one or two words")
             var tone: String
