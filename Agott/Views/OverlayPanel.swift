@@ -169,10 +169,10 @@ struct OverlayView: View {
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
+                    // Only the answers: you know what you asked, and the
+                    // header line already says what it is doing.
                     ForEach(copilot.overlayTurns) { turn in
-                        if turn.role == .user {
-                            Text(turn.text).font(.system(size: 15)).foregroundStyle(Ink.muted)
-                        } else {
+                        if turn.role != .user {
                             // Reading size, not caption size: this is the answer.
                             AssistantTurnView(turn: turn, compact: true)
                                 .font(.system(size: 16))

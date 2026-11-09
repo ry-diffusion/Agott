@@ -20,7 +20,9 @@ struct AssistantTurnView: View {
             // it: the folded "Thought for 6s" line, unless steps are hidden.
             let working = turn.isStreaming && turn.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 && turn.cards.isEmpty && turn.error == nil
-            if working || (AppSettings.shared.showSteps && !turn.steps.isEmpty) {
+            // Compact (the overlay): its own header line is the progress,
+            // so no second spinner and no steps here.
+            if !compact, working || (AppSettings.shared.showSteps && !turn.steps.isEmpty) {
                 StepsView(steps: turn.steps, isStreaming: working, started: turn.date,
                           status: working ? Agent.shared.status : nil)
             }
