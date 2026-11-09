@@ -25,6 +25,7 @@ final class SpotifyAccount {
 
     @ObservationIgnored private var accessToken: String?
     @ObservationIgnored private var expires = Date.distantPast
+    @ObservationIgnored private var refreshing: Task<Void, Error>?
     @ObservationIgnored private var verifier = ""
 
     private init() {
@@ -187,8 +188,18 @@ final class SpotifyAccount {
 
     private func validToken() async throws -> String {
         if let accessToken, expires > Date().addingTimeInterval(60) { return accessToken }
-        guard let refresh = Keychain.get(Self.refreshAccount) else { throw SpotifyError.notConnected }
-        try await token(["grant_type": "refresh_token", "refresh_token": refresh, "client_id": clientID])
+        // One refresh at a time: Spotify rotates the refresh token, so a
+        // second refresh with the old one (covers for a list, all at once)
+        // was refused and signed you out.
+        if let refreshing {
+            try await refreshing.value
+        } else {
+            guard let refresh = Keychain.get(Self.refreshAccount) else { throw SpotifyError.notConnected }
+            let task = Task { try await token(["grant_type": "refresh_token", "refresh_token": refresh, "client_id": clientID]) }
+            refreshing = task
+            defer { refreshing = nil }
+            try await task.value
+        }
         guard let accessToken else { throw SpotifyError.notConnected }
         return accessToken
     }
@@ -202,11 +213,13 @@ final class SpotifyAccount {
         request.httpBody = Data(form.map { "\($0.key)=\($0.value.addingPercentEncoding(withAllowedCharacters: allowed) ?? $0.value)" }
             .joined(separator: "&").utf8)
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard (response as? HTTPURLResponse)?.statusCode == 200,
-              let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let access = json["access_token"] as? String else {
-            if form["grant_type"] == "refresh_token" { signOut() }
-            throw SpotifyError.http((response as? HTTPURLResponse)?.statusCode ?? 0)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        guard status == 200, let json, let access = json["access_token"] as? String else {
+            // Only a refresh Spotify says is no longer valid (revoked access)
+            // signs you out; a hiccup (a 5xx, a rate limit) is just an error.
+            if form["grant_type"] == "refresh_token", json?["error"] as? String == "invalid_grant" { signOut() }
+            throw SpotifyError.http(status)
         }
         accessToken = access
         expires = Date().addingTimeInterval(json["expires_in"] as? Double ?? 3600)
