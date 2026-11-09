@@ -93,7 +93,7 @@ struct RootView: View {
             // Pages without a top bar of their own still get a title bar strip.
             .overlay(alignment: .top) {
                 if section != .home && section != .chat {
-                    TitleBarArea().frame(height: WindowBar.height)
+                    TitleBarArea(doubleClickOnly: true).frame(height: WindowBar.height)
                 }
             }
             .id(section)

@@ -7,12 +7,31 @@ import SwiftUI
 /// behind a top bar: its buttons keep their clicks, the gaps between them
 /// become title bar.
 struct TitleBarArea: NSViewRepresentable {
-    func makeNSView(context: Context) -> TitleBarView { TitleBarView() }
-    func updateNSView(_ view: TitleBarView, context: Context) {}
+    /// Laid over a page rather than behind a bar: it takes only double-clicks,
+    /// and every other click reaches what the page draws there (a back
+    /// button, a chip), so the strip never swallows one.
+    var doubleClickOnly = false
+
+    func makeNSView(context: Context) -> TitleBarView {
+        let view = TitleBarView()
+        view.doubleClickOnly = doubleClickOnly
+        return view
+    }
+
+    func updateNSView(_ view: TitleBarView, context: Context) { view.doubleClickOnly = doubleClickOnly }
 }
 
 class TitleBarView: NSView {
+    var doubleClickOnly = false
+
     override var mouseDownCanMoveWindow: Bool { false }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        if doubleClickOnly {
+            guard let event = NSApp.currentEvent, event.type == .leftMouseDown, event.clickCount >= 2 else { return nil }
+        }
+        return super.hitTest(point)
+    }
 
     override func mouseDown(with event: NSEvent) {
         guard let window else { return }
