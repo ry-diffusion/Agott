@@ -15,6 +15,9 @@ struct DocumentRow: View {
     var badge: String?
     var outgoing = false
     var highlighted = false
+    /// Takes the whole width offered (a list), or only what it needs (a
+    /// file in your message, on the right beside your words).
+    var fills = true
 
     var body: some View {
         HStack(spacing: 12) {
@@ -45,9 +48,9 @@ struct DocumentRow: View {
                     .foregroundStyle(outgoing ? AnyShapeStyle(Ink.onSpot.opacity(0.75)) : AnyShapeStyle(Ink.muted))
                     .lineLimit(1)
             }
-            Spacer(minLength: 0)
+            if fills { Spacer(minLength: 0) }
         }
-        .frame(minWidth: 220, alignment: .leading)
+        .frame(minWidth: fills ? 220 : nil, alignment: .leading)
     }
 }
 
@@ -76,7 +79,7 @@ struct AttachmentsView: View {
     var outgoing: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .trailing, spacing: 6) {
             ForEach(attachments) { attachment in
                 Button { attachment.open() } label: {
                     if attachment.kind == .image {
@@ -91,8 +94,14 @@ struct AttachmentsView: View {
                         .frame(minWidth: 120, minHeight: 90)
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     } else {
+                        // Each file in a bubble of its own, like your words.
                         DocumentRow(symbol: attachment.kind.symbol, title: attachment.name, detail: attachment.detail,
-                                    badge: attachment.badge, outgoing: outgoing)
+                                    badge: attachment.badge, outgoing: outgoing, fills: false)
+                            .padding(.leading, 8)
+                            .padding(.trailing, 14)
+                            .padding(.vertical, 8)
+                            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Ink.bubble))
+                            .frame(maxWidth: 380, alignment: .trailing)
                     }
                 }
                 .buttonStyle(.plain)
