@@ -654,27 +654,45 @@ actor MemoryStore {
     }
 
     /// Throws away every voice note read so far (photos stay), and rebuilds
-    /// the moments they were in, so they can be read again with a better
-    /// engine. Returns how many were removed.
+    /// only the moments they were in, so they can be read again with a
+    /// better engine. Returns how many were removed.
     func forgetVoiceNotes() throws -> Int {
         let db = try open()
         let match = "source = 'whatsapp' AND ext_id LIKE 'media-%' AND (text LIKE '[voice note]%' OR text LIKE '[áudio]%')"
-        var chats: [(String, Double, Double)] = []
-        try db.rows("SELECT chat_id, MIN(ts), MAX(ts) FROM messages WHERE \(match) GROUP BY chat_id") {
-            chats.append(($0.text(0) ?? "", $0.double(1), $0.double(2)))
+        var times: [String: [Double]] = [:]
+        try db.rows("SELECT chat_id, ts FROM messages WHERE \(match) ORDER BY chat_id, ts") {
+            times[$0.text(0) ?? "", default: []].append($0.double(1))
         }
-        guard !chats.isEmpty else { return 0 }
+        guard !times.isEmpty else { return 0 }
         var removed = 0
         try db.transaction {
             try db.execute("DELETE FROM messages WHERE \(match)")
             removed = db.changes
-            for (chatID, earliest, latest) in chats {
-                try rechunk(db: db, source: .whatsapp, chatID: chatID, from: earliest, through: latest)
+            // Notes close together share a moment; each moment is rebuilt
+            // once, and the years between them stay as they are (no new
+            // summaries, vectors or facts for chats that did not change).
+            for (chatID, stamps) in times {
+                for (earliest, latest) in Self.spans(stamps, gap: Self.momentGap) {
+                    try rechunk(db: db, source: .whatsapp, chatID: chatID, from: earliest, through: latest)
+                }
             }
         }
-        try refreshChats(db: db, keys: chats.map { (MemorySource.whatsapp, $0.0) })
+        try refreshChats(db: db, keys: times.keys.map { (MemorySource.whatsapp, $0) })
         vectorCache = nil
         return removed
+    }
+
+    /// Sorted times grouped into runs no more than `gap` apart.
+    nonisolated static func spans(_ sorted: [Double], gap: Double) -> [(Double, Double)] {
+        var result: [(Double, Double)] = []
+        for time in sorted {
+            if let last = result.last, time - last.1 <= gap {
+                result[result.count - 1].1 = time
+            } else {
+                result.append((time, time))
+            }
+        }
+        return result
     }
 
     func counts() throws -> [MemorySource: Int] {
