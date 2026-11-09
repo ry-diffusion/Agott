@@ -76,6 +76,7 @@ struct OverlayView: View {
     @State private var agent = Agent.shared
     @State private var copilot = Copilot.shared
     @State private var dictation = Dictation.shared
+    @State private var voice = VoiceSetup.shared
     @FocusState private var fieldFocused: Bool
 
     var body: some View {
@@ -133,6 +134,14 @@ struct OverlayView: View {
                 }
             }
             Spacer()
+            if voice.isSpeaking {
+                Button { voice.stop() } label: {
+                    Image(systemName: "speaker.wave.2.fill").symbolEffect(.variableColor.iterative, isActive: true)
+                        .foregroundStyle(Ink.muted)
+                }
+                .buttonStyle(.plain)
+                .help(Text("Stop reading aloud"))
+            }
             if let app = copilot.overlayTurns.first?.screenApp {
                 Chip(text: app, symbol: "eye")
                     .help(Text("Agott looked at this app"))

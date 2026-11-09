@@ -244,6 +244,13 @@ struct SettingsPageView: View {
                     }
                     .labelsHidden().fixedSize()
                 }
+                SettingsRow(symbol: "speaker.wave.2", title: "Read answers aloud",
+                            detail: "When you ask by holding the key, Agott says the answer, in your language, with a voice made on this Mac (Supertonic, a few hundred MB, downloaded once).") {
+                    HStack(spacing: 8) {
+                        if settings.speakAnswers { VoiceStatus() }
+                        Toggle("", isOn: $settings.speakAnswers).labelsHidden()
+                    }
+                }
             }
         case .connections:
             SettingsSection(title: "Spotify")
@@ -361,6 +368,29 @@ struct SettingsRow<Control: View>: View {
 }
 
 #if os(macOS)
+/// Where the voice download stands, like Parakeet's below.
+private struct VoiceStatus: View {
+    @State private var setup = VoiceSetup.shared
+
+    var body: some View {
+        switch setup.state {
+        case .ready:
+            Button("Try it") { setup.speak(String(localized: "Hi! This is how I sound when I answer you.")) }
+                .buttonStyle(.candy(.soft, compact: true))
+        case .downloading(let fraction):
+            HStack(spacing: 6) {
+                ProgressView(value: fraction).progressViewStyle(.circular).controlSize(.small)
+                Text(fraction, format: .percent.precision(.fractionLength(0)))
+                    .font(.callout).monospacedDigit().foregroundStyle(Ink.muted)
+            }
+        case .missing, .failed:
+            Button("Download") { setup.start() }
+                .buttonStyle(.candy(.soft, compact: true))
+                .help({ if case .failed(let reason) = setup.state { Text(reason) } else { Text("Downloads the voice from Hugging Face, once.") } }())
+        }
+    }
+}
+
 /// Where the Parakeet download stands: a progress ring while it comes in,
 /// a way to try again when it failed.
 private struct ParakeetStatus: View {

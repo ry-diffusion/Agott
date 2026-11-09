@@ -67,6 +67,9 @@ final class Copilot {
         if purpose == .ask, Agent.shared.isBusy { return }
         guard !Dictation.shared.isRunning, mode != .inserting else { return }
         holding = purpose
+        VoiceSetup.shared.stop()
+        // The answer will be read aloud: load the voice while you talk.
+        if purpose == .ask { VoiceSetup.shared.prepare() }
         Dictation.shared.start()
         mode = .listening(ask: purpose == .ask)
         Agent.shared.setMood(.listening)
@@ -101,7 +104,7 @@ final class Copilot {
             }
             switch purpose {
             case .ask:
-                ask(text)
+                ask(text, spoken: true)
             case .dictate:
                 mode = .inserting
                 Agent.shared.setMood(.working)
@@ -136,7 +139,8 @@ final class Copilot {
         #endif
     }
 
-    func ask(_ text: String, attachments: [FileAttachment] = [], newChat: Bool = false) {
+    /// `spoken`: asked by voice, so the answer is read aloud when that is on.
+    func ask(_ text: String, attachments: [FileAttachment] = [], newChat: Bool = false, spoken: Bool = false) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty || !attachments.isEmpty else { return }
         draft = ""
@@ -148,12 +152,30 @@ final class Copilot {
         Agent.shared.send(trimmed, lookAtScreen: attachments.isEmpty, attachments: attachments)
         #if os(macOS)
         OverlayController.shared.show(focus: false)
+        VoiceSetup.shared.stop()
+        if spoken, let askedAt { speakWhenAnswered(askedAt) }
         #endif
     }
+
+    #if os(macOS)
+    /// Reads the answer aloud once it is all in, if the overlay still shows it.
+    private func speakWhenAnswered(_ asked: Date) {
+        guard AppSettings.shared.speakAnswers else { return }
+        Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            while Agent.shared.isBusy { try? await Task.sleep(for: .milliseconds(200)) }
+            guard askedAt == asked, mode == .answering,
+                  let answer = overlayTurns.last(where: { $0.role == .assistant }), answer.error == nil,
+                  !answer.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+            VoiceSetup.shared.speak(answer.text)
+        }
+    }
+    #endif
 
     func abandon() {
         #if os(macOS)
         holding = nil
+        VoiceSetup.shared.stop()
         Dictation.shared.cancel()
         #endif
         if mode != .answering { mode = .hidden }
@@ -167,6 +189,9 @@ final class Copilot {
 
     func dismiss() {
         if Agent.shared.isBusy { Agent.shared.cancel() }
+        #if os(macOS)
+        VoiceSetup.shared.stop()
+        #endif
         mode = .hidden
         sinceTurn = nil
         askedAt = nil

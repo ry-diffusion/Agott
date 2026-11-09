@@ -1363,3 +1363,34 @@ struct SecondReviewFixTests {
         #expect(await Deadline.run(.seconds(1)) { 7 } == 7)
     }
 }
+
+#if os(macOS)
+@Suite("Voice")
+@MainActor
+struct VoiceTests {
+    @Test func shortSentencesRideWithTheNext() {
+        let sentences = Voice.sentences("Ok. A reunião é amanhã às dez, na sala grande. Leva o notebook!")
+        #expect(sentences == ["Ok. A reunião é amanhã às dez, na sala grande.", "Leva o notebook!"])
+    }
+
+    @Test func languageFollowsSettingsUnlessTheTextSaysOtherwise() {
+        #expect(Voice.language(for: "A reunião foi remarcada para amanhã de manhã, depois do almoço.", preferred: "auto") == "pt")
+        #expect(Voice.language(for: "ok", preferred: "pt-BR") == "pt")
+        #expect(Voice.language(for: "The meeting was moved to tomorrow morning, right after lunch with the whole team.", preferred: "pt-BR") == "en")
+    }
+
+    @Test func answersBecomePlainSentences() {
+        let text = VoiceSetup.spoken("**Três** coisas:\n- comprar pão\n- ver https://example.com agora\n\n---")
+        #expect(text == "Três coisas: comprar pão. ver agora.")
+    }
+
+    /// Speaks one sentence when the voice is on this Mac; prints only the timing.
+    @Test func synthesizesWhenInstalled() async throws {
+        guard Voice.isInstalled else { return }
+        let clock = ContinuousClock.now
+        let seconds = try await Voice.shared.render("Oi! Tudo certo por aí?", language: "pt")
+        print("VOICE audio=\(seconds)s made in \(ContinuousClock.now - clock)")
+        #expect(seconds > 0.5)
+    }
+}
+#endif

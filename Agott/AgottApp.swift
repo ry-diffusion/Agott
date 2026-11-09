@@ -116,6 +116,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // The fast transcription model, fetched once in the background;
         // Apple's engine stands in until it is here.
         ParakeetSetup.shared.start()
+        VoiceSetup.shared.start()
         #endif
         // Repair what older versions wrote, then keep indexing.
         MusicListener.shared.start()

@@ -86,6 +86,15 @@ final class AppSettings {
             #endif
         }
     }
+    /// Answers to questions asked by voice are read aloud (Supertonic-3, on this Mac).
+    var speakAnswers: Bool {
+        didSet {
+            save(speakAnswers, "speakAnswers")
+            #if os(macOS)
+            if speakAnswers { VoiceSetup.shared.start() } else { VoiceSetup.shared.stop() }
+            #endif
+        }
+    }
     var askKey: HoldKey { didSet { save(askKey.rawValue, "askKey") } }
     /// The key combination that opens quick entry to type (a TextShortcut raw value).
     var textShortcut: String {
@@ -166,6 +175,7 @@ final class AppSettings {
         autoLearn = defaults.object(forKey: "autoLearn") as? Bool ?? true
         autoReminders = defaults.object(forKey: "autoReminders") as? Bool ?? true
         transcribeVoiceNotes = defaults.object(forKey: "transcribeVoiceNotes") as? Bool ?? true
+        speakAnswers = defaults.bool(forKey: "speakAnswers")
         describePhotos = defaults.object(forKey: "describePhotos") as? Bool ?? true
         listenToMusic = defaults.object(forKey: "listenToMusic") as? Bool ?? true
         showSteps = defaults.object(forKey: "showSteps") as? Bool ?? true
