@@ -75,7 +75,8 @@ actor Parakeet {
     private func load() async throws -> AsrManager {
         if let manager { return manager }
         if let loading { return try await loading.value.0 }
-        await MainActor.run { ParakeetSetup.shared.isLoading = true }
+        // The task is in place before the first await, so a second caller
+        // arriving meanwhile waits for it instead of loading a second copy.
         let task = Task { () throws -> (AsrManager, AsrModels) in
             let models = Self.isInstalled
                 ? try await AsrModels.load(from: Self.directory, version: Self.version)
@@ -86,6 +87,7 @@ actor Parakeet {
         }
         loading = task
         defer { loading = nil }
+        await MainActor.run { ParakeetSetup.shared.isLoading = true }
         let manager: AsrManager
         do {
             (manager, models) = try await task.value
@@ -245,7 +247,8 @@ final class ParakeetSetup {
             task = nil
             // Voice notes waited for it; dictation should not wait for the load.
             if state == .ready {
-                Indexer.shared.run()
+                // Only once you are set up: onboarding decides what is read.
+                if AppSettings.shared.hasOnboarded, !LaunchOptions.isDemo { Indexer.shared.run() }
                 Task.detached(priority: .utility) { try? await Parakeet.shared.prepare() }
             }
         }
