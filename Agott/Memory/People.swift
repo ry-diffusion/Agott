@@ -549,15 +549,30 @@ final class PeopleDirectory {
         for (first, refs) in firsts where refs.count == 1 && first.count >= 3 && refs[0].name.contains(" ") {
             if let word = refs[0].name.split(separator: " ").first { names.append((String(word), refs[0])) }
         }
-        var result = text
-        for (name, ref) in names.sorted(by: { $0.0.count > $1.0.count }) where name.count >= 3 {
+        let regexes: [(NSRegularExpression, String)] = names.sorted(by: { $0.0.count > $1.0.count }).compactMap { name, ref in
+            guard name.count >= 3 else { return nil }
             let escaped = NSRegularExpression.escapedPattern(for: name)
             guard let regex = try? NSRegularExpression(
-                pattern: "(?<![\\p{L}\\d<=/])\(escaped)(?![\\p{L}\\d])", options: [.caseInsensitive]) else { continue }
-            result = regex.stringByReplacingMatches(in: result, range: NSRange(result.startIndex..., in: result),
-                                                    withTemplate: NSRegularExpression.escapedTemplate(for: ref.tag))
+                pattern: "(?<![\\p{L}\\d<=/])\(escaped)(?![\\p{L}\\d])", options: [.caseInsensitive]) else { return nil }
+            return (regex, NSRegularExpression.escapedTemplate(for: ref.tag))
         }
-        return result
+        func tagged(_ piece: Substring) -> String {
+            var piece = String(piece)
+            for (regex, template) in regexes {
+                piece = regex.stringByReplacingMatches(in: piece, range: NSRange(piece.startIndex..., in: piece), withTemplate: template)
+            }
+            return piece
+        }
+        // Media tags are left whole: a person tag inside by="…" or title="…"
+        // broke the tag and showed its insides in the reply.
+        var result = ""
+        var cursor = text.startIndex
+        for match in text.matches(of: MediaTag.pattern) {
+            result += tagged(text[cursor..<match.range.lowerBound])
+            result += text[match.range]
+            cursor = match.range.upperBound
+        }
+        return result + tagged(text[cursor...])
     }
 }
 
