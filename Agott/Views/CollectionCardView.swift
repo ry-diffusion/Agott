@@ -97,7 +97,7 @@ struct CollectionCardView: View {
             return
         }
         #endif
-        if let link = item.link { openURL(link); return }
+        if let link = ArtworkLookup.openable(item.link) { openURL(link); return }
         if let place = media.destinations.first { openURL(place.url) }
     }
 }
@@ -115,7 +115,7 @@ struct Artwork: View {
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: corner, style: .continuous)
         Group {
-            if let url {
+            if let url = ArtworkLookup.trusted(url) {
                 AsyncImage(url: url, transaction: Transaction(animation: .easeOut(duration: 0.2))) { phase in
                     if let image = phase.image {
                         image.resizable().scaledToFill()

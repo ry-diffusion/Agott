@@ -46,8 +46,11 @@ nonisolated struct ShowListTool: Tool {
     @concurrent func call(arguments: Arguments) async throws -> String {
         let kind = "\(arguments.kind)"
         let items = await ArtworkLookup.fill(arguments.items.map { item in
+            // Pictures and links the model wrote are kept only from known
+            // places: anything else is looked up again by name.
             Card.Collection.Item(title: item.title, subtitle: item.subtitle, detail: item.detail,
-                                 image: item.imageURL.flatMap(URL.init(string:)), link: item.link.flatMap(URL.init(string:)))
+                                 image: ArtworkLookup.trusted(item.imageURL.flatMap(URL.init(string:))),
+                                 link: ArtworkLookup.openable(item.link.flatMap(URL.init(string:))))
         }, kind: kind)
         guard !items.isEmpty else { return "A list needs at least one item." }
         await CardBus.post(.collection(.init(
@@ -91,7 +94,13 @@ nonisolated struct SpotifyTopTool: Tool {
         case .years: "long_term"
         }
         let artists = arguments.what == .artists
-        let top = try await SpotifyAccount.shared.top(artists: artists, range: range, limit: arguments.count)
+        let top: [SpotifyAccount.TopItem]
+        do {
+            top = try await SpotifyAccount.shared.top(artists: artists, range: range, limit: arguments.count)
+        } catch {
+            // Said to the model, so the turn goes on and it can tell you.
+            return "Spotify could not be reached: \(error.localizedDescription). Tell the user in a sentence."
+        }
         guard !top.isEmpty else { return "Spotify has no top \(artists ? "artists" : "tracks") for that period yet." }
         let period = switch arguments.period {
         case .weeks: String(localized: "Last 4 weeks")
@@ -112,6 +121,24 @@ nonisolated struct SpotifyTopTool: Tool {
 /// catalogue, posters from IMDb. Nothing for places and the rest.
 nonisolated enum ArtworkLookup {
     private static let log = Logger(subsystem: "br.com.zesmoi.Agott", category: "artwork")
+
+    /// Where pictures are loaded from without asking: the catalogues this
+    /// lookup uses. A picture is fetched as soon as it is drawn, so an
+    /// address the model was talked into writing (with something private
+    /// in its query) must never be one of them.
+    static let artworkHosts = ["scdn.co", "spotifycdn.com", "mzstatic.com", "media-amazon.com"]
+
+    static func trusted(_ url: URL?) -> URL? {
+        guard let url, url.scheme == "https", let host = url.host()?.lowercased() else { return nil }
+        return artworkHosts.contains { host == $0 || host.hasSuffix("." + $0) } ? url : nil
+    }
+
+    /// A link fit to open on a click: the web or Spotify, nothing that runs
+    /// or reads files.
+    static func openable(_ url: URL?) -> URL? {
+        guard let url, let scheme = url.scheme?.lowercased(), ["https", "http", "spotify"].contains(scheme) else { return nil }
+        return url
+    }
 
     /// Fills in missing pictures, all at once.
     static func fill(_ items: [Card.Collection.Item], kind: String) async -> [Card.Collection.Item] {
