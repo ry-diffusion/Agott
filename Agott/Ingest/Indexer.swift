@@ -201,10 +201,16 @@ final class Indexer {
             // Once, on moving to Parakeet: the Apple-engine transcripts go,
             // and the voice notes are read again from the start (their
             // cursor key is new).
-            if Parakeet.isInstalled, !UserDefaults.standard.bool(forKey: "voiceNotes.parakeet.purged") {
-                let removed = (try? await MemoryStore.shared.forgetVoiceNotes()) ?? 0
-                UserDefaults.standard.set(true, forKey: "voiceNotes.parakeet.purged")
-                log.notice("Removed \(removed) voice notes read with the Apple engine")
+            if Parakeet.isInstalled, AppSettings.shared.transcribeVoiceNotes,
+               !UserDefaults.standard.bool(forKey: "voiceNotes.parakeet.purged") {
+                do {
+                    let removed = try await MemoryStore.shared.forgetVoiceNotes()
+                    UserDefaults.standard.set(true, forKey: "voiceNotes.parakeet.purged")
+                    log.notice("Removed \(removed) voice notes read with the Apple engine")
+                } catch {
+                    // Tried again next run; nothing is marked done.
+                    log.error("Could not remove the old voice notes: \(error.localizedDescription, privacy: .public)")
+                }
             }
             while !Task.isCancelled, batches < MediaIngestor.batchesPerRun,
                   let added = await MediaIngestor.run(contacts: contacts) {

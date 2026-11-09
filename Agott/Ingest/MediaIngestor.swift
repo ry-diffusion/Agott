@@ -90,18 +90,29 @@ enum MediaIngestor {
         var messages: [RawMessage] = []
         var last = UserDefaults.standard.double(forKey: cursorKey(kind))
         var added = 0
+        var stopped = false
         for item in items {
             guard !Task.isCancelled else { break }
             // Dictation comes first: wait while you are talking (a minute at most).
             for _ in 0..<120 where await MainActor.run(body: { Dictation.shared.isRunning }) {
                 try? await Task.sleep(for: .milliseconds(500))
             }
-            if FileManager.default.fileExists(atPath: item.file.path), let text = await words(for: item) {
-                var message = item.message
-                message.text = text
-                messages.append(message)
-                added += 1
+            if FileManager.default.fileExists(atPath: item.file.path) {
+                switch await words(for: item) {
+                case .words(let text):
+                    var message = item.message
+                    message.text = text
+                    messages.append(message)
+                    added += 1
+                case .nothing:
+                    break
+                case .failed:
+                    // The engine failed or took too long: stop here and try
+                    // this one again next run, rather than skip it for good.
+                    stopped = true
+                }
             }
+            if stopped { break }
             // Read or unreadable, it is not tried again.
             last = item.message.date.timeIntervalSince1970 - appleEpochOffset
         }
@@ -110,12 +121,21 @@ enum MediaIngestor {
         return added
     }
 
+    /// What reading an item gave: its words, nothing worth keeping (a silent
+    /// note, a blank photo), or a failure worth trying again.
+    enum Reading: Sendable {
+        case words(String)
+        case nothing
+        case failed
+    }
+
     /// The words a voice note or a photo stands for.
-    static func words(for item: Item) async -> String? {
+    static func words(for item: Item) async -> Reading {
         switch item.kind {
         case .voice:
-            guard let transcript = await transcribe(item.file), !transcript.isEmpty else { return nil }
-            return String(localized: "[voice note] \(transcript)")
+            guard let transcript = await transcribe(item.file) else { return .failed }
+            let words = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+            return words.isEmpty ? .nothing : .words(String(localized: "[voice note] \(words)"))
         case .photo:
             var parts: [String] = []
             // Vision on a background thread: on the main one every photo
@@ -127,26 +147,17 @@ enum MediaIngestor {
             if let written = await AttachmentStore.recognizedText(in: item.file) {
                 parts.append(String(localized: "text in it: \(String(written.prefix(600)))"))
             }
-            guard !parts.isEmpty else { return nil }
-            return String(localized: "[photo] \(parts.joined(separator: "; "))")
+            guard !parts.isEmpty else { return .nothing }
+            return .words(String(localized: "[photo] \(parts.joined(separator: "; "))"))
         }
     }
 
-    /// A whole audio file to text, on the Mac: Parakeet when chosen and
-    /// installed, Apple's engine otherwise. Gives up after a minute.
+    /// A whole audio file to text, on the Mac, with Parakeet. Nil when the
+    /// model is missing, fails, or takes more than a minute.
     static func transcribe(_ url: URL) async -> String? {
         guard Parakeet.isInstalled else { return nil }
         let language = Parakeet.language(for: AppSettings.shared.speechLocale)
-        return await withTaskGroup(of: String?.self) { group in
-            group.addTask { try? await Parakeet.shared.transcribe(file: url, language: language) }
-            group.addTask {
-                try? await Task.sleep(for: .seconds(60))
-                return nil
-            }
-            let first = await group.next() ?? nil
-            group.cancelAll()
-            return first
-        }
+        return await Deadline.run(.seconds(60)) { try? await Parakeet.shared.transcribe(file: url, language: language) } ?? nil
     }
 }
 #endif
