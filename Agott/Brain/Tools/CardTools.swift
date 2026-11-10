@@ -125,7 +125,9 @@ nonisolated struct ArtifactTool: Tool {
     Make or revise something the user asked to keep as a document: a file, a long draft, a study guide, \
     code, a small interactive web page. It opens in a panel beside the chat. To revise one, call again with \
     the same title and the full new content; it becomes the next version. Prefer answering in the chat: \
-    only use this when the user asks for a document or the content is longer than a page and meant to be saved.
+    only use this when the user asks for a document or the content is longer than a page and meant to be saved. \
+    Write people and groups as their tags (<e id=12/>) here too, never their names: Agott shows the names, \
+    or hides them. \(ArtifactStyle.guidance)
     """
 
     @Generable
@@ -145,9 +147,14 @@ nonisolated struct ArtifactTool: Tool {
 
     @concurrent func call(arguments: Arguments) async throws -> String {
         let kind = Card.Artifact.Kind(rawValue: "\(arguments.kind)") ?? .document
+        // Who it names, kept with it: the names then travel with the artifact.
+        let content = arguments.content
+        let people = await MainActor.run {
+            ArtifactNames.mentions(in: content) { PeopleDirectory.shared.name($0) }
+        }
         await CardBus.post(.artifact(.init(
             key: arguments.title.folded, title: arguments.title, kind: kind,
-            language: arguments.language, content: arguments.content)))
+            language: arguments.language, content: arguments.content, people: people.isEmpty ? nil : people)))
         return "The artifact \"\(arguments.title)\" is open beside the chat. Say in one sentence what it is; do not repeat its content."
     }
 }

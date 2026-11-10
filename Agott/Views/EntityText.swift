@@ -89,12 +89,6 @@ extension EntityText {
     }
 }
 
-extension Card.Artifact {
-    /// The artifact as it leaves Agott (copied, saved, published): people's
-    /// tags turned into their names.
-    var exportText: String { EntityText.plain(content, hidden: false) }
-}
-
 /// A song, album, film or the like named in a reply:
 /// `<media kind="song" title="Do I Wanna Know?" by="Arctic Monkeys"/>`.
 /// It travels inside the text as an `agott://media/<kind>?title=…&by=…` link

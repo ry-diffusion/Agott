@@ -123,6 +123,16 @@ nonisolated enum Card: Identifiable, Hashable, Sendable, Codable {
         var language: String?
         var content: String
         var version = 1
+        /// The people and groups its tags name, kept with it so the names
+        /// show on another device and on the published page. Older
+        /// artifacts have none and are read from the directory.
+        var people: [Mention]? = nil
+
+        struct Mention: Hashable, Sendable, Codable {
+            var id: Int64
+            var name: String
+            var isGroup = false
+        }
     }
 
     struct Explanation: Hashable, Sendable, Codable {

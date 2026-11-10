@@ -149,7 +149,8 @@ private struct ArtifactTile: View {
 
     /// The first words, without Markdown marks.
     static func preview(_ artifact: Card.Artifact) -> String {
-        let text = artifact.kind == .code || artifact.kind == .html ? artifact.content : artifact.content.markdownStripped
+        let shown = artifact.shownText(hidden: AppSettings.shared.hideNames)
+        let text = artifact.kind == .code || artifact.kind == .html ? shown : shown.markdownStripped
         return String(text.prefix(280))
     }
 

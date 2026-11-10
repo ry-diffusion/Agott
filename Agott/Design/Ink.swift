@@ -16,19 +16,19 @@ enum Ink {
     // MARK: Colour
 
     /// The page.
-    static let canvas = dynamic(dark: (0.149, 0.149, 0.149), light: (0.988, 0.988, 0.984))
+    static let canvas = dynamic(Tone.canvas)
     /// The sidebar: a shade darker than the page.
-    static let sidebar = dynamic(dark: (0.118, 0.118, 0.118), light: (0.953, 0.953, 0.945))
+    static let sidebar = dynamic(Tone.sidebar)
     /// Inside a panel or card.
-    static let surface = dynamic(dark: (0.180, 0.180, 0.180), light: (1.0, 1.0, 1.0))
+    static let surface = dynamic(Tone.surface)
     /// A field, a chip, a hovered row.
-    static let raised = dynamic(dark: (0.212, 0.212, 0.212), light: (0.945, 0.945, 0.937))
+    static let raised = dynamic(Tone.raised)
     /// Your messages: a soft grey pill.
-    static let bubble = dynamic(dark: (0.235, 0.235, 0.235), light: (0.929, 0.929, 0.922))
+    static let bubble = dynamic(Tone.bubble)
     /// Text.
-    static let text = dynamic(dark: (0.925, 0.925, 0.910), light: (0.110, 0.110, 0.106))
-    static let muted = dynamic(dark: (0.600, 0.600, 0.588), light: (0.455, 0.455, 0.443))
-    static let hairline = dynamic(dark: (0.262, 0.262, 0.262), light: (0.878, 0.878, 0.867))
+    static let text = dynamic(Tone.text)
+    static let muted = dynamic(Tone.muted)
+    static let hairline = dynamic(Tone.hairline)
     /// The one colour: the system's purple, for what is selected or live.
     /// It is the purple Liquid Glass is tinted with across macOS, and it
     /// adjusts itself between light and dark.
@@ -58,6 +58,25 @@ enum Ink {
     static let intelligence: [Color] = [spot]
 
     static func intelligenceRing(angle: Double) -> Color { spot }
+
+    /// The greys as numbers, so the app and the pages it writes (artifacts,
+    /// the published site) share one palette.
+    nonisolated enum Tone {
+        typealias RGB = (Double, Double, Double)
+        typealias Pair = (dark: RGB, light: RGB)
+        static let canvas: Pair = (dark: (0.149, 0.149, 0.149), light: (0.988, 0.988, 0.984))
+        static let sidebar: Pair = (dark: (0.118, 0.118, 0.118), light: (0.953, 0.953, 0.945))
+        static let surface: Pair = (dark: (0.180, 0.180, 0.180), light: (1.0, 1.0, 1.0))
+        static let raised: Pair = (dark: (0.212, 0.212, 0.212), light: (0.945, 0.945, 0.937))
+        static let bubble: Pair = (dark: (0.235, 0.235, 0.235), light: (0.929, 0.929, 0.922))
+        static let text: Pair = (dark: (0.925, 0.925, 0.910), light: (0.110, 0.110, 0.106))
+        static let muted: Pair = (dark: (0.600, 0.600, 0.588), light: (0.455, 0.455, 0.443))
+        static let hairline: Pair = (dark: (0.262, 0.262, 0.262), light: (0.878, 0.878, 0.867))
+        /// The system purple `spot` is, as the system draws it in each mode.
+        static let spot: Pair = (dark: (0.749, 0.353, 0.949), light: (0.686, 0.322, 0.871))
+    }
+
+    static func dynamic(_ tone: Tone.Pair) -> Color { dynamic(dark: tone.dark, light: tone.light) }
 
     static func dynamic(dark: (Double, Double, Double), light: (Double, Double, Double)) -> Color {
         #if os(macOS)

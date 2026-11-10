@@ -4,7 +4,7 @@ import Foundation
 /// The HTML of the artifacts site: an index that works like a repository,
 /// and one page per artifact. Web pages are published as they are;
 /// documents and tables render their Markdown in the browser; code is
-/// highlighted.
+/// highlighted. Everything wears Agott's artifact sheet (`ArtifactStyle`).
 enum SitePages {
     static func index(_ entries: [ArtifactPublisher.Entry], domain: String) -> String {
         let rows = entries.map { entry in
@@ -43,6 +43,7 @@ enum SitePages {
     }
 
     static func artifact(_ artifact: Card.Artifact, entry: ArtifactPublisher.Entry) -> String {
+        // A web page is published as written, with Agott's sheet in front.
         if artifact.kind == .html { return artifact.exportText }
         let source = jsString(artifact.exportText)
         let header = """
@@ -56,7 +57,8 @@ enum SitePages {
         case .code:
             let language = (artifact.language ?? "").lowercased().filter { $0.isLetter || $0.isNumber }
             return page(title: artifact.title, head: """
-            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
             <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
             """, body: """
             \(header)
@@ -101,8 +103,6 @@ enum SitePages {
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="robots" content="noindex, nofollow">
         <title>\(escape(title))</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com">
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&display=swap">
         <style>\(css)</style>
         \(head)
         </head>
@@ -113,48 +113,35 @@ enum SitePages {
         """
     }
 
-    private static let css = """
-    :root { --bg:#fbf8f9; --surface:#ffffff; --text:#1d1a1c; --muted:#6f676c; --line:#ece5e9; --spot:#f2559c; }
-    @media (prefers-color-scheme: dark) {
-      :root { --bg:#141216; --surface:#1d1a20; --text:#f3eef1; --muted:#a39aa0; --line:#2b262d; --spot:#ff6aaa; }
+    /// Agott's artifact sheet, so the site and the pages on it look like
+    /// the app, plus the index and the document header.
+    private static var css: String {
+        ArtifactStyle.css + "\n" + """
+        main { padding-top: 48px; padding-bottom: 80px; }
+        .brand { display:flex; align-items:center; gap:8px; font-weight:600; color:var(--muted); font-size:14px; }
+        .dot { width:8px; height:8px; border-radius:50%; background:var(--spot); }
+        .top h1 { font-size: 40px; margin: 12px 0 0; }
+        .sub { color: var(--muted); margin: 4px 0 20px; }
+        #q { width:100%; padding:11px 14px; border-radius:var(--radius-sm); }
+        .list { list-style:none; padding:0; margin:24px 0 0; display:grid; gap:8px; }
+        .list li { display:grid; grid-template-columns:auto 1fr; gap:2px 12px; align-items:center; margin:0; padding:14px 16px; border-radius:var(--radius); background:var(--surface); border:1px solid var(--line); transition: background-color .15s ease; }
+        .list li:hover { background: var(--raised); }
+        .list li.empty { display:block; color:var(--muted); text-align:center; }
+        .title { font-weight:600; color: var(--text); }
+        .meta { grid-column: 2; color: var(--muted); font-size: 13px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+        .v { font-size:12px; padding:0 7px; border-radius:999px; border:1px solid var(--line); color:var(--muted); }
+        .v:hover { border-color: var(--spot); color: var(--spot); text-decoration:none; }
+        .kind { grid-row: span 2; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.04em; padding:3px 8px; border-radius:999px; background: var(--raised); color: var(--muted); }
+        .doc-top { display:flex; align-items:center; gap:12px; margin-bottom: 28px; }
+        .doc-top .back { font-weight:600; }
+        .doc-top .meta { grid-column:auto; }
+        .doc-title { font-size: 34px; margin: 0 0 20px; }
+        .doc table { display:block; overflow-x:auto; }
+        pre.code { margin:0; padding:0; overflow:auto; }
+        pre.code code { display:block; padding:16px; font: 14px/1.55 var(--mono); background: transparent; }
+        @media (max-width: 520px) { .top h1 { font-size: 32px; } main { padding-top: 32px; } }
+        """
     }
-    * { box-sizing: border-box; }
-    body { margin:0; background:var(--bg); color:var(--text); font:16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
-    main { max-width: 760px; margin: 0 auto; padding: 48px 20px 80px; }
-    a { color: var(--spot); text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    .brand { display:flex; align-items:center; gap:8px; font-weight:600; color:var(--muted); font-size:14px; }
-    .dot { width:10px; height:10px; border-radius:50%; background:var(--spot); }
-    h1, .doc h1 { font-family: "Mochiy Pop One", system-ui, sans-serif; font-weight:400; letter-spacing:-0.01em; }
-    .top h1 { font-size: 40px; margin: 12px 0 0; }
-    .sub { color: var(--muted); margin: 4px 0 20px; }
-    #q { width:100%; padding:12px 16px; border-radius:14px; border:1px solid var(--line); background:var(--surface); color:var(--text); font:inherit; }
-    #q:focus { outline: 2px solid var(--spot); outline-offset: 1px; }
-    .list { list-style:none; padding:0; margin:24px 0 0; display:grid; gap:8px; }
-    .list li { display:grid; grid-template-columns:auto 1fr; gap:4px 12px; align-items:center; padding:14px 16px; border-radius:14px; background:var(--surface); border:1px solid var(--line); transition: transform .15s ease, border-color .15s ease; }
-    .list li:hover { border-color: var(--spot); transform: translateY(-1px); }
-    .list li.empty { display:block; color:var(--muted); text-align:center; }
-    .title { font-weight:600; color: var(--text); }
-    .meta { grid-column: 2; color: var(--muted); font-size: 13px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
-    .v { font-size:12px; padding:1px 7px; border-radius:999px; border:1px solid var(--line); color:var(--muted); }
-    .v:hover { border-color: var(--spot); color: var(--spot); text-decoration:none; }
-    .kind { grid-row: span 2; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; padding:4px 8px; border-radius:8px; background: color-mix(in srgb, var(--spot) 14%, transparent); color: var(--spot); }
-    .doc-top { display:flex; align-items:center; gap:12px; margin-bottom: 28px; }
-    .doc-top .back { font-weight:600; }
-    .doc-top .meta { grid-column:auto; }
-    .doc-title { font-size: 30px; margin: 0 0 20px; }
-    .doc h1 { font-size: 32px; line-height:1.25; }
-    .doc h2 { font-size: 22px; margin-top: 32px; }
-    .doc blockquote { margin:0; padding-left:14px; border-left:3px solid var(--spot); color:var(--muted); }
-    .doc table { border-collapse: collapse; width:100%; display:block; overflow-x:auto; }
-    .doc th, .doc td { padding:8px 12px; border-bottom:1px solid var(--line); text-align:left; }
-    .doc code { font: 14px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--surface); padding: 1px 5px; border-radius: 6px; }
-    .doc pre { background: var(--surface); padding:16px; border-radius:14px; overflow-x:auto; border:1px solid var(--line); }
-    .doc pre code { padding:0; background:none; }
-    pre.code { border-radius:14px; overflow:auto; margin:0; }
-    pre.code code { font: 14px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; border-radius:14px; }
-    @media (max-width: 520px) { .top h1 { font-size: 32px; } main { padding-top: 32px; } }
-    """
 
     private static func kindName(_ kind: Card.Artifact.Kind) -> String {
         switch kind {
