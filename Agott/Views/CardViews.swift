@@ -45,6 +45,7 @@ struct AssistantTurnView: View {
                     // Agott's words straight on the page, in reading-size
                     // type: no bubble, no frame.
                     MarkdownView(text: turn.text, size: .zen)
+                        .equatable()
                     // Names in the reply are links: clicking one shows who they are.
                     .environment(\.openURL, OpenURLAction { url in
                         guard let person = PersonPeek.from(url) else { return .systemAction }

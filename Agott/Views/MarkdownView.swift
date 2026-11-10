@@ -2,20 +2,38 @@ import SwiftUI
 
 /// Markdown as a reader would want it: headings, lists, quotes, code and
 /// tables laid out as blocks, inline styles and links inside them.
-struct MarkdownView: View {
+///
+/// A long text is laid out lazily: inside a scroll view only the blocks near
+/// what is on screen are built, so a reply of a thousand lines costs about
+/// what a screenful does. Equatable, so a chat redrawing around a reply that
+/// did not change leaves it alone (use `.equatable()`).
+struct MarkdownView: View, Equatable {
     var text: String
     var size: Size = .body
 
     enum Size { case body, document, zen }
 
+    /// From this many blocks on, they are built as they scroll into view.
+    static let lazyFrom = 24
+
     var body: some View {
-        VStack(alignment: .leading, spacing: size == .body ? 10 : 14) {
-            ForEach(Array(MarkdownBlock.parse(text).enumerated()), id: \.offset) { _, block in
-                view(for: block)
+        let blocks = MarkdownBlock.parse(text)
+        let spacing: CGFloat = size == .body ? 10 : 14
+        Group {
+            if blocks.count >= Self.lazyFrom {
+                LazyVStack(alignment: .leading, spacing: spacing) { content(blocks) }
+            } else {
+                VStack(alignment: .leading, spacing: spacing) { content(blocks) }
             }
         }
         .textSelection(.enabled)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func content(_ blocks: [MarkdownBlock]) -> some View {
+        ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
+            view(for: block)
+        }
     }
 
     @ViewBuilder
