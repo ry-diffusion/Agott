@@ -67,6 +67,7 @@ final class Copilot {
         if purpose == .ask, Agent.shared.isBusy { return }
         guard !Dictation.shared.isRunning, mode != .inserting else { return }
         holding = purpose
+        Nudges.shared.stepAside()
         VoiceSetup.shared.stop()
         // The answer will be read aloud: load the voice while you talk.
         if purpose == .ask { VoiceSetup.shared.prepare() }
@@ -133,6 +134,7 @@ final class Copilot {
     func beginTyping() {
         Agent.shared.setMood(.idle)
         #if os(macOS)
+        Nudges.shared.stepAside()
         QuickEntryController.shared.show()
         #else
         mode = .typing
@@ -151,6 +153,7 @@ final class Copilot {
         // Screenshots sent along say what is on screen; otherwise Agott looks.
         Agent.shared.send(trimmed, lookAtScreen: attachments.isEmpty, attachments: attachments)
         #if os(macOS)
+        Nudges.shared.stepAside()
         OverlayController.shared.show(focus: false)
         VoiceSetup.shared.stop()
         if spoken, let askedAt { speakWhenAnswered(askedAt) }

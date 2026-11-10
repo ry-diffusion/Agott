@@ -17,6 +17,8 @@ final class OverlayController {
     private var panel: OverlayPanel?
     private var hideTask: Task<Void, Never>?
 
+    var isVisible: Bool { panel?.isVisible ?? false }
+
     private func makePanel() -> OverlayPanel {
         let panel = OverlayPanel(
             contentRect: NSRect(x: 0, y: 0, width: 664, height: 420),
@@ -77,18 +79,23 @@ struct OverlayView: View {
     @State private var copilot = Copilot.shared
     @State private var dictation = Dictation.shared
     @State private var voice = VoiceSetup.shared
+    @State private var nudges = Nudges.shared
     @FocusState private var fieldFocused: Bool
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
-            ThinkingOrb(mode: orbMode, size: 22, active: isListening || agent.isBusy)
-                .padding(.top, 1)
+            if let nudge = nudges.showing {
+                ReminderPopup(nudge: nudge)
+            } else {
+                ThinkingOrb(mode: orbMode, size: 22, active: isListening || agent.isBusy)
+                    .padding(.top, 1)
 
-            VStack(alignment: .leading, spacing: 10) {
-                header
-                content
+                VStack(alignment: .leading, spacing: 10) {
+                    header
+                    content
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(16)
         .frame(width: 600)
@@ -99,7 +106,9 @@ struct OverlayView: View {
         // Room for the whole shadow inside the panel: with less, it was cut
         // into a visible rectangle around the card.
         .padding(32)
-        .onExitCommand { copilot.dismiss() }
+        .onExitCommand {
+            if let nudge = nudges.showing { nudges.done(nudge) } else { copilot.dismiss() }
+        }
         .onChange(of: copilot.mode) { _, mode in
             fieldFocused = mode == .typing
         }
@@ -206,6 +215,52 @@ struct OverlayView: View {
                 .padding(.top, 4)
             }
         }
+    }
+}
+/// A reminder whose time has come: what it is, when, and what to do with it.
+struct ReminderPopup: View {
+    var nudge: Nudge
+    @State private var nudges = Nudges.shared
+
+    var body: some View {
+        Image(systemName: "bell.fill")
+            .font(.system(size: 17, weight: .semibold))
+            .foregroundStyle(Ink.spot)
+            .symbolEffect(.wiggle, options: .nonRepeating)
+            .frame(width: 22)
+            .padding(.top, 2)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Text("Reminder").font(.headline)
+                Text(when).font(.callout).foregroundStyle(Ink.muted)
+                Spacer()
+                Button { nudges.done(nudge) } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(Ink.muted)
+                }
+                .buttonStyle(.plain)
+                .help(Text("Reminder done"))
+            }
+            Text(nudge.title)
+                .font(.system(size: 17))
+                .foregroundStyle(Ink.text)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 8) {
+                Button { nudges.done(nudge) } label: { Label("Reminder done", systemImage: "checkmark") }
+                    .buttonStyle(.candy(.primary, compact: true))
+                    .keyboardShortcut(.defaultAction)
+                Button("In 10 minutes") { nudges.snooze(nudge, minutes: 10) }
+                    .buttonStyle(.candy(.soft, compact: true))
+                Button("In an hour") { nudges.snooze(nudge, minutes: 60) }
+                    .buttonStyle(.candy(.soft, compact: true))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// "now" when it is happening, else its time ("at 14:30").
+    private var when: String {
+        if abs(nudge.due.timeIntervalSinceNow) < 90 { return String(localized: "now") }
+        return nudge.due.formatted(.dateTime.weekday().hour().minute())
     }
 }
 #endif

@@ -45,7 +45,9 @@ nonisolated final class Organizer: @unchecked Sendable {
         }
     }
 
-    func createReminder(title: String, due: Date?, alert: Date? = nil, notes: String?) throws -> EKReminder {
+    /// `alarm` false: the reminder is listed with its time but does not ring
+    /// (Agott brings it up itself on the Mac).
+    func createReminder(title: String, due: Date?, alert: Date? = nil, alarm: Bool = true, notes: String?) throws -> EKReminder {
         if !remindersAuthorized { throw CocoaError(.featureUnsupported) }
         let reminder = EKReminder(eventStore: store)
         reminder.title = title
@@ -54,10 +56,18 @@ nonisolated final class Organizer: @unchecked Sendable {
         if let due {
             reminder.dueDateComponents = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: due)
             // The alert can come before the time itself ("leave in an hour").
-            reminder.addAlarm(EKAlarm(absoluteDate: alert ?? due))
+            if alarm { reminder.addAlarm(EKAlarm(absoluteDate: alert ?? due)) }
         }
         try store.save(reminder, commit: true)
         return reminder
+    }
+
+    /// Ticks off one reminder, found by its identifier.
+    func complete(reminderID: String) throws {
+        guard remindersAuthorized, let reminder = store.calendarItem(withIdentifier: reminderID) as? EKReminder,
+              !reminder.isCompleted else { return }
+        reminder.isCompleted = true
+        try store.save(reminder, commit: true)
     }
 
     func complete(reminderTitled title: String) async throws -> Bool {

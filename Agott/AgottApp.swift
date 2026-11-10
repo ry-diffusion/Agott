@@ -117,6 +117,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Apple's engine stands in until it is here.
         ParakeetSetup.shared.start()
         VoiceSetup.shared.start()
+        // Reminders Agott brings up in its pop-up.
+        if !LaunchOptions.isDemo { Nudges.shared.start() }
         #endif
         // Repair what older versions wrote, then keep indexing.
         MusicListener.shared.start()

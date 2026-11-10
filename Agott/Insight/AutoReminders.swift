@@ -1,3 +1,4 @@
+import EventKit
 import Foundation
 import FoundationModels
 import UserNotifications
@@ -52,16 +53,26 @@ enum AutoReminders {
     }
 
     /// Sets a reminder once (the same title at the same time is never made
-    /// twice) and says so in a notification.
+    /// twice). On the Mac, Agott brings it up in its pop-up at the alert
+    /// time and the copy in Reminders does not ring; on the iPhone, Reminders
+    /// alerts. `announce`: say so in a notification (for ones Agott set on
+    /// its own; one asked for in the chat is confirmed there).
     @discardableResult
-    static func make(title: String, due: Date, alert: Date, notes: String?) async -> Bool {
+    static func make(title: String, due: Date, alert: Date, notes: String?, announce: Bool = true) async -> Bool {
         let key = "\(title.folded)|\(Int(due.timeIntervalSince1970 / 300))"
         var made = UserDefaults.standard.stringArray(forKey: madeKey) ?? []
         guard !made.contains(key) else { return false }
         if !Organizer.shared.remindersAuthorized { _ = await Organizer.shared.requestAccess() }
+        #if os(macOS)
+        // The pop-up works without Reminders; the copy there is a bonus.
+        let copy = try? Organizer.shared.createReminder(title: title, due: due, alert: alert, alarm: false, notes: notes)
+        Nudges.shared.add(title: title, due: due, alert: alert, reminderID: copy?.calendarItemIdentifier)
+        #else
         guard (try? Organizer.shared.createReminder(title: title, due: due, alert: alert, notes: notes)) != nil else { return false }
+        #endif
         made.append(key)
         UserDefaults.standard.set(Array(made.suffix(300)), forKey: madeKey)
+        guard announce else { return true }
         let content = UNMutableNotificationContent()
         content.title = String(localized: "Reminder set")
         content.body = "\(title) · \(due.formatted(.dateTime.weekday().day().month().hour().minute()))"
@@ -75,8 +86,10 @@ enum AutoReminders {
 nonisolated struct RemindMeTool: Tool {
     let name = "remind_me"
     let description = """
-    Set a reminder that alerts the user at the right time. Use it whenever they ask to be reminded, or \
-    offer it when they mention something with a time they might forget.
+    Set a reminder that alerts the user at the right time: on the Mac, Agott itself pops it up over whatever \
+    they are doing; it is kept in Reminders too. Use it whenever they ask to be reminded ("me lembra de…", \
+    "remind me in 20 minutes", "I'm going upstairs, remind me to come back down at 3"), working the time out \
+    from now, or offer it when they mention something with a time they might forget.
     """
 
     @Generable
@@ -93,9 +106,14 @@ nonisolated struct RemindMeTool: Tool {
         guard let due = ToolDates.parse(arguments.due) else { return "That time could not be read; ask when." }
         let alert = due.addingTimeInterval(-Double(arguments.leadMinutes) * 60)
         // They asked for it in words, so no approval card on top.
-        let made = await AutoReminders.make(title: arguments.title, due: due, alert: max(Date(), alert), notes: nil)
+        let made = await AutoReminders.make(title: arguments.title, due: due, alert: max(Date(), alert), notes: nil, announce: false)
+        #if os(macOS)
+        let failure = "A reminder like that already exists."
+        #else
+        let failure = "A reminder like that already exists, or Reminders is not allowed for Agott."
+        #endif
         return made
             ? "Reminder set: \(arguments.title), \(ToolDates.format(due)), alert \(ToolDates.format(alert))."
-            : "A reminder like that already exists, or Reminders is not allowed for Agott."
+            : failure
     }
 }
