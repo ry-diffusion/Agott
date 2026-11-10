@@ -8419,6 +8419,76 @@
           }
         }
       }
+    },
+    "wrangler is not logged in to Cloudflare. Run “npx wrangler login” once in Terminal." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O wrangler não está conectado ao Cloudflare. Rode “npx wrangler login” uma vez no Terminal."
+          }
+        }
+      }
+    },
+    "Your Cloudflare login has more than one account. Choose the one with your site in Settings › Connections." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seu login do Cloudflare tem mais de uma conta. Escolha a do seu site em Ajustes › Conexões."
+          }
+        }
+      }
+    },
+    "Which Cloudflare account has %@?" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qual conta do Cloudflare tem %@?"
+          }
+        }
+      }
+    },
+    "Your wrangler login reaches more than one account. Agott remembers this; you can change it in Settings." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seu login do wrangler tem mais de uma conta. O Agott guarda a escolha; dá para trocar nos Ajustes."
+          }
+        }
+      }
+    },
+    "Cloudflare account" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conta do Cloudflare"
+          }
+        }
+      }
+    },
+    "The account that has the site address, when your login reaches more than one." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A conta que tem o endereço do site, quando seu login tem mais de uma."
+          }
+        }
+      }
+    },
+    "Choose…" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolher…"
+          }
+        }
+      }
     }
   },
   "version" : "1.1"

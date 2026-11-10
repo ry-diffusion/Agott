@@ -267,6 +267,11 @@ struct SettingsPageView: View {
                 SettingsRow(symbol: "server.rack", title: "Worker name", detail: "Uses wrangler's own login (run “npx wrangler login” once).") {
                     TextField("", text: $settings.publishWorker).textFieldStyle(.roundedBorder).frame(width: 200)
                 }
+                #if os(macOS)
+                SettingsRow(symbol: "person.crop.square", title: "Cloudflare account", detail: "The account that has the site address, when your login reaches more than one.") {
+                    PublishAccountPicker()
+                }
+                #endif
             }
         case .permissions:
             SettingsCard {
@@ -411,6 +416,43 @@ private struct ParakeetStatus: View {
             Button("Download") { setup.start() }
                 .buttonStyle(.candy(.soft, compact: true))
                 .help({ if case .failed(let reason) = setup.state { Text(reason) } else { Text("Downloads Parakeet from Hugging Face, once.") } }())
+        }
+    }
+}
+#endif
+
+#if os(macOS)
+/// The Cloudflare accounts wrangler's login reaches, to pick the site's.
+private struct PublishAccountPicker: View {
+    @State private var settings = AppSettings.shared
+    @State private var accounts: [ArtifactPublisher.Account]?
+    @State private var problem: String?
+
+    var body: some View {
+        Group {
+            if let accounts {
+                Picker("", selection: $settings.publishAccount) {
+                    if settings.publishAccount.isEmpty || !accounts.contains(where: { $0.id == settings.publishAccount }) {
+                        Text("Choose…").tag(settings.publishAccount)
+                    }
+                    ForEach(accounts) { account in
+                        Text(account.name).tag(account.id)
+                    }
+                }
+                .labelsHidden()
+                .fixedSize()
+            } else if let problem {
+                Text(problem).font(.caption).foregroundStyle(Ink.muted).frame(maxWidth: 200, alignment: .trailing)
+            } else {
+                ProgressView().controlSize(.small)
+            }
+        }
+        .task {
+            do {
+                accounts = try await ArtifactPublisher.accounts()
+            } catch {
+                problem = error.localizedDescription
+            }
         }
     }
 }

@@ -174,10 +174,10 @@ struct ArtifactPanel: View {
     private func content(_ artifact: Card.Artifact) -> some View {
         switch (artifact.kind, showSource) {
         case (.html, false):
-            HTMLPreview(html: artifact.content)
+            HTMLPreview(html: artifact.shownPage(hidden: AppSettings.shared.hideNames))
         case (.code, _), (.html, true), (.document, true):
             ScrollView([.vertical, .horizontal]) {
-                Text(artifact.content)
+                Text(artifact.shownText(hidden: AppSettings.shared.hideNames))
                     .font(.system(.callout, design: .monospaced))
                     .foregroundStyle(Ink.text)
                     .textSelection(.enabled)
@@ -187,7 +187,7 @@ struct ArtifactPanel: View {
             }
         case (.document, false), (.table, _):
             ScrollView {
-                MarkdownView(text: artifact.content, size: .document)
+                MarkdownView(text: artifact.shownMarkdown(hidden: AppSettings.shared.hideNames), size: .document)
                     .padding(.horizontal, 28)
                     .padding(.vertical, 24)
                     .frame(maxWidth: 720)
@@ -229,6 +229,8 @@ private struct PublishButton: View {
     @State private var publisher = ArtifactPublisher.shared
     @State private var confirming = false
     @State private var error: String?
+    /// The login reaches several Cloudflare accounts: which has the site.
+    @State private var accounts: [ArtifactPublisher.Account] = []
 
     private var entry: ArtifactPublisher.Entry? { publisher.entry(for: artifact.key) }
     private var busy: Bool { publisher.publishing == artifact.key }
@@ -275,6 +277,21 @@ private struct PublishButton: View {
         } message: {
             Text("It goes to \(publisher.domain), where anyone with the link can open it. Check it holds nothing private about you or others.")
         }
+        .confirmationDialog(
+            Text("Which Cloudflare account has \(publisher.domain)?"),
+            isPresented: Binding(get: { !accounts.isEmpty }, set: { if !$0 { accounts = [] } })
+        ) {
+            ForEach(accounts) { account in
+                Button(account.name) {
+                    AppSettings.shared.publishAccount = account.id
+                    accounts = []
+                    publish()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Your wrangler login reaches more than one account. Agott remembers this; you can change it in Settings.")
+        }
         .alert(Text("Could not publish"), isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -287,6 +304,8 @@ private struct PublishButton: View {
             do {
                 let url = try await publisher.publish(artifact)
                 Clipboard.copy(url.absoluteString)
+            } catch ArtifactPublisher.PublishError.chooseAccount(let found) {
+                accounts = found
             } catch {
                 self.error = error.localizedDescription
             }
@@ -295,7 +314,13 @@ private struct PublishButton: View {
 
     private func unpublish() {
         Task {
-            do { try await publisher.unpublish(artifact.key) } catch { self.error = error.localizedDescription }
+            do {
+                try await publisher.unpublish(artifact.key)
+            } catch ArtifactPublisher.PublishError.chooseAccount(let found) {
+                accounts = found
+            } catch {
+                self.error = error.localizedDescription
+            }
         }
     }
 }

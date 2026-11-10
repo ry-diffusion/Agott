@@ -24,14 +24,27 @@ final class ArtifactPublisher {
         var published: Date
     }
 
+    /// A Cloudflare account your wrangler login can deploy to.
+    struct Account: Decodable, Hashable, Identifiable, Sendable {
+        var id: String
+        var name: String
+    }
+
     enum PublishError: LocalizedError {
         case noNode
+        case notLoggedIn
+        /// The login reaches several accounts and none is chosen yet.
+        case chooseAccount([Account])
         case deploy(String)
 
         var errorDescription: String? {
             switch self {
             case .noNode:
                 String(localized: "Publishing needs Node.js (for wrangler). Install it, then run “npx wrangler login” once in Terminal.")
+            case .notLoggedIn:
+                String(localized: "wrangler is not logged in to Cloudflare. Run “npx wrangler login” once in Terminal.")
+            case .chooseAccount:
+                String(localized: "Your Cloudflare login has more than one account. Choose the one with your site in Settings › Connections.")
             case .deploy(let output):
                 String(localized: "wrangler could not deploy: \(output)")
             }
@@ -107,9 +120,11 @@ final class ArtifactPublisher {
         try write(SitePages.notFound(), to: "404.html")
         // Personal pages: keep them out of search engines.
         try write("/*\n  X-Robots-Tag: noindex, nofollow\n  Referrer-Policy: no-referrer\n", to: "_headers")
+        let account = try await Self.account()
         let config = """
         {
           "name": "\(AppSettings.shared.publishWorker)",
+          "account_id": "\(account)",
           "compatibility_date": "2026-10-01",
           "assets": { "directory": "./public", "not_found_handling": "404-page" },
           "routes": [{ "pattern": "\(domain)", "custom_domain": true }]
@@ -117,7 +132,7 @@ final class ArtifactPublisher {
         """
         try config.write(to: siteURL.appending(path: "wrangler.jsonc"), atomically: true, encoding: .utf8)
 
-        try await Self.runWrangler(["deploy"], in: siteURL)
+        _ = try await Self.runWrangler(["deploy"], in: siteURL, account: account)
 
         let data = try JSONEncoder.iso.encode(entries)
         try data.write(to: manifestURL, options: .atomic)
@@ -156,8 +171,45 @@ final class ArtifactPublisher {
 
     // MARK: wrangler
 
-    /// Runs wrangler through npx, with the user's own Node and login.
-    @concurrent nonisolated static func runWrangler(_ arguments: [String], in directory: URL) async throws {
+    /// The account to deploy to: the one chosen in Settings, else the only
+    /// one the login reaches. Several and none chosen: the caller asks.
+    private static func account() async throws -> String {
+        let chosen = AppSettings.shared.publishAccount
+        if !chosen.isEmpty { return chosen }
+        let accounts = try await accounts()
+        switch accounts.count {
+        case 0: throw PublishError.notLoggedIn
+        case 1:
+            AppSettings.shared.publishAccount = accounts[0].id
+            return accounts[0].id
+        default: throw PublishError.chooseAccount(accounts)
+        }
+    }
+
+    /// The accounts wrangler's login can deploy to.
+    static func accounts() async throws -> [Account] {
+        struct WhoAmI: Decodable {
+            var loggedIn: Bool
+            var accounts: [Account]?
+        }
+        let output: String
+        do {
+            output = try await runWrangler(["whoami", "--json"], in: FileManager.default.temporaryDirectory)
+        } catch PublishError.deploy {
+            // whoami --json fails when nobody is logged in.
+            throw PublishError.notLoggedIn
+        }
+        // npx may print a line of its own before the JSON.
+        guard let start = output.firstIndex(of: "{"),
+              let who = try? JSONDecoder().decode(WhoAmI.self, from: Data(output[start...].utf8)),
+              who.loggedIn else { throw PublishError.notLoggedIn }
+        return (who.accounts ?? []).sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    /// Runs wrangler through npx, with the user's own Node and login, and
+    /// returns what it printed on standard output.
+    @discardableResult
+    @concurrent nonisolated static func runWrangler(_ arguments: [String], in directory: URL, account: String? = nil) async throws -> String {
         guard let npx = findNPX() else { throw PublishError.noNode }
         let process = Process()
         process.executableURL = npx
@@ -167,19 +219,40 @@ final class ArtifactPublisher {
         environment["PATH"] = npx.deletingLastPathComponent().path + ":/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin"
         environment["CI"] = "1"
         environment["WRANGLER_SEND_METRICS"] = "false"
+        // Plain text: no colour codes in what we read back.
+        environment["NO_COLOR"] = "1"
+        environment["FORCE_COLOR"] = "0"
+        if let account { environment["CLOUDFLARE_ACCOUNT_ID"] = account }
         process.environment = environment
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
+        let out = Pipe()
+        let err = Pipe()
+        process.standardOutput = out
+        process.standardError = err
 
         try process.run()
-        let output = await Task.detached { pipe.fileHandleForReading.readDataToEndOfFile() }.value
+        // Both read at once, so a full pipe never stalls wrangler.
+        async let stdout = Task.detached { out.fileHandleForReading.readDataToEndOfFile() }.value
+        async let stderr = Task.detached { err.fileHandleForReading.readDataToEndOfFile() }.value
+        let (output, errors) = await (stdout, stderr)
         process.waitUntilExit()
+        let printed = String(decoding: output, as: UTF8.self)
         guard process.terminationStatus == 0 else {
-            let text = String(decoding: output, as: UTF8.self)
-            let lines = text.split(separator: "\n").filter { $0.contains("ERROR") || $0.contains("✘") || $0.contains("error") }
-            throw PublishError.deploy(String((lines.isEmpty ? String(text.suffix(400)) : lines.prefix(4).joined(separator: " ")).prefix(400)))
+            throw PublishError.deploy(failure(in: printed + "\n" + String(decoding: errors, as: UTF8.self)))
         }
+        return printed
+    }
+
+    /// The lines that say what went wrong, without colour codes or wrangler's
+    /// own decoration.
+    nonisolated static func failure(in output: String) -> String {
+        let clean = output
+            .replacing(/\x1B\[[0-9;?]*[A-Za-z]/, with: "")
+            .replacing(/\[[0-9;]*m/, with: "")
+        let lines = clean.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        let errors = lines.filter { $0.contains("ERROR") || $0.hasPrefix("✘") || $0.localizedCaseInsensitiveContains("error") }
+            .map { $0.replacing(/^✘\s*/, with: "").replacing(/^\[ERROR\]\s*/, with: "") }
+        let text = errors.isEmpty ? lines.suffix(4).joined(separator: " ") : errors.prefix(4).joined(separator: " ")
+        return String(text.prefix(400))
     }
 
     nonisolated static func findNPX() -> URL? {

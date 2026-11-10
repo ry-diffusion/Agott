@@ -129,6 +129,9 @@ final class AppSettings {
     /// Where published artifacts live, and the Worker that serves them.
     var publishDomain: String { didSet { save(publishDomain, "publishDomain") } }
     var publishWorker: String { didSet { save(publishWorker, "publishWorker") } }
+    /// The Cloudflare account the site deploys to; empty until chosen (or
+    /// found alone on the login).
+    var publishAccount: String { didSet { save(publishAccount, "publishAccount") } }
     /// Let the model read new moments after every indexing run.
     var autoLearn: Bool { didSet { save(autoLearn, "autoLearn") } }
     /// Agott sets reminders on its own when a message sets up something at a time.
@@ -182,6 +185,7 @@ final class AppSettings {
         hideNames = defaults.bool(forKey: "hideNames")
         publishDomain = defaults.string(forKey: "publishDomain") ?? "artifacts.grupomidas.com.br"
         publishWorker = defaults.string(forKey: "publishWorker") ?? "agott-artifacts"
+        publishAccount = defaults.string(forKey: "publishAccount") ?? ""
         aboutMe = defaults.string(forKey: "aboutMe") ?? ""
         apiKey = Keychain.get("opencode-api-key") ?? ""
     }

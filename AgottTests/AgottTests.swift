@@ -1448,3 +1448,15 @@ struct AttachmentTests {
         #endif
     }
 }
+
+#if os(macOS)
+@Suite("Publishing")
+struct PublishingTests {
+    @Test func wranglerErrorsReadPlainly() {
+        let output = "\u{1B}[31m✘ \u{1B}[41;31m[\u{1B}[41;97mERROR\u{1B}[41;31m]\u{1B}[0m \u{1B}[1mMore than one account available but unable to select one in non-interactive mode.\u{1B}[0m\n\nSome help text"
+        #expect(ArtifactPublisher.failure(in: output) == "More than one account available but unable to select one in non-interactive mode.")
+        // Codes that lost their escape character on the way are dropped too.
+        #expect(ArtifactPublisher.failure(in: "[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mBroken.[0m") == "Broken.")
+    }
+}
+#endif
