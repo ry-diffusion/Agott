@@ -97,8 +97,12 @@ enum ComputerControl {
         let element = handle.element
         let name = "[\(item.id)]" + (item.label.isEmpty ? " \(item.role)" : " \(item.label)")
         let actions = AXReader.actions(element)
+        /// A busy app can time out and still carry the action out later, so
+        /// a timeout counts as sent: falling back to a click would do it twice.
         func run(_ ax: String) -> Bool {
-            actions.contains(ax) && AXUIElementPerformAction(element, ax as CFString) == .success
+            guard actions.contains(ax) else { return false }
+            let result = AXUIElementPerformAction(element, ax as CFString)
+            return result == .success || result == .cannotComplete
         }
         func set(_ attribute: String, _ value: Bool) -> Bool {
             AXReader.isSettable(element, attribute)
