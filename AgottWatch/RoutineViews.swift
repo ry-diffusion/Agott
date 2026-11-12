@@ -73,6 +73,20 @@ private struct RoutineDetail: View {
                     Text(step.text).font(.footnote)
                 }
             }
+            let history = sync.efficiency(routine.id)
+            if !history.isEmpty {
+                Section("Last time") {
+                    ForEach(Exercise.allCases.filter { history[$0] != nil }) { exercise in
+                        if let trend = EfficiencyTrend.of(history[exercise] ?? []) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Label(exercise.name, systemImage: exercise.symbol).font(.footnote.weight(.semibold))
+                                Text(trend.latest.summary).font(.caption2).foregroundStyle(.secondary)
+                                if let change = trend.summary { Text(change).font(.caption2).foregroundStyle(.green) }
+                            }
+                        }
+                    }
+                }
+            }
         }
         .navigationTitle(routine.title)
         .fullScreenCover(isPresented: $counting) { CountingView(routine: routine) }
@@ -115,6 +129,10 @@ private struct CountingView: View {
                     .contentTransition(.numericText())
                     .animation(.snappy, value: session.count(current))
                 Text("of \(session.target(current))").font(.footnote).foregroundStyle(.secondary)
+                if let heartRate = wrist.heartRate {
+                    Label("\(Int(heartRate.rounded()))", systemImage: "heart.fill")
+                        .font(.caption2.monospacedDigit()).foregroundStyle(.red)
+                }
                 if session.exercises.count > 1 {
                     Button("Next exercise") {
                         let all = session.exercises
@@ -162,9 +180,11 @@ private struct CountingView: View {
 
     private func finish() async {
         finishing = true
-        await wrist.end()
-        let proof = session.proof()
-        RoutineSync.shared.markDone(routine.id, proof: proof.counts.contains { $0.counted > 0 } || !proof.ticked.isEmpty ? proof : nil)
+        let counted = session.proof(heartRates: wrist.heartRates)
+        let hasProof = counted.counts.contains { $0.counted > 0 } || !counted.ticked.isEmpty
+        // Into Health with its sets, and back with heart rate and energy.
+        let proof = await wrist.end(saving: hasProof ? counted : nil, routine: routine)
+        RoutineSync.shared.markDone(routine.id, proof: hasProof ? proof : nil)
         await RoutineSync.shared.sync()
         dismiss()
     }

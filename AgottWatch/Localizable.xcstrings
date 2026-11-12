@@ -240,6 +240,76 @@
           }
         }
       }
+    },
+    "%@ s a rep" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ s por repetição"
+          }
+        }
+      }
+    },
+    "%lld s rest" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld s de descanso"
+          }
+        }
+      }
+    },
+    "%lld bpm" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld bpm"
+          }
+        }
+      }
+    },
+    "%@ reps" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ repetições"
+          }
+        }
+      }
+    },
+    "%@ pace" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ritmo"
+          }
+        }
+      }
+    },
+    "%@ heart rate" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ batimentos"
+          }
+        }
+      }
+    },
+    "Last time" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Da última vez"
+          }
+        }
+      }
     }
   },
   "version" : "1.1"

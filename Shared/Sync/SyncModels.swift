@@ -50,6 +50,20 @@ nonisolated struct WorkoutProof: Codable, Hashable, Sendable {
     var ended: Date
     /// How far the watch went up and down (metres), from the barometer.
     var heightSwing: Double?
+    /// The sets, as counted (nil in proofs from before sets were kept).
+    var sets: [WorkoutSet]?
+    /// From the Watch's workout session: bpm, and active energy in kcal.
+    var heartRateAverage: Double?
+    var heartRateMax: Double?
+    var energy: Double?
+
+    /// How each exercise went, in the order done.
+    var efficiency: [ExerciseEfficiency] {
+        let sets = sets ?? []
+        var order: [Exercise] = []
+        for set in sets where !order.contains(set.exercise) { order.append(set.exercise) }
+        return order.compactMap { ExerciseEfficiency(exercise: $0, sets: sets) }
+    }
 
     /// "30/30 push-ups, 45/48 squats".
     var summary: String {

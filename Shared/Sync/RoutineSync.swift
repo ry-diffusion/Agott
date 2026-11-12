@@ -81,6 +81,14 @@ final class RoutineSync {
         RoutineDays.streak(days(routineID), today: today)
     }
 
+    /// Each exercise's workouts for a routine, oldest first, from the proofs
+    /// every device synced.
+    func efficiency(_ routineID: UUID) -> [Exercise: [ExerciseEfficiency]] {
+        let proofs = done.values.filter { $0.routineID == routineID }.compactMap(\.proof)
+        return Dictionary(grouping: proofs.flatMap(\.efficiency), by: \.exercise)
+            .mapValues { $0.sorted { $0.date < $1.date } }
+    }
+
     func doneToday(_ routineID: UUID, now: Date = Date()) -> DoneRecord? {
         done[DoneRecord.name(routineID, day: RoutineDays.day(now))]
     }

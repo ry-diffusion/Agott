@@ -4,15 +4,18 @@ import HealthKit
 import Observation
 
 /// The wrist as the counter. A workout session (functional strength
-/// training) keeps Agott running and reading motion with the wrist down,
-/// and goes into Health; the barometer records how far the wrist went up
-/// and down, as more proof for squats.
+/// training) keeps Agott running and reading motion with the wrist down, and
+/// collects heart rate and energy; at the end the workout goes into Health
+/// with every set as one of its activities. The barometer records how far
+/// the wrist went up and down, as more proof for squats.
 @MainActor @Observable
-final class WristWorkout {
+final class WristWorkout: NSObject, HKLiveWorkoutBuilderDelegate {
     private(set) var isRunning = false
     private(set) var problem: String?
+    /// The latest heart rate (bpm).
+    private(set) var heartRate: Double?
 
-    @ObservationIgnored private let store = HKHealthStore()
+    @ObservationIgnored private(set) var heartRates: [(at: Date, bpm: Double)] = []
     @ObservationIgnored private let motion = CMMotionManager()
     @ObservationIgnored private let altimeter = CMAltimeter()
     @ObservationIgnored private var session: HKWorkoutSession?
@@ -24,6 +27,7 @@ final class WristWorkout {
         guard !isRunning else { return }
         isRunning = true
         problem = nil
+        heartRates = []
         await startHealthSession()
 
         motion.deviceMotionUpdateInterval = 1.0 / 50
@@ -50,36 +54,48 @@ final class WristWorkout {
         }
     }
 
-    /// Stops counting and saves the workout to Health (if allowed).
-    func end() async {
-        guard isRunning else { return }
+    /// Stops counting. With a proof, the workout is saved to Health with its
+    /// sets, and the proof comes back with heart rate and energy; without
+    /// one, the workout is thrown away.
+    @discardableResult
+    func end(saving proof: WorkoutProof? = nil, routine: RoutineRecord? = nil) async -> WorkoutProof? {
+        guard isRunning else { return proof }
         isRunning = false
         motion.stopDeviceMotionUpdates()
         altimeter.stopRelativeAltitudeUpdates()
-        guard let session, let builder else { return }
+        guard let session, let builder else { return proof }
+        self.session = nil
+        self.builder = nil
         session.end()
+        guard var proof, let routine else {
+            builder.discardWorkout()
+            return proof
+        }
         do {
             try await builder.endCollection(at: Date())
+            let bpm = HKUnit.count().unitDivided(by: .minute())
+            let rate = builder.statistics(for: HKQuantityType(.heartRate))
+            proof.heartRateAverage = rate?.averageQuantity()?.doubleValue(for: bpm) ?? proof.heartRateAverage
+            proof.heartRateMax = rate?.maximumQuantity()?.doubleValue(for: bpm) ?? proof.heartRateMax
+            proof.energy = builder.statistics(for: HKQuantityType(.activeEnergyBurned))?.sumQuantity()?.doubleValue(for: .kilocalorie())
+            try await builder.addMetadata(HealthWorkouts.metadata(proof, routine: routine))
+            for activity in HealthWorkouts.activities(proof) { try? await builder.addWorkoutActivity(activity) }
             _ = try await builder.finishWorkout()
         } catch {
             problem = error.localizedDescription
         }
-        self.session = nil
-        self.builder = nil
+        return proof
     }
 
     /// Without Health, counting still works; it only stops when the screen sleeps.
     private func startHealthSession() async {
-        guard HKHealthStore.isHealthDataAvailable() else { return }
+        guard await HealthWorkouts.authorize() else { return }
         do {
-            try await store.requestAuthorization(toShare: [HKObjectType.workoutType()],
-                                                 read: [HKQuantityType(.heartRate), HKQuantityType(.activeEnergyBurned)])
-            let configuration = HKWorkoutConfiguration()
-            configuration.activityType = .functionalStrengthTraining
-            configuration.locationType = .indoor
-            let session = try HKWorkoutSession(healthStore: store, configuration: configuration)
+            let configuration = HealthWorkouts.configuration
+            let session = try HKWorkoutSession(healthStore: HealthWorkouts.store, configuration: configuration)
             let builder = session.associatedWorkoutBuilder()
-            builder.dataSource = HKLiveWorkoutDataSource(healthStore: store, workoutConfiguration: configuration)
+            builder.dataSource = HKLiveWorkoutDataSource(healthStore: HealthWorkouts.store, workoutConfiguration: configuration)
+            builder.delegate = self
             session.startActivity(with: Date())
             try await builder.beginCollection(at: Date())
             self.session = session
@@ -88,4 +104,19 @@ final class WristWorkout {
             problem = error.localizedDescription
         }
     }
+
+    // Heart rate as it comes, to tell how hard each set was.
+    nonisolated func workoutBuilder(_ workoutBuilder: HKLiveWorkoutBuilder, didCollectDataOf collectedTypes: Set<HKSampleType>) {
+        let type = HKQuantityType(.heartRate)
+        guard collectedTypes.contains(type), let statistics = workoutBuilder.statistics(for: type),
+              let quantity = statistics.mostRecentQuantity() else { return }
+        let bpm = quantity.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
+        let at = statistics.mostRecentQuantityDateInterval()?.end ?? Date()
+        Task { @MainActor in
+            self.heartRate = bpm
+            self.heartRates.append((at, bpm))
+        }
+    }
+
+    nonisolated func workoutBuilderDidCollectEvent(_ workoutBuilder: HKLiveWorkoutBuilder) {}
 }

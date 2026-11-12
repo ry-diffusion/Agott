@@ -82,6 +82,10 @@ private struct RoutineCard: View {
                     }
                 }
             }
+            NavigationLink { RoutineProgressView(routine: routine) } label: {
+                Label("Progress", systemImage: "chart.xyaxis.line").font(.callout)
+            }
+            .foregroundStyle(Ink.spot)
             if let done {
                 Label {
                     if let proof = done.proof {
@@ -183,6 +187,7 @@ private struct WorkoutSheet: View {
             }
         }
         .onAppear {
+            Task { await HealthWorkouts.authorize() }
             session.onRep = { _, _ in UIImpactFeedbackGenerator(style: .light).impactOccurred() }
             session.onExerciseDone = { _ in UINotificationFeedbackGenerator().notificationOccurred(.success) }
             motion.start { gravity, acceleration, time in
@@ -214,8 +219,12 @@ private struct WorkoutSheet: View {
 
     private func finish(proven: Bool) {
         motion.stop()
-        RoutineSync.shared.markDone(routine.id, proof: proven || session.proof().counts.contains { $0.counted > 0 } ? session.proof() : nil)
+        let proof = session.proof()
+        let hasProof = proven || proof.counts.contains { $0.counted > 0 }
+        RoutineSync.shared.markDone(routine.id, proof: hasProof ? proof : nil)
         Task {
+            // Into Health, each set as an activity.
+            if hasProof { await HealthWorkouts.save(proof, routine: routine) }
             await RoutineSync.shared.sync()
             await PhoneRoutines.reschedule()
         }

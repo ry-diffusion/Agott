@@ -24,6 +24,8 @@ final class WorkoutSession {
     @ObservationIgnored var onExerciseDone: ((Exercise) -> Void)?
 
     @ObservationIgnored private var counter: RepCounter?
+    /// When each rep was counted, for telling sets apart.
+    @ObservationIgnored private var repTimes: [(exercise: Exercise, at: Date)] = []
 
     init(routine: RoutineRecord, sensor: MotionSensor) {
         self.routine = routine
@@ -67,6 +69,7 @@ final class WorkoutSession {
         guard rep else { return }
         let wasMet = isMet(exercise)
         counts[exercise, default: 0] += 1
+        repTimes.append((exercise, Date()))
         onRep?(exercise, count(exercise))
         if !wasMet, count(exercise) >= target(exercise) {
             onExerciseDone?(exercise)
@@ -75,10 +78,21 @@ final class WorkoutSession {
         }
     }
 
-    func proof(now: Date = Date()) -> WorkoutProof {
-        WorkoutProof(
+    /// Sets so far, with heart rate where samples (time, bpm) are given.
+    func sets(heartRates: [(at: Date, bpm: Double)] = []) -> [WorkoutSet] {
+        WorkoutSet.withHeartRates(WorkoutSet.split(repTimes), samples: heartRates)
+    }
+
+    func proof(now: Date = Date(), heartRates: [(at: Date, bpm: Double)] = []) -> WorkoutProof {
+        var proof = WorkoutProof(
             counts: exercises.map { ExerciseCount(exercise: $0, target: target($0), counted: count($0), sensor: sensor) },
             ticked: ticked.sorted(), started: started, ended: now, heightSwing: heightSwing)
+        proof.sets = sets(heartRates: heartRates)
+        if !heartRates.isEmpty {
+            proof.heartRateAverage = heartRates.map(\.bpm).reduce(0, +) / Double(heartRates.count)
+            proof.heartRateMax = heartRates.map(\.bpm).max()
+        }
+        return proof
     }
 }
 

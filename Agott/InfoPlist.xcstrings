@@ -81,6 +81,42 @@
         }
       }
     },
+    "NSHealthShareUsageDescription" : {
+      "comment" : "Privacy - Health Share Usage Description",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Agott reads your workouts and heart rate to show how your sets improve over time."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Agott lê seus treinos e batimentos para mostrar como suas séries melhoram com o tempo."
+          }
+        }
+      }
+    },
+    "NSHealthUpdateUsageDescription" : {
+      "comment" : "Privacy - Health Update Usage Description",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Agott saves the workouts it counts to Health, with every set and its reps."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Agott salva no Saúde os treinos que conta, com cada série e suas repetições."
+          }
+        }
+      }
+    },
     "NSLocalNetworkUsageDescription" : {
       "extractionState" : "manual",
       "localizations" : {
