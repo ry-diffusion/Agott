@@ -1,0 +1,2 @@
+# Copy to .dev.vars for `npm run dev`. Any long random string works locally.
+AGOTT_TOKENS=local-dev-token-change-me-0123456789

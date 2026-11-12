@@ -1,0 +1,15 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "agott-sync",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-08-01",
+	"observability": { "enabled": true },
+	// One SQLite Durable Object per person: every write for one person goes
+	// through one place, so a day marked done on the Watch and on the Mac at
+	// once never loses either.
+	"durable_objects": {
+		"bindings": [{ "name": "VAULT", "class_name": "Vault" }]
+	},
+	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["Vault"] }]
+	// AGOTT_TOKENS is a secret: `npx wrangler secret put AGOTT_TOKENS`.
+}
