@@ -49,6 +49,8 @@ struct RootView: View {
     @Environment(\.colorScheme) private var scheme
     #if os(macOS)
     @State private var windowWidth: CGFloat = 1200
+    #else
+    @Environment(\.scenePhase) private var scenePhase
     #endif
     private var section: AppSection { navigator.section }
     /// Every screen is one page now: People is a table, chats are reached
@@ -129,6 +131,9 @@ struct RootView: View {
         }
         #else
         TabView {
+            Tab("Today", systemImage: "figure.strengthtraining.functional") {
+                NavigationStack { TodayRoutineView() }
+            }
             Tab("Mac", systemImage: "laptopcomputer") {
                 NavigationStack { RemoteChatView() }
             }
@@ -140,6 +145,10 @@ struct RootView: View {
             }
         }
         .tint(Ink.spot)
+        .task { await PhoneRoutines.start() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await PhoneRoutines.start() } }
+        }
         #endif
     }
 

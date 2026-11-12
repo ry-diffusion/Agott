@@ -29,7 +29,12 @@ struct SyncSettings: View {
                 if let problem = sync.problem { Text(problem).font(.caption).foregroundStyle(.orange) }
                 HStack {
                     Button("Sync now") { Task { await sync.sync() } }.disabled(sync.isSyncing)
-                    Button("Disconnect", role: .destructive) { sync.disconnect() }
+                    Button("Disconnect", role: .destructive) {
+                        sync.disconnect()
+                        #if os(iOS)
+                        WatchLink.shared.sendAccount()
+                        #endif
+                    }
                 }
                 .controlSize(.small)
             } else {
@@ -108,6 +113,9 @@ enum AppSync {
 
     /// Just connected: what this device has goes up.
     static func connected() {
+        #if os(iOS)
+        WatchLink.shared.sendAccount()
+        #endif
         #if os(macOS)
         Nudges.shared.publishAll()
         // The Mac is where keys are typed: they win the first time.

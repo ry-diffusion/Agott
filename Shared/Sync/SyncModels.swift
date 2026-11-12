@@ -16,6 +16,17 @@ nonisolated struct RoutineRecord: Codable, Hashable, Sendable, Identifiable {
     var updatedAt: Date
 
     var plan: WorkoutPlan { WorkoutPlan.parse(steps) }
+
+    /// What Agott says when it is put off, sharper each time.
+    var nags: [String] {
+        let lines = nagLines.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        return lines.isEmpty ? [
+            String(localized: "Still waiting on this: \(title)."),
+            String(localized: "Come on, \(title). Now."),
+            String(localized: "Seriously, where is the \(title)? I'm not letting this go."),
+            String(localized: "Still nothing? \(title). Get up."),
+        ] : lines
+    }
     var time: String { String(format: "%02d:%02d", hour, minute) }
 
     static func name(_ id: UUID) -> String { "routine/\(id.uuidString)" }

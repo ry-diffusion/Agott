@@ -16,6 +16,9 @@ struct AgottApp: App {
     init() {
         Lettering.register()
         AppSync.configure()
+        #if os(iOS)
+        PhoneRoutines.register()
+        #endif
     }
 
     var body: some Scene {

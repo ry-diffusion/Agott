@@ -6,6 +6,16 @@
 	     an app browse for a service type it has not declared here, and Xcode
 	     has no INFOPLIST_KEY_ setting for this array. Generated keys are
 	     merged on top of this file. -->
+	<!-- iOS wakes Agott now and then to sync routines, so a day done on
+	     the Watch or the Mac stops the phone's reminders. -->
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>br.com.zesmoi.Agott.routines</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+	</array>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_agott._tcp</string>

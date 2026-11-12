@@ -9121,6 +9121,186 @@
           }
         }
       }
+    },
+    "Connect sync in Settings to see the routines you set on your Mac, and to do them from here or your Watch." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conecte a sincronização nos Ajustes para ver as rotinas que você criou no Mac e fazê-las daqui ou do Watch."
+          }
+        }
+      }
+    },
+    "No routines yet. Ask Agott on your Mac to make you do something every day." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma rotina ainda. Peça ao Agott no Mac para te fazer fazer algo todo dia."
+          }
+        }
+      }
+    },
+    "Every day at %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todo dia às %@"
+          }
+        }
+      }
+    },
+    "Done on the %@: %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Feito no %@: %@"
+          }
+        }
+      }
+    },
+    "Done on the %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Feito no %@"
+          }
+        }
+      }
+    },
+    "Start" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Começar"
+          }
+        }
+      }
+    },
+    "Counting needs AirPods Pro, AirPods Max or AirPods (3rd generation or later). You can also count on your Watch." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Para contar, use AirPods Pro, AirPods Max ou AirPods (3ª geração ou mais novos). Você também pode contar no Watch."
+          }
+        }
+      }
+    },
+    "Agott can't read your AirPods' motion. Allow Motion & Fitness for Agott in Settings." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Agott não consegue ler o movimento dos AirPods. Permita Movimento e Condicionamento para o Agott nos Ajustes."
+          }
+        }
+      }
+    },
+    "Exercises" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exercícios"
+          }
+        }
+      }
+    },
+    "Tick when done" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marque quando fizer"
+          }
+        }
+      }
+    },
+    "Not everything was counted yet." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ainda não contou tudo."
+          }
+        }
+      }
+    },
+    "Mark done anyway" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marcar como feito mesmo assim"
+          }
+        }
+      }
+    },
+    "Keep going" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continuar"
+          }
+        }
+      }
+    },
+    "The day counts for your streak, without proof." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O dia conta para a sequência, sem prova."
+          }
+        }
+      }
+    },
+    "of %lld %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "de %lld %@"
+          }
+        }
+      }
+    },
+    "Counting with your AirPods" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contando com seus AirPods"
+          }
+        }
+      }
+    },
+    "Put in your AirPods to count" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coloque os AirPods para contar"
+          }
+        }
+      }
+    },
+    "Time for it." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Está na hora."
+          }
+        }
+      }
     }
   },
   "version" : "1.1"
