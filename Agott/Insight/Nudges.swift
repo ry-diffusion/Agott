@@ -302,6 +302,7 @@ final class Nudges {
 
     /// Gone for good (from the Routines page).
     func delete(_ nudge: Nudge) {
+        if nudge.repeatsDaily { RoutineSync.shared.save(record(nudge, stopped: true)) }
         pending.removeAll { $0.id == nudge.id }
         finish(nudge)
     }
@@ -316,6 +317,7 @@ final class Nudges {
         pending[index].due = due
         pending[index].alert = due
         pending[index].nagged = 0
+        RoutineSync.shared.save(record(pending[index]))
         pending.sort { $0.alert < $1.alert }
         finish(routine)
     }
