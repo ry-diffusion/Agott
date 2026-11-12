@@ -84,6 +84,8 @@ nonisolated struct Nudge: Codable, Hashable, Identifiable, Sendable {
     /// already today), else starts again; it comes back at its time tomorrow.
     mutating func markDone(at now: Date = Date(), calendar: Calendar = .current) {
         let today = calendar.startOfDay(for: now)
+        // Twice in a day counts once, and never skips tomorrow.
+        if let lastDone, calendar.isDate(lastDone, inSameDayAs: now) { return }
         if let lastDone, calendar.startOfDay(for: lastDone) >= calendar.date(byAdding: .day, value: -1, to: today)! {
             if calendar.startOfDay(for: lastDone) < today { streak += 1 }
         } else {
@@ -93,6 +95,10 @@ nonisolated struct Nudge: Codable, Hashable, Identifiable, Sendable {
         nagged = 0
         due = next(after: max(now, due), calendar: calendar)
         alert = due
+    }
+
+    func doneToday(at now: Date = Date(), calendar: Calendar = .current) -> Bool {
+        lastDone.map { calendar.isDate($0, inSameDayAs: now) } ?? false
     }
 
     /// A routine whose day went by undone (the Mac was off, or it was
@@ -174,7 +180,7 @@ final class Nudges {
     /// Seen and done: a one-off is gone (and ticked off in Reminders); a
     /// routine counts the day and comes back tomorrow.
     func done(_ nudge: Nudge) {
-        guard let index = pending.firstIndex(where: { $0.id == nudge.id }) else { return close() }
+        guard let index = pending.firstIndex(where: { $0.id == nudge.id }) else { return finish(nudge) }
         if pending[index].repeatsDaily {
             pending[index].markDone()
             pending.sort { $0.alert < $1.alert }
@@ -184,16 +190,47 @@ final class Nudges {
                 Task.detached { try? Organizer.shared.complete(reminderID: id) }
             }
         }
-        close()
+        finish(nudge)
     }
 
     /// Again in a while; each time sharper.
     func snooze(_ nudge: Nudge, minutes: Int) {
-        guard let index = pending.firstIndex(where: { $0.id == nudge.id }) else { return close() }
+        guard let index = pending.firstIndex(where: { $0.id == nudge.id }) else { return finish(nudge) }
         pending[index].alert = Date().addingTimeInterval(Double(minutes) * 60)
         pending[index].nagged += 1
         pending.sort { $0.alert < $1.alert }
-        close()
+        finish(nudge)
+    }
+
+    /// Gone for good (from the Routines page).
+    func delete(_ nudge: Nudge) {
+        pending.removeAll { $0.id == nudge.id }
+        finish(nudge)
+    }
+
+    /// A routine at another time of day, from its next day on.
+    func setTime(_ routine: Nudge, hour: Int, minute: Int) {
+        guard let index = pending.firstIndex(where: { $0.id == routine.id }) else { return }
+        let now = Date()
+        let base = routine.doneToday(at: now) ? Calendar.current.date(byAdding: .day, value: 1, to: now)! : now
+        var due = Calendar.current.date(bySettingHour: hour, minute: minute, second: 0, of: base) ?? base
+        if due < now { due = Calendar.current.date(byAdding: .day, value: 1, to: due)! }
+        pending[index].due = due
+        pending[index].alert = due
+        pending[index].nagged = 0
+        pending.sort { $0.alert < $1.alert }
+        finish(routine)
+    }
+
+    /// After a change: the pop-up closes if it was showing this one;
+    /// anything else on screen is left alone.
+    private func finish(_ nudge: Nudge) {
+        if showing?.id == nudge.id {
+            close()
+        } else {
+            save()
+            arm()
+        }
     }
 
     /// Closed without doing it: a routine only goes away for ten minutes.

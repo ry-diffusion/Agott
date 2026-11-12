@@ -1523,3 +1523,20 @@ struct VideoRoutineTests {
     }
 }
 #endif
+
+#if os(macOS)
+@Suite("Routines page")
+struct RoutinesPageTests {
+    @Test func doneTwiceInADayCountsOnce() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Sao_Paulo")!
+        let seven = calendar.date(from: DateComponents(year: 2026, month: 11, day: 9, hour: 7))!
+        var routine = Nudge(title: "Calistenia", due: seven, alert: seven, repeatsDaily: true)
+        routine.markDone(at: seven.addingTimeInterval(600), calendar: calendar)
+        let tomorrow = routine.due
+        routine.markDone(at: seven.addingTimeInterval(1200), calendar: calendar)
+        #expect(routine.due == tomorrow && routine.streak == 1)
+        #expect(routine.doneToday(at: seven.addingTimeInterval(3600), calendar: calendar))
+    }
+}
+#endif
