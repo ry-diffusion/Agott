@@ -8731,6 +8731,66 @@
           }
         }
       }
+    },
+    "Watching “%@”" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Assistindo “%@”"
+          }
+        }
+      }
+    },
+    "Looking for subtitles" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Procurando legendas"
+          }
+        }
+      }
+    },
+    "Downloading the audio" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Baixando o áudio"
+          }
+        }
+      }
+    },
+    "Transcribing %lld min of audio" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcrevendo %lld min de áudio"
+          }
+        }
+      }
+    },
+    "Transcribing the audio" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcrevendo o áudio"
+          }
+        }
+      }
+    },
+    "Reading the video" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lendo o vídeo"
+          }
+        }
+      }
     }
   },
   "version" : "1.1"

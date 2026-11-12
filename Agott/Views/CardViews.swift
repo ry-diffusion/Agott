@@ -26,6 +26,8 @@ struct AssistantTurnView: View {
                 StepsView(steps: turn.steps, isStreaming: working, started: turn.date,
                           status: working ? Agent.shared.status : nil)
             }
+            // Long work under way (a video being watched): live, then gone.
+            if turn.isStreaming { LiveWorkCards(compact: compact) }
             // Cards come from tools, which run before the words that follow them.
             ForEach(turn.cards) { card in
                 CardView(card: card)

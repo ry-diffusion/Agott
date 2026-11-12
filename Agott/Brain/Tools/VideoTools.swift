@@ -33,17 +33,20 @@ nonisolated enum VideoReader {
     /// Characters of transcript that go to the model.
     static let transcriptBudget = 30_000
 
-    static func read(_ url: URL) async throws -> Video {
+    /// `reporter`: the live card in the chat, told each step.
+    static func read(_ url: URL, reporter: LiveWork.Reporter? = nil) async throws -> Video {
         guard let ytdlp = find("yt-dlp") else { throw Problem.noYtDlp }
         let folder = FileManager.default.temporaryDirectory.appending(path: "Agott video \(UUID().uuidString.prefix(8))", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
 
         var video = try await metadata(url, ytdlp: ytdlp, in: folder)
+        reporter?.title(String(localized: "Watching “\(video.title)”"))
+        reporter?.stage(String(localized: "Looking for subtitles"))
         if let words = try? await subtitles(url, ytdlp: ytdlp, in: folder), !words.isEmpty {
             video.transcript = words
             video.source = "subtitles"
-        } else if let words = try await audioTranscript(url, ytdlp: ytdlp, in: folder) {
+        } else if let words = try await audioTranscript(url, minutes: (video.duration ?? 0) / 60, ytdlp: ytdlp, in: folder, reporter: reporter) {
             video.transcript = words
             video.source = "audio"
         }
@@ -95,20 +98,24 @@ nonisolated enum VideoReader {
     }
 
     /// No subtitles: the audio, transcribed here.
-    private static func audioTranscript(_ url: URL, ytdlp: URL, in folder: URL) async throws -> String? {
+    private static func audioTranscript(_ url: URL, minutes: Int, ytdlp: URL, in folder: URL, reporter: LiveWork.Reporter?) async throws -> String? {
         guard Parakeet.isInstalled else {
             throw Problem.failed("This video has no subtitles, and the transcription model is not downloaded yet (Settings › Voice).")
         }
-        var arguments = ["--no-playlist", "--no-warnings", "-f", "bestaudio[ext=m4a]/bestaudio",
+        reporter?.stage(String(localized: "Downloading the audio"), fraction: 0)
+        var arguments = ["--no-playlist", "--no-warnings", "--newline", "-f", "bestaudio[ext=m4a]/bestaudio",
                          "-o", folder.appending(path: "audio.%(ext)s").path]
         if let ffmpeg = find("ffmpeg") {
             arguments += ["-x", "--audio-format", "m4a", "--ffmpeg-location", ffmpeg.path]
         }
-        _ = try await run(ytdlp, arguments + [url.absoluteString], in: folder, limit: .seconds(300))
+        _ = try await run(ytdlp, arguments + [url.absoluteString], in: folder, limit: .seconds(300)) { line in
+            if let percent = downloadPercent(line) { reporter?.progress(percent) }
+        }
         let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
         guard let audio = files.first(where: { $0.lastPathComponent.hasPrefix("audio.") && $0.pathExtension != "part" }) else {
             throw Problem.failed("yt-dlp could not fetch the video's audio.")
         }
+        reporter?.stage(minutes > 0 ? String(localized: "Transcribing \(minutes) min of audio") : String(localized: "Transcribing the audio"))
         let language = await Parakeet.language(for: AppSettings.shared.speechLocale)
         let words = await Deadline.run(.seconds(600)) { try? await Parakeet.shared.transcribe(file: audio, language: language) } ?? nil
         guard let words, !words.isEmpty else { throw Problem.failed("The audio could not be transcribed.") }
@@ -147,6 +154,12 @@ nonisolated enum VideoReader {
         return lines.joined(separator: " ").replacingOccurrences(of: " [", with: "\n[")
     }
 
+    /// How far a yt-dlp download is, from a "[download]  45.3% of …" line.
+    static func downloadPercent(_ line: String) -> Double? {
+        guard line.hasPrefix("[download]"), let match = line.firstMatch(of: /(\d+(?:\.\d+)?)%/) else { return nil }
+        return Double(match.1).map { $0 / 100 }
+    }
+
     /// "00:01:02.500" or "01:02.500" in whole seconds.
     static func seconds(_ stamp: String) -> Int {
         let parts = stamp.split(separator: ":").map { Double($0) ?? 0 }
@@ -163,7 +176,10 @@ nonisolated enum VideoReader {
             .map(URL.init(fileURLWithPath:))
     }
 
-    private static func run(_ executable: URL, _ arguments: [String], in folder: URL, limit: Duration) async throws -> String {
+    /// Runs a tool and returns what it printed. `onLine` sees each line as
+    /// it comes (progress). Stopping the task stops the tool.
+    private static func run(_ executable: URL, _ arguments: [String], in folder: URL, limit: Duration,
+                            onLine: (@Sendable (String) -> Void)? = nil) async throws -> String {
         let process = Process()
         process.executableURL = executable
         process.arguments = arguments
@@ -175,24 +191,46 @@ nonisolated enum VideoReader {
         let err = Pipe()
         process.standardOutput = out
         process.standardError = err
+        let running = Running(process)
         try process.run()
-        async let stdout = Task.detached { out.fileHandleForReading.readDataToEndOfFile() }.value
-        async let stderr = Task.detached { err.fileHandleForReading.readDataToEndOfFile() }.value
-        // Too long: stop it, which also ends the reads above.
-        let watchdog = Task.detached {
-            try? await Task.sleep(for: limit)
-            if process.isRunning { process.terminate() }
+        return try await withTaskCancellationHandler {
+            async let stdout = Task.detached { () -> String in
+                var all = ""
+                do {
+                    for try await line in out.fileHandleForReading.bytes.lines {
+                        all += line + "\n"
+                        onLine?(line)
+                    }
+                } catch {}
+                return all
+            }.value
+            async let stderr = Task.detached { err.fileHandleForReading.readDataToEndOfFile() }.value
+            // Too long: stop it, which also ends the reads above.
+            let watchdog = Task.detached {
+                try? await Task.sleep(for: limit)
+                running.stop()
+            }
+            let (output, errors) = await (stdout, stderr)
+            process.waitUntilExit()
+            watchdog.cancel()
+            try Task.checkCancellation()
+            guard process.terminationStatus == 0 else {
+                let message = String(decoding: errors, as: UTF8.self)
+                    .split(separator: "\n").last { $0.contains("ERROR") }.map(String.init)
+                    ?? String(localized: "yt-dlp stopped without saying why.")
+                throw Problem.failed(String(message.prefix(300)))
+            }
+            return output
+        } onCancel: {
+            running.stop()
         }
-        let (output, errors) = await (stdout, stderr)
-        process.waitUntilExit()
-        watchdog.cancel()
-        guard process.terminationStatus == 0 else {
-            let message = String(decoding: errors, as: UTF8.self)
-                .split(separator: "\n").last { $0.contains("ERROR") }.map(String.init)
-                ?? String(localized: "yt-dlp stopped without saying why.")
-            throw Problem.failed(String(message.prefix(300)))
-        }
-        return String(decoding: output, as: UTF8.self)
+    }
+
+    /// A running tool that can be stopped from any thread.
+    private final class Running: @unchecked Sendable {
+        private let process: Process
+        init(_ process: Process) { self.process = process }
+        func stop() { if process.isRunning { process.terminate() } }
     }
 }
 
@@ -218,7 +256,12 @@ nonisolated struct WatchVideoTool: Tool {
             return "That is not a video address."
         }
         do {
-            let video = try await VideoReader.read(url)
+            let video = try await LiveWork.track(
+                String(localized: "Watching the video"), symbol: "play.rectangle",
+                stage: String(localized: "Reading the video")
+            ) { reporter in
+                try await VideoReader.read(url, reporter: reporter)
+            }
             var parts = ["Title: \(video.title)"]
             if let channel = video.channel { parts.append("Channel: \(channel)") }
             if let duration = video.duration { parts.append("Length: \(duration / 60) min \(duration % 60) s") }
