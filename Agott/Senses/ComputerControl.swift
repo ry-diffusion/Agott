@@ -44,6 +44,7 @@ enum ComputerControl {
 
     /// Acts on element `id` and says what changed.
     static func act(_ action: ElementAction, on id: Int) async throws -> String {
+        try await ComputerUseOverlay.shared.announce(action, on: id)
         if let item = ScreenReader.shared.pageElement(id) { return try await actOnPage(action, on: item) }
         try ensureTrusted()
         guard let (handle, item) = await ScreenReader.shared.element(id) else { throw Failure.unknownElement(id) }
@@ -161,6 +162,7 @@ enum ComputerControl {
 
     /// Clicks at a point (from a screenshot) and says what changed.
     static func click(_ point: CGPoint, double: Bool) async throws -> String {
+        try await ComputerUseOverlay.shared.step(String(localized: "Clicking"), at: point)
         try ensureTrusted()
         let before = ScreenReader.shared.latest
         await focusTarget()
@@ -173,6 +175,7 @@ enum ComputerControl {
     /// a paste, while many (web pages, chat apps) ignore a value set from
     /// outside.
     static func type(_ text: String, into id: Int?, replace: Bool, submit: Bool) async throws -> String {
+        try await ComputerUseOverlay.shared.announceTyping(into: id)
         if let id, let item = ScreenReader.shared.pageElement(id) {
             // On a page the value is set with the events typing makes; a
             // select picks the option with that text.
@@ -216,6 +219,7 @@ enum ComputerControl {
 
     /// Presses a shortcut and says what changed.
     static func press(keys combo: String) async throws -> String {
+        try await ComputerUseOverlay.shared.step(String(localized: "Pressing \(combo)"))
         try ensureTrusted()
         let before = ScreenReader.shared.latest
         await focusTarget()
@@ -225,6 +229,7 @@ enum ComputerControl {
 
     /// Scrolls inside element `id` (or under the mouse) and says what changed.
     static func scroll(lines: Int, in id: Int?) async throws -> String {
+        try await ComputerUseOverlay.shared.step(String(localized: "Scrolling"), at: ComputerUseOverlay.point(of: id))
         let item = id.flatMap { ScreenReader.shared.pageElement($0) }
         if item != nil || (id == nil && ScreenReader.shared.readsPage) {
             let request = SafariBridge.Request(op: "act", action: "scroll", ref: item?.web, lines: lines)
@@ -273,6 +278,7 @@ enum ComputerControl {
     /// Opens an app by name, or a URL, waits for its window and shows it, so
     /// the model can act on it straight away.
     static func open(_ target: String) async throws -> String {
+        try await ComputerUseOverlay.shared.step(String(localized: "Opening \(target)…"))
         let trimmed = target.trimmingCharacters(in: .whitespaces)
         if let url = URL(string: trimmed), url.scheme != nil {
             NSWorkspace.shared.open(url)

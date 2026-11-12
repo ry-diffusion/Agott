@@ -78,6 +78,15 @@ opens Safari's settings.
 `LiveSafariTests` (run with `TEST_RUNNER_AGOTT_SAFARI=1`, the extension on and allowed on `127.0.0.1`) opens a
 local test page in Safari, lists it and presses, types, picks an option and submits through `ComputerControl`.
 
+## While Agott works in an app
+
+`Agott/Views/ComputerUseOverlay.swift`: from the first look or action until the reply ends, a purple frame sits around
+the window Agott is using and a black pill at its bottom says "Agott is using Finder", the step ("Pressing
+“Downloads”"), and has **Stop**. Agott's own pointer, a purple arrow with its name, glides to each element before it
+is pressed, typed into or scrolled, and pulses when it acts, so actions through Accessibility (which do not move
+your mouse) can be followed. None of it takes focus or clicks except Stop, which cancels the reply and refuses any
+action still on its way until the next message. While it shows, the notch island stays hidden, so there is one Stop.
+
 ## What came from fazm
 
 fazm (github.com/mediar-ai/fazm, MIT per its README) drives native apps through its bundled

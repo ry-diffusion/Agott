@@ -83,6 +83,8 @@ final class ActivityIsland {
     private var wanted: Bool {
         guard Self.working else { return false }
         if OverlayController.shared.isVisible || QuickEntryController.shared.isShown { return false }
+        // Using another app, Agott shows its own pill with Stop over that app.
+        if ComputerUseOverlay.shared.isVisible { return false }
         // Agott's own window in front: the chat already shows the work.
         let ownWindowInFront = NSApp.isActive && NSApp.windows.contains {
             $0.isKeyWindow && $0.isVisible && !($0 is NSPanel) && !$0.isMiniaturized

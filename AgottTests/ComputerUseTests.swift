@@ -2,6 +2,7 @@
 import AppKit
 import ApplicationServices
 import Foundation
+import SwiftUI
 import Testing
 @testable import Agott
 
@@ -585,6 +586,68 @@ struct LegacyReader {
         if !lines.isEmpty { parts.append("Controls (use the number to press one):\n" + lines.prefix(160).joined(separator: "\n")) }
         if !text.isEmpty { parts.append("Visible text (OCR, top to bottom):\n" + String(text.prefix(6000))) }
         return parts.joined(separator: "\n")
+    }
+}
+#endif
+
+#if os(macOS)
+// MARK: The overlay while Agott uses an app
+
+@MainActor
+struct ComputerUseOverlayTests {
+    @Test func accessibilityPointsBecomeAppKitPoints() {
+        // Accessibility measures down from the top of the main screen.
+        #expect(ComputerUseOverlay.appKitPoint(fromAX: CGPoint(x: 100, y: 50), mainHeight: 900) == CGPoint(x: 100, y: 850))
+        #expect(ComputerUseOverlay.appKitRect(fromAX: CGRect(x: 10, y: 100, width: 300, height: 200), mainHeight: 900)
+            == CGRect(x: 10, y: 600, width: 300, height: 200))
+    }
+
+    @Test func pointerTipLandsOnThePoint() {
+        let frame = ComputerUseOverlay.pointerFrame(tipAt: CGPoint(x: 500, y: 400))
+        // The tip is `tip` from the panel's top-left corner.
+        #expect(frame.minX + ComputerUseOverlay.tip.x == 500)
+        #expect(frame.maxY - ComputerUseOverlay.tip.y == 400)
+        #expect(frame.size == ComputerUseOverlay.pointerSize)
+    }
+
+    @Test func stopRefusesActionsUntilTheNextReply() async {
+        let overlay = ComputerUseOverlay.shared
+        overlay.busyChanged(true)
+        overlay.model.stopped = true
+        await #expect(throws: ComputerUseOverlay.Stopped.self) {
+            try await overlay.step("Pressing “Send”")
+        }
+        // The reply ends, a new one starts: Agott may act again.
+        overlay.busyChanged(false)
+        overlay.busyChanged(true)
+        #expect(!overlay.model.stopped)
+        overlay.busyChanged(false)
+    }
+
+    /// Renders the pill and the pointer to PNGs, to look at the design
+    /// without a screenshot of anyone's screen. TEST_RUNNER_AGOTT_RENDER=1.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["AGOTT_RENDER"] == "1"))
+    func renderOverlay() throws {
+        let model = ComputerUseOverlay.Model()
+        model.appName = "Finder"
+        model.step = "Pressing “Downloads”"
+        let view = ZStack(alignment: .topLeading) {
+            Color(white: 0.93)
+            UsingAppFrame(model: model).frame(width: 520, height: 300).offset(x: 20, y: 20)
+            AgottPointer(model: model).offset(x: 220, y: 110)
+            UsingAppPill(model: model) {}
+                .frame(width: ComputerUseOverlay.pillSize.width, height: ComputerUseOverlay.pillSize.height)
+                .offset(x: 90, y: 245)
+        }
+        .frame(width: 560, height: 340)
+        .environment(\.colorScheme, .dark)
+        let renderer = ImageRenderer(content: view)
+        renderer.scale = 2
+        let image = try #require(renderer.nsImage)
+        let data = try #require(NSBitmapImageRep(data: image.tiffRepresentation!)?.representation(using: .png, properties: [:]))
+        let url = URL.temporaryDirectory.appending(path: "agott-overlay.png")
+        try data.write(to: url)
+        print("RENDERED \(url.path)")
     }
 }
 #endif

@@ -33,6 +33,7 @@ nonisolated struct LookAtScreenTool: Tool {
 
     @concurrent func call(arguments: Arguments) async throws -> Prompt {
         await CardBus.status(String(localized: "Looking at your screen…"))
+        try await ComputerUseOverlay.shared.step(String(localized: "Reading the window"))
         let snapshot = await ScreenReader.shared.capture(pixels: arguments.screenshot == true ? .always : .auto)
         if snapshot.isEmpty {
             return Prompt("Could not read the screen. Agott needs Accessibility (and, for screenshots, Screen Recording) permission.")

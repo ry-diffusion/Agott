@@ -4,12 +4,32 @@
     "" : {
       "shouldTranslate" : false
     },
+    "Adjusting “%@”" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajustando “%@”"
+          }
+        }
+      }
+    },
     "Agott has no App Group container to share with its Safari extension." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "O Agott não tem um contêiner de App Group para compartilhar com a extensão do Safari."
+          }
+        }
+      }
+    },
+    "Agott is using %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agott está usando %@"
           }
         }
       }
@@ -24,12 +44,62 @@
         }
       }
     },
+    "Going to “%@”" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indo para “%@”"
+          }
+        }
+      }
+    },
     "On" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ligado"
+          }
+        }
+      }
+    },
+    "Opening the menu of “%@”" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrindo o menu de “%@”"
+          }
+        }
+      }
+    },
+    "Opening “%@”" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrindo “%@”"
+          }
+        }
+      }
+    },
+    "Pressing “%@”" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pressionando “%@”"
+          }
+        }
+      }
+    },
+    "Reading the window" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lendo a janela"
           }
         }
       }
@@ -54,12 +124,72 @@
         }
       }
     },
+    "Scrolling to “%@”" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rolando até “%@”"
+          }
+        }
+      }
+    },
+    "Selecting “%@”" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selecionando “%@”"
+          }
+        }
+      }
+    },
+    "Stop Agott now" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parar o Agott agora"
+          }
+        }
+      }
+    },
+    "Stopped" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parado"
+          }
+        }
+      }
+    },
     "The Safari page did not answer." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "A página do Safari não respondeu."
+          }
+        }
+      }
+    },
+    "The user pressed Stop. Do not continue; wait for them." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A pessoa apertou Parar. Não continue; espere por ela."
+          }
+        }
+      }
+    },
+    "Typing into “%@”" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Digitando em “%@”"
           }
         }
       }
