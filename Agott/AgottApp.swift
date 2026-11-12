@@ -123,6 +123,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         VoiceSetup.shared.start()
         // Reminders Agott brings up in its pop-up.
         if !LaunchOptions.isDemo { Nudges.shared.start() }
+        // Agott at work while you are elsewhere, at the notch.
+        ActivityIsland.shared.start()
         #endif
         // Repair what older versions wrote, then keep indexing.
         MusicListener.shared.start()

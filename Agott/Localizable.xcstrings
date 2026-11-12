@@ -9571,6 +9571,16 @@
           }
         }
       }
+    },
+    "Working…" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trabalhando…"
+          }
+        }
+      }
     }
   },
   "version" : "1.1"
