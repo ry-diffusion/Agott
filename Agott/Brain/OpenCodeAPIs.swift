@@ -211,7 +211,7 @@ extension OpenCodeExecutor {
 
     // MARK: Messages
 
-    static func anthropicInput(_ request: LanguageModelExecutorGenerationRequest) -> (system: String, messages: [[String: Any]]) {
+    static func anthropicInput(_ request: LanguageModelExecutorGenerationRequest, vision: Bool = false) -> (system: String, messages: [[String: Any]]) {
         var system: [String] = []
         var messages: [[String: Any]] = []
         /// Anthropic wants strictly alternating roles; same-role content merges.
@@ -241,7 +241,18 @@ extension OpenCodeExecutor {
                     return ["type": "tool_use", "id": call.id, "name": call.toolName, "input": input]
                 })
             case .toolOutput(let output):
-                append("user", [["type": "tool_result", "tool_use_id": output.id, "content": text(output.segments)]])
+                // A screenshot a tool returned goes inside its result.
+                var content: Any = text(output.segments)
+                if vision {
+                    let images = output.segments.compactMap { segment -> [String: Any]? in
+                        guard case .attachment(let attachment) = segment, case .image(let image) = attachment.content,
+                              let jpeg = jpegData(image.cgImage) else { return nil }
+                        return ["type": "image", "source": ["type": "base64", "media_type": "image/jpeg",
+                                                            "data": jpeg.base64EncodedString()]]
+                    }
+                    if !images.isEmpty { content = [["type": "text", "text": text(output.segments)]] + images }
+                }
+                append("user", [["type": "tool_result", "tool_use_id": output.id, "content": content]])
             default:
                 continue
             }
@@ -252,7 +263,7 @@ extension OpenCodeExecutor {
 
     func respondMessages(to request: LanguageModelExecutorGenerationRequest,
                          streamingInto channel: LanguageModelExecutorGenerationChannel) async throws {
-        let (system, messages) = Self.anthropicInput(request)
+        let (system, messages) = Self.anthropicInput(request, vision: configuration.supportsVision)
         var body: [String: Any] = [
             "model": configuration.model,
             "messages": messages,

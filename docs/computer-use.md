@@ -1,0 +1,77 @@
+# Computer use: accessibility first
+
+Agott's computer-use tools (`look_at_screen`, `press`, `type_text`, `press_keys`, `scroll`, `click_at`, `open`)
+read and drive other Mac apps through the Accessibility API. A screenshot is only taken when that is not enough.
+
+## How it works
+
+- **Reading** (`Agott/Senses/AXReader.swift`): the focused window of the app in front (or the dialog over it, which
+  is all that can be used while it is up), any open menu, and the menu bar's titles. One IPC round trip per element
+  for all its attributes (`AXUIElementCopyMultipleAttributeValues`), only the visible rows of tables and outlines
+  (`AXVisibleRows`), nothing scrolled out of view (a scroll area clips what is inside it), a 0.5 s messaging
+  timeout set on every element (never on the system-wide element), and caps of 3000 elements, depth 40, 300
+  children per element and 2 s per read.
+- **Compaction** (`Agott/Senses/AXTree.swift`, pure and unit-tested): keeps what can be pressed or read, drops the
+  scaffolding (groups, scroll bars, splitters, unlabelled images), folds each table row into one line, drops a
+  button's own caption and the window title repeated as text, shows values only where they matter (a field's text,
+  a checkbox's on/off, a popup's choice), and caps the result at 7000 characters (plain text goes first, controls
+  last, the focused element never). One line per element: `[12] button "Save" disabled`, `[13] field "Name"
+  ="Moizes" focused`, `[14] row "Report.pdf · Today · 2 MB" selected`.
+- **Addressing**: ids are handed out by an element's role, words and section, so the same control keeps its id
+  from one read to the next. Acting re-reads only if the app has redrawn the element since.
+- **Acting** (`Agott/Senses/ComputerControl.swift`): `AXPress` for buttons, `AXFocused` for fields, `AXSelected` for
+  rows that have no press, `AXShowMenu`, `AXIncrement`/`AXDecrement`, `AXScrollToVisible`; a real click on the
+  element's centre (scrolled into view first) only when the app does not support the action. Typing is by paste,
+  into the element given (its text selected through `AXSelectedTextRange` to replace it).
+- **Settling and what changed**: after every action Agott polls a cheap signature of the app (front app, window
+  title and child count, focused element and its value) every 60 ms until two readings agree (1.5 s at most), reads
+  again and returns only the difference (`+` new, `-` gone, `~` changed), or the whole window when the window or
+  app changed. The model rarely needs to look again.
+- **Pixels**: a screenshot of the window, read with OCR (every line with its `@x,y` for `click_at`) and, for a model
+  that sees, sent as an image in the tool result, only when there is no window, almost nothing is readable, most of
+  the window is one drawn view (a canvas, game, video or image), a web area exposes nothing, or the model asks
+  (`look_at_screen` with `screenshot`).
+
+The approval prompt (`Approvals.ask`) still comes before every action that changes something.
+
+## What came from fazm
+
+fazm (github.com/mediar-ai/fazm, MIT per its README) drives native apps through its bundled
+`mcp-server-macos-use` (Business Source License 1.1, so none of its code was copied) on top of MacosUseSDK (MIT).
+The ideas taken, reimplemented here in Agott's own code:
+
+- read the AX tree instead of looking at pixels; keep interactive roles and anything with text, drop structural
+  containers without text and scroll-bar parts;
+- breadth-first caps on elements, depth, children per element (ranged `AXUIElementCopyAttributeValues`) and time;
+- scope the view to a sheet when a dialog is up;
+- after an action, return the diff between the tree before and after instead of the whole tree, and follow the
+  app that came to the front;
+- `AXSelected` for rows that have no `AXPress`, and `AXPress` when synthetic clicks are dropped;
+- search the elements by text (fazm writes the tree to a file for grep; here `look_at_screen` takes `find`);
+- screenshots only on demand.
+
+Different from fazm: Agott acts by element id, not by coordinates; ids are stable across reads; table rows fold into
+one line; only visible rows are read; attributes come in one batched call; the UI settle is detected instead of a
+fixed 100–200 ms wait; and the screenshot fallback is decided automatically.
+
+## Before and after
+
+Measured by `LiveAccessibilityTests.measureBeforeAndAfter()` (run with `TEST_RUNNER_AGOTT_MEASURE=1`) on
+Finder-, System Settings- and Notes-like windows built by the test itself (never the person's own apps or data),
+and on Calculator, a real app in its own process. "Before" is the previous reader: every element attribute by
+attribute, plus OCR of the window, which `look_at_screen` ran on every call. Tokens are about characters ÷ 4.
+
+| Window | Before: characters | Before: ms (AX + OCR) | After: characters | After: ms |
+|---|---|---|---|---|
+| Finder-like (300 files, 12 places) | 7770 | 476 | 1991 | 29 |
+| Settings-like (25 panes, 8 options) | 2752 | 244 | 1283 | 21 |
+| Notes-like (60 notes, a long note) | 11896 | 333 | 2664 | 17 |
+| Calculator (real app, AX only on both sides) | 824 | 38 | 534 | 12 |
+
+Per step (act, then see the result): before, the action returned one line and the model looked again, paying the
+whole "before" column again; now the action returns what changed, about 60 characters when one thing changed (for
+example `+ [48] "Saved just now"`), plus the time to settle (≈180 ms when nothing moves).
+
+The fixture timings are in-process, so they undercount the IPC cost both readers pay with a real app; the
+Calculator row shows that cost (one batched call per element instead of five to seven). The real "before" also
+included a ScreenCaptureKit screenshot, not counted here.

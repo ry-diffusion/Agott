@@ -248,7 +248,12 @@ nonisolated struct OpenCodeExecutor: LanguageModelExecutor {
         var messages: [[String: Any]] = []
         var pendingReasoning: String?
 
+        var pendingImages: [[String: Any]] = []
         for entry in request.transcript {
+            if !pendingImages.isEmpty, !Self.isToolOutput(entry) {
+                messages.append(["role": "user", "content": [["type": "text", "text": "The screenshot from the tool above:"]] + pendingImages])
+                pendingImages = []
+            }
             switch entry {
             case .instructions(let instructions):
                 messages.append(["role": "system", "content": text(instructions.segments)])
@@ -277,6 +282,11 @@ nonisolated struct OpenCodeExecutor: LanguageModelExecutor {
                     "tool_call_id": output.id,
                     "content": text(output.segments),
                 ])
+                // Tool messages take text only; a screenshot a tool returned
+                // follows as the user's, right after it.
+                if vision, let images = imageParts(output.segments), !images.isEmpty {
+                    pendingImages += images
+                }
             case .response(let response):
                 messages.append(["role": "assistant", "content": text(response.segments)])
                 pendingReasoning = nil
@@ -287,6 +297,9 @@ nonisolated struct OpenCodeExecutor: LanguageModelExecutor {
             }
         }
 
+        if !pendingImages.isEmpty {
+            messages.append(["role": "user", "content": [["type": "text", "text": "The screenshot from the tool above:"]] + pendingImages])
+        }
         if let schema = request.schema,
            let data = try? JSONEncoder().encode(schema),
            let json = String(data: data, encoding: .utf8)
@@ -345,6 +358,20 @@ nonisolated struct OpenCodeExecutor: LanguageModelExecutor {
                 return nil
             }
         }
+    }
+
+    static func isToolOutput(_ entry: Transcript.Entry) -> Bool {
+        if case .toolOutput = entry { true } else { false }
+    }
+
+    /// The images among `segments`, as Chat Completions image parts.
+    static func imageParts(_ segments: [Transcript.Segment]) -> [[String: Any]]? {
+        let parts = segments.compactMap { segment -> [String: Any]? in
+            guard case .attachment(let attachment) = segment, case .image(let image) = attachment.content,
+                  let jpeg = jpegData(image.cgImage) else { return nil }
+            return ["type": "image_url", "image_url": ["url": "data:image/jpeg;base64,\(jpeg.base64EncodedString())"]]
+        }
+        return parts.isEmpty ? nil : parts
     }
 
     static func jpegData(_ image: CGImage, quality: Double = 0.7) -> Data? {

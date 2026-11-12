@@ -6,10 +6,11 @@ import Foundation
 
 /// Agott's hands: press, click, type, key, scroll, open.
 ///
-/// Pressing goes through Accessibility first (`AXPress` on the numbered
-/// element from the last snapshot) because it does not move your mouse or
-/// depend on the window not having shifted. Synthesised clicks are the
-/// fallback for apps that draw their own controls.
+/// Acting goes through Accessibility first, on the numbered element from the
+/// last read (`AXPress`, `AXSelected`, `AXFocused`, `AXShowMenu`…), because
+/// it does not move the mouse and does not depend on where the window is.
+/// Synthesised clicks are the fallback for apps that draw their own controls.
+/// Every action waits for the app to settle and reports what changed.
 enum ComputerControl {
     enum Failure: LocalizedError {
         case notTrusted, unknownElement(Int), appNotFound(String)
@@ -21,6 +22,11 @@ enum ComputerControl {
             case .appNotFound(let name): String(localized: "Could not find an app or address called \(name).")
             }
         }
+    }
+
+    /// What can be done to an element, by name, for the press tool.
+    nonisolated enum ElementAction: String, CaseIterable, Sendable {
+        case press, open, menu, focus, select, increment, decrement, show
     }
 
     static func ensureTrusted() throws {
@@ -35,25 +41,79 @@ enum ComputerControl {
         try? await Task.sleep(for: .milliseconds(250))
     }
 
-    static func press(element id: Int) async throws -> String {
+    /// Acts on element `id` and says what changed.
+    static func act(_ action: ElementAction, on id: Int) async throws -> String {
         try ensureTrusted()
-        guard let element = ScreenReader.shared.handles[id],
-              let info = ScreenReader.shared.latest?.elements.first(where: { $0.id == id })
-        else { throw Failure.unknownElement(id) }
+        guard let (handle, item) = await ScreenReader.shared.element(id) else { throw Failure.unknownElement(id) }
+        let before = ScreenReader.shared.latest
         await focusTarget()
-        if AXUIElementPerformAction(element, kAXPressAction as CFString) == .success {
-            return "Pressed [\(id)] \(info.label)"
-        }
-        click(at: CGPoint(x: info.frame.midX, y: info.frame.midY))
-        return "Clicked [\(id)] \(info.label) at its centre"
+        let done = await perform(action, on: handle, item: item)
+        return await ScreenReader.shared.change(after: done, since: before)
     }
 
-    static func click(at point: CGPoint, double: Bool = false) {
+    nonisolated private static let textRoles: Set<String> = ["field", "textarea", "search", "password", "combobox", "datefield", "timefield"]
+    nonisolated private static let rowRoles: Set<String> = ["row", "cell"]
+
+    @concurrent nonisolated static func perform(_ action: ElementAction, on handle: ScreenReader.Handle, item: AXItem) async -> String {
+        let element = handle.element
+        let name = "[\(item.id)]" + (item.label.isEmpty ? " \(item.role)" : " \(item.label)")
+        let actions = AXReader.actions(element)
+        func run(_ ax: String) -> Bool {
+            actions.contains(ax) && AXUIElementPerformAction(element, ax as CFString) == .success
+        }
+        func set(_ attribute: String, _ value: Bool) -> Bool {
+            AXReader.isSettable(element, attribute)
+                && AXUIElementSetAttributeValue(element, attribute as CFString, value as CFBoolean) == .success
+        }
+        /// The fallback: a real click on the element's centre, scrolled into view first.
+        func click(double: Bool = false, right: Bool = false) async -> String {
+            _ = run("AXScrollToVisible")
+            guard let frame = AXReader.frame(element) ?? item.frame, frame.width > 0 else {
+                return "Could not reach \(name): it has no position on screen."
+            }
+            ComputerControl.click(at: CGPoint(x: frame.midX, y: frame.midY), double: double, right: right)
+            return (double ? "Double-clicked " : right ? "Right-clicked " : "Clicked ") + "\(name) at its centre."
+        }
+
+        switch action {
+        case .press:
+            if textRoles.contains(item.role), !actions.contains(kAXPressAction) {
+                return set(kAXFocusedAttribute, true) ? "Focused \(name)." : await click()
+            }
+            if run(kAXPressAction) { return "Pressed \(name)." }
+            if rowRoles.contains(item.role), set(kAXSelectedAttribute, true) { return "Selected \(name)." }
+            if run(kAXPickAction) || run(kAXConfirmAction) { return "Pressed \(name)." }
+            return await click()
+        case .open:
+            if run("AXOpen") { return "Opened \(name)." }
+            return await click(double: true)
+        case .menu:
+            if run(kAXShowMenuAction) { return "Opened the menu of \(name)." }
+            return await click(right: true)
+        case .focus:
+            if set(kAXFocusedAttribute, true) { return "Focused \(name)." }
+            return await click()
+        case .select:
+            if set(kAXSelectedAttribute, true) { return "Selected \(name)." }
+            if run(kAXPressAction) { return "Pressed \(name)." }
+            return await click()
+        case .increment:
+            return run(kAXIncrementAction) ? "Incremented \(name)." : "\(name) cannot be incremented."
+        case .decrement:
+            return run(kAXDecrementAction) ? "Decremented \(name)." : "\(name) cannot be decremented."
+        case .show:
+            return run("AXScrollToVisible") ? "Scrolled \(name) into view." : "\(name) cannot be scrolled to."
+        }
+    }
+
+    nonisolated static func click(at point: CGPoint, double: Bool = false, right: Bool = false) {
         let source = CGEventSource(stateID: .combinedSessionState)
         let clicks = double ? 2 : 1
+        let (downType, upType, button): (CGEventType, CGEventType, CGMouseButton) =
+            right ? (.rightMouseDown, .rightMouseUp, .right) : (.leftMouseDown, .leftMouseUp, .left)
         for index in 1...clicks {
-            let down = CGEvent(mouseEventSource: source, mouseType: .leftMouseDown, mouseCursorPosition: point, mouseButton: .left)
-            let up = CGEvent(mouseEventSource: source, mouseType: .leftMouseUp, mouseCursorPosition: point, mouseButton: .left)
+            let down = CGEvent(mouseEventSource: source, mouseType: downType, mouseCursorPosition: point, mouseButton: button)
+            let up = CGEvent(mouseEventSource: source, mouseType: upType, mouseCursorPosition: point, mouseButton: button)
             down?.setIntegerValueField(.mouseEventClickState, value: Int64(index))
             up?.setIntegerValueField(.mouseEventClickState, value: Int64(index))
             down?.post(tap: .cghidEventTap)
@@ -61,19 +121,75 @@ enum ComputerControl {
         }
     }
 
-    static func type(_ text: String, submit: Bool) async throws {
+    /// Clicks at a point (from a screenshot) and says what changed.
+    static func click(_ point: CGPoint, double: Bool) async throws -> String {
         try ensureTrusted()
+        let before = ScreenReader.shared.latest
         await focusTarget()
+        click(at: point, double: double)
+        return await ScreenReader.shared.change(after: "Clicked at \(Int(point.x)),\(Int(point.y)).", since: before)
+    }
+
+    /// Types into element `id` (or wherever the cursor is), replacing what is
+    /// there when asked. By paste, not by setting the value: every app hears
+    /// a paste, while many (web pages, chat apps) ignore a value set from
+    /// outside.
+    static func type(_ text: String, into id: Int?, replace: Bool, submit: Bool) async throws -> String {
+        try ensureTrusted()
+        let before = ScreenReader.shared.latest
+        var target = ""
+        if let id {
+            guard let (handle, item) = await ScreenReader.shared.element(id) else { throw Failure.unknownElement(id) }
+            await focusTarget()
+            _ = await perform(.focus, on: handle, item: item)
+            target = " into [\(id)]"
+            if replace, !selectAll(handle) { try keys("cmd+a") }
+        } else {
+            await focusTarget()
+            if replace { try keys("cmd+a") }
+        }
         try TextInsertion.insert(text)
         if submit {
             try await Task.sleep(for: .milliseconds(350))
             try keys("return")
         }
+        return await ScreenReader.shared.change(after: (submit ? "Typed and sent" : "Typed") + target + ".", since: before)
     }
 
-    static func scroll(lines: Int) {
+    /// Selects all the text of a field through Accessibility.
+    nonisolated private static func selectAll(_ handle: ScreenReader.Handle) -> Bool {
+        var count: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(handle.element, kAXNumberOfCharactersAttribute as CFString, &count) == .success,
+              let length = (count as? NSNumber)?.intValue,
+              AXReader.isSettable(handle.element, kAXSelectedTextRangeAttribute) else { return false }
+        var range = CFRange(location: 0, length: length)
+        guard let value = AXValueCreate(.cfRange, &range) else { return false }
+        return AXUIElementSetAttributeValue(handle.element, kAXSelectedTextRangeAttribute as CFString, value) == .success
+    }
+
+    /// Presses a shortcut and says what changed.
+    static func press(keys combo: String) async throws -> String {
+        try ensureTrusted()
+        let before = ScreenReader.shared.latest
+        await focusTarget()
+        try keys(combo)
+        return await ScreenReader.shared.change(after: "Pressed \(combo).", since: before)
+    }
+
+    /// Scrolls inside element `id` (or under the mouse) and says what changed.
+    static func scroll(lines: Int, in id: Int?) async throws -> String {
+        try ensureTrusted()
+        let before = ScreenReader.shared.latest
+        var point: CGPoint?
+        if let id {
+            guard let (handle, item) = await ScreenReader.shared.element(id) else { throw Failure.unknownElement(id) }
+            if let frame = AXReader.frame(handle.element) ?? item.frame { point = CGPoint(x: frame.midX, y: frame.midY) }
+        }
+        await focusTarget()
         let event = CGEvent(scrollWheelEvent2Source: nil, units: .line, wheelCount: 1, wheel1: Int32(lines), wheel2: 0, wheel3: 0)
+        if let point { event?.location = point }
         event?.post(tap: .cghidEventTap)
+        return await ScreenReader.shared.change(after: "Scrolled \(lines) lines.", since: before)
     }
 
     /// "cmd+shift+t", "return", "escape", "down"…
@@ -102,16 +218,17 @@ enum ComputerControl {
         up?.post(tap: .cgAnnotatedSessionEventTap)
     }
 
-    /// Opens an app by name, or a URL.
+    /// Opens an app by name, or a URL, waits for its window and shows it, so
+    /// the model can act on it straight away.
     static func open(_ target: String) async throws -> String {
         let trimmed = target.trimmingCharacters(in: .whitespaces)
         if let url = URL(string: trimmed), url.scheme != nil {
             NSWorkspace.shared.open(url)
-            return "Opened \(trimmed)"
+            return await shown("Opened \(trimmed).", app: nil)
         }
         if trimmed.contains("."), !trimmed.contains(" "), let url = URL(string: "https://\(trimmed)") {
             NSWorkspace.shared.open(url)
-            return "Opened \(url.absoluteString)"
+            return await shown("Opened \(url.absoluteString).", app: nil)
         }
         let folders = ["/Applications", "/System/Applications", "/System/Applications/Utilities",
                        URL.homeDirectory.appending(path: "Applications").path]
@@ -121,12 +238,30 @@ enum ComputerControl {
                 ?? candidates.first(where: { $0.folded.hasPrefix(trimmed.folded) && $0.hasSuffix(".app") })
             {
                 let url = URL(fileURLWithPath: folder).appending(path: match)
-                _ = try await NSWorkspace.shared.openApplication(at: url, configuration: .init())
-                try? await Task.sleep(for: .milliseconds(600))
-                return "Opened \(match.replacingOccurrences(of: ".app", with: ""))"
+                let app = try await NSWorkspace.shared.openApplication(at: url, configuration: .init())
+                return await shown("Opened \(match.replacingOccurrences(of: ".app", with: "")).", app: app)
             }
         }
         throw Failure.appNotFound(trimmed)
+    }
+
+    /// Waits (up to three seconds) for the app to come to the front with a
+    /// window, then reads it.
+    private static func shown(_ summary: String, app: NSRunningApplication?) async -> String {
+        let clock = ContinuousClock()
+        let deadline = clock.now + .seconds(3)
+        try? await Task.sleep(for: .milliseconds(200))
+        while clock.now < deadline {
+            if let front = NSWorkspace.shared.frontmostApplication, front.bundleIdentifier != Bundle.main.bundleIdentifier,
+               app == nil || front.processIdentifier == app?.processIdentifier,
+               AXReader.element(AXUIElementCreateApplication(front.processIdentifier), kAXFocusedWindowAttribute) != nil {
+                break
+            }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        guard AXIsProcessTrusted() else { return summary }
+        await ScreenReader.settle(pid: ScreenReader.shared.targetApp?.processIdentifier ?? 0)
+        return "\(summary)\n\(await ScreenReader.shared.capture().rendered())"
     }
 
     /// Positions, not letters: these are ANSI key codes, which is what a

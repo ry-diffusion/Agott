@@ -372,12 +372,13 @@ final class Agent {
             var step = Step(id: "screen", kind: .context, title: String(localized: "Looking at your screen"), symbol: "eye",
                             state: .running, started: .now)
             show(step)
-            let snapshot = await ScreenReader.shared.capture(ocr: true)
-            if !snapshot.text.isEmpty || !snapshot.elements.isEmpty {
-                context.append("What is on the user's screen right now:\n" + snapshot.rendered(maxElements: 80, maxText: 5000))
+            let snapshot = await ScreenReader.shared.capture()
+            if !snapshot.isEmpty {
+                let screen = snapshot.rendered(maxCharacters: 4000)
+                context.append("What is on the user's screen right now (act on elements by their [id]):\n" + screen)
                 user.screenApp = snapshot.appName
                 step.title = String(localized: "Looked at \(snapshot.appName)")
-                step.detail = String(snapshot.text.prefix(600))
+                step.detail = String((snapshot.text.isEmpty ? screen : snapshot.text).prefix(600))
             }
             step.state = .done
             step.ended = .now

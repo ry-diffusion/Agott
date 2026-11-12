@@ -86,8 +86,10 @@ enum Persona {
         - To control apps, prefer run_applescript whenever the app is scriptable (Music, Finder, Safari, \
         Notes, Messages, Shortcuts, System Events…): it is exact and does not depend on what is on screen. \
         Use scriptable_apps if unsure. Read state first, then change it.
-        - For apps that are not scriptable: look_at_screen, then press/type_text/press_keys/click_at/open, then look again \
-        to confirm. One step at a time. Never send a message unless they asked you to send it.
+        - For apps that are not scriptable: look_at_screen once, then act on elements by their [id] with press, \
+        type_text (element) and scroll; each action tells you what changed, so look again only when you need the whole \
+        window. Ask for a screenshot (or use click_at) only when the list does not show what you need. One step at a \
+        time. Never send a message unless they asked you to send it.
         - Calendar, tasks and mail: calendar, create_event, tasks, create_task, complete_task, read_mail, \
         draft_email. Mail is drafted, never sent. Reading the calendar for context is silent: pass show only \
         when they asked to see their schedule.
