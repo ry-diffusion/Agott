@@ -5,17 +5,105 @@ import Observation
 
 /// A reminder Agott brings up itself: at its time it appears in Agott's
 /// pop-up over whatever you are doing, with a sound, until you mark it done
-/// or put it off. It is kept in Reminders too (without an alarm there, so it
-/// does not ring twice), and done here is done there.
+/// or put it off. A one-off is kept in Reminders too (without an alarm there,
+/// so it does not ring twice), and done here is done there.
+///
+/// A routine comes back every day at its time with its steps, and does not
+/// let go: closing it only puts it off ten minutes, and while it sits on
+/// screen undone it asks again, sharper each time, in the user's own tone.
 nonisolated struct Nudge: Codable, Hashable, Identifiable, Sendable {
     var id = UUID()
     var title: String
-    /// When the thing happens.
+    /// When the thing happens (for a routine: today's, or the next one).
     var due: Date
     /// When to bring it up (the same, or earlier for "leave in an hour").
     var alert: Date
     /// Its copy in Reminders, if one was made.
     var reminderID: String?
+    /// Every day at the same time, until stopped.
+    var repeatsDaily = false
+    /// What to do, in Markdown (a routine's steps).
+    var details: String?
+    /// What Agott says when it is put off again and again, sharper each time.
+    var nagLines: [String] = []
+    /// Times it was put off (or left waiting) since it came up.
+    var nagged = 0
+    /// Days in a row it was done.
+    var streak = 0
+    var lastDone: Date?
+
+    init(title: String, due: Date, alert: Date, reminderID: String? = nil,
+         repeatsDaily: Bool = false, details: String? = nil, nagLines: [String] = []) {
+        self.title = title
+        self.due = due
+        self.alert = alert
+        self.reminderID = reminderID
+        self.repeatsDaily = repeatsDaily
+        self.details = details
+        self.nagLines = nagLines
+    }
+
+    // Saved before routines existed: the new fields take their defaults.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        title = try c.decode(String.self, forKey: .title)
+        due = try c.decode(Date.self, forKey: .due)
+        alert = try c.decode(Date.self, forKey: .alert)
+        reminderID = try c.decodeIfPresent(String.self, forKey: .reminderID)
+        repeatsDaily = try c.decodeIfPresent(Bool.self, forKey: .repeatsDaily) ?? false
+        details = try c.decodeIfPresent(String.self, forKey: .details)
+        nagLines = try c.decodeIfPresent([String].self, forKey: .nagLines) ?? []
+        nagged = try c.decodeIfPresent(Int.self, forKey: .nagged) ?? 0
+        streak = try c.decodeIfPresent(Int.self, forKey: .streak) ?? 0
+        lastDone = try c.decodeIfPresent(Date.self, forKey: .lastDone)
+    }
+
+    /// What the pop-up says: the thing itself at first, then the nag lines,
+    /// one sharper each time it is put off.
+    var line: String {
+        guard nagged > 0 else { return title }
+        let lines = nagLines.isEmpty ? Self.defaultNags(title) : nagLines
+        return lines[min(nagged - 1, lines.count - 1)]
+    }
+
+    static func defaultNags(_ title: String) -> [String] {
+        [String(localized: "Still waiting on this: \(title)."),
+         String(localized: "Come on, \(title). Now."),
+         String(localized: "Seriously, where is the \(title)? I'm not letting this go."),
+         String(localized: "Still nothing? \(title). Get up.")]
+    }
+
+    /// The next time this time of day comes, after `date`.
+    func next(after date: Date, calendar: Calendar = .current) -> Date {
+        let time = calendar.dateComponents([.hour, .minute], from: due)
+        return calendar.nextDate(after: date, matching: time, matchingPolicy: .nextTime) ?? date.addingTimeInterval(86_400)
+    }
+
+    /// A routine done now: the streak goes on if it was done yesterday (or
+    /// already today), else starts again; it comes back at its time tomorrow.
+    mutating func markDone(at now: Date = Date(), calendar: Calendar = .current) {
+        let today = calendar.startOfDay(for: now)
+        if let lastDone, calendar.startOfDay(for: lastDone) >= calendar.date(byAdding: .day, value: -1, to: today)! {
+            if calendar.startOfDay(for: lastDone) < today { streak += 1 }
+        } else {
+            streak = 1
+        }
+        lastDone = now
+        nagged = 0
+        due = next(after: max(now, due), calendar: calendar)
+        alert = due
+    }
+
+    /// A routine whose day went by undone (the Mac was off, or it was
+    /// ignored past midnight): the streak is lost and it is due today.
+    mutating func catchUp(at now: Date = Date(), calendar: Calendar = .current) {
+        guard repeatsDaily, calendar.startOfDay(for: due) < calendar.startOfDay(for: now) else { return }
+        streak = 0
+        nagged = 0
+        due = next(after: calendar.startOfDay(for: now), calendar: calendar)
+        alert = due
+    }
 }
 
 @MainActor @Observable
@@ -27,7 +115,11 @@ final class Nudges {
     /// The one in the pop-up now.
     private(set) var showing: Nudge?
 
+    /// How long a routine on screen waits before asking again.
+    static let nagEvery: Duration = .seconds(10 * 60)
+
     @ObservationIgnored private var timer: Task<Void, Never>?
+    @ObservationIgnored private var nagTimer: Task<Void, Never>?
     @ObservationIgnored private var started = false
     private static let url = URL.applicationSupportDirectory.appending(path: "Agott/nudges.json")
 
@@ -37,6 +129,8 @@ final class Nudges {
             pending = saved.sorted { $0.alert < $1.alert }
         }
     }
+
+    var routines: [Nudge] { pending.filter(\.repeatsDaily) }
 
     /// Starts the clock. One missed while the Mac was off comes up now.
     func start() {
@@ -52,26 +146,59 @@ final class Nudges {
     }
 
     func add(title: String, due: Date, alert: Date, reminderID: String?) {
-        pending.append(Nudge(title: title, due: due, alert: alert, reminderID: reminderID))
-        pending.sort { $0.alert < $1.alert }
-        save()
-        arm()
+        insert(Nudge(title: title, due: due, alert: alert, reminderID: reminderID))
     }
 
-    /// Seen and done: gone here, and ticked off in Reminders.
+    /// A routine every day at `time`, replacing one with the same name.
+    @discardableResult
+    func addRoutine(title: String, hour: Int, minute: Int, steps: String?, nagLines: [String]) -> Nudge {
+        pending.removeAll { $0.repeatsDaily && $0.title.folded == title.folded }
+        let now = Date()
+        let today = Calendar.current.date(bySettingHour: hour, minute: minute, second: 0, of: now) ?? now
+        let first = today > now ? today : Calendar.current.date(byAdding: .day, value: 1, to: today)!
+        let routine = Nudge(title: title, due: first, alert: first, repeatsDaily: true,
+                            details: steps, nagLines: nagLines.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty })
+        insert(routine)
+        return routine
+    }
+
+    /// Stops routines whose name has these words; returns their names.
+    func stopRoutines(matching words: String) -> [String] {
+        let match = pending.filter { $0.repeatsDaily && (words.isEmpty || $0.title.folded.contains(words.folded)) }
+        guard !match.isEmpty else { return [] }
+        pending.removeAll { item in match.contains { $0.id == item.id } }
+        if let showing, match.contains(where: { $0.id == showing.id }) { close() } else { save(); arm() }
+        return match.map(\.title)
+    }
+
+    /// Seen and done: a one-off is gone (and ticked off in Reminders); a
+    /// routine counts the day and comes back tomorrow.
     func done(_ nudge: Nudge) {
-        remove(nudge)
-        if let id = nudge.reminderID {
-            Task.detached { try? Organizer.shared.complete(reminderID: id) }
+        guard let index = pending.firstIndex(where: { $0.id == nudge.id }) else { return close() }
+        if pending[index].repeatsDaily {
+            pending[index].markDone()
+            pending.sort { $0.alert < $1.alert }
+        } else {
+            pending.remove(at: index)
+            if let id = nudge.reminderID {
+                Task.detached { try? Organizer.shared.complete(reminderID: id) }
+            }
         }
+        close()
     }
 
-    /// Again in a while.
+    /// Again in a while; each time sharper.
     func snooze(_ nudge: Nudge, minutes: Int) {
-        guard let index = pending.firstIndex(where: { $0.id == nudge.id }) else { return }
+        guard let index = pending.firstIndex(where: { $0.id == nudge.id }) else { return close() }
         pending[index].alert = Date().addingTimeInterval(Double(minutes) * 60)
+        pending[index].nagged += 1
         pending.sort { $0.alert < $1.alert }
         close()
+    }
+
+    /// Closed without doing it: a routine only goes away for ten minutes.
+    func dismiss(_ nudge: Nudge) {
+        if nudge.repeatsDaily { snooze(nudge, minutes: 10) } else { done(nudge) }
     }
 
     /// The pop-up is wanted for something else (a question, dictation): the
@@ -79,16 +206,20 @@ final class Nudges {
     func stepAside() {
         guard showing != nil else { return }
         showing = nil
+        nagTimer?.cancel()
         arm()
     }
 
-    private func remove(_ nudge: Nudge) {
-        pending.removeAll { $0.id == nudge.id }
-        close()
+    private func insert(_ nudge: Nudge) {
+        pending.append(nudge)
+        pending.sort { $0.alert < $1.alert }
+        save()
+        arm()
     }
 
     private func close() {
         showing = nil
+        nagTimer?.cancel()
         save()
         OverlayController.shared.hide(after: 0)
         arm()
@@ -96,7 +227,19 @@ final class Nudges {
 
     private func arm() {
         timer?.cancel()
-        guard showing == nil, let next = pending.first else { return }
+        guard showing == nil else { return }
+        // A routine whose day went by comes due today, streak lost.
+        var changed = false
+        for index in pending.indices where pending[index].repeatsDaily {
+            let before = pending[index]
+            pending[index].catchUp()
+            if pending[index] != before { changed = true }
+        }
+        if changed {
+            pending.sort { $0.alert < $1.alert }
+            save()
+        }
+        guard let next = pending.first else { return }
         timer = Task { [weak self] in
             let wait = next.alert.timeIntervalSinceNow
             if wait > 0 { try? await Task.sleep(for: .seconds(wait)) }
@@ -116,10 +259,30 @@ final class Nudges {
             arm()
             return
         }
+        present(nudge)
+        if nudge.repeatsDaily { keepNagging(nudge.id) }
+    }
+
+    private func present(_ nudge: Nudge) {
         showing = nudge
         OverlayController.shared.show(focus: false)
-        NSSound(named: "Glass")?.play()
-        if AppSettings.shared.speakAnswers { VoiceSetup.shared.speak(nudge.title) }
+        NSSound(named: nudge.nagged > 1 ? "Sosumi" : "Glass")?.play()
+        if AppSettings.shared.speakAnswers { VoiceSetup.shared.speak(nudge.line) }
+    }
+
+    /// A routine left on screen undone asks again every few minutes.
+    private func keepNagging(_ id: UUID) {
+        nagTimer?.cancel()
+        nagTimer = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: Self.nagEvery)
+                guard !Task.isCancelled, let self, self.showing?.id == id,
+                      let index = self.pending.firstIndex(where: { $0.id == id }) else { return }
+                self.pending[index].nagged += 1
+                self.save()
+                self.present(self.pending[index])
+            }
+        }
     }
 
     private func save() {

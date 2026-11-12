@@ -107,7 +107,7 @@ struct OverlayView: View {
         // into a visible rectangle around the card.
         .padding(32)
         .onExitCommand {
-            if let nudge = nudges.showing { nudges.done(nudge) } else { copilot.dismiss() }
+            if let nudge = nudges.showing { nudges.dismiss(nudge) } else { copilot.dismiss() }
         }
         .onChange(of: copilot.mode) { _, mode in
             fieldFocused = mode == .typing
@@ -217,48 +217,68 @@ struct OverlayView: View {
         }
     }
 }
-/// A reminder whose time has come: what it is, when, and what to do with it.
+/// A reminder whose time has come: what it is, when, and what to do with
+/// it. A routine shows its steps and only lets go once it is done.
 struct ReminderPopup: View {
     var nudge: Nudge
     @State private var nudges = Nudges.shared
 
     var body: some View {
-        Image(systemName: "bell.fill")
+        Image(systemName: nudge.repeatsDaily ? "figure.strengthtraining.functional" : "bell.fill")
             .font(.system(size: 17, weight: .semibold))
             .foregroundStyle(Ink.spot)
-            .symbolEffect(.wiggle, options: .nonRepeating)
+            .symbolEffect(.wiggle, options: .nonRepeating, value: nudge.nagged)
             .frame(width: 22)
             .padding(.top, 2)
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                Text("Reminder").font(.headline)
-                Text(when).font(.callout).foregroundStyle(Ink.muted)
+                Text(nudge.repeatsDaily ? "Routine" : "Reminder").font(.headline)
+                Text(subtitle).font(.callout).foregroundStyle(Ink.muted)
                 Spacer()
-                Button { nudges.done(nudge) } label: {
+                Button { nudges.dismiss(nudge) } label: {
                     Image(systemName: "xmark.circle.fill").foregroundStyle(Ink.muted)
                 }
                 .buttonStyle(.plain)
-                .help(Text("Reminder done"))
+                .help(nudge.repeatsDaily ? Text("Back in 10 minutes") : Text("Reminder done"))
             }
-            Text(nudge.title)
-                .font(.system(size: 17))
+            Text(nudge.line)
+                .font(.system(size: 17, weight: nudge.nagged > 0 ? .semibold : .regular))
                 .foregroundStyle(Ink.text)
                 .fixedSize(horizontal: false, vertical: true)
+                .contentTransition(.opacity)
+            if let details = nudge.details, !details.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                ScrollView {
+                    MarkdownView(text: details)
+                        .font(.system(size: 14))
+                }
+                .scrollIndicators(.never)
+                .frame(maxHeight: 260)
+                .fixedSize(horizontal: false, vertical: true)
+            }
             HStack(spacing: 8) {
-                Button { nudges.done(nudge) } label: { Label("Reminder done", systemImage: "checkmark") }
-                    .buttonStyle(.candy(.primary, compact: true))
-                    .keyboardShortcut(.defaultAction)
+                Button { nudges.done(nudge) } label: {
+                    Label(nudge.repeatsDaily ? "Routine done" : "Reminder done", systemImage: "checkmark")
+                }
+                .buttonStyle(.candy(.primary, compact: true))
+                .keyboardShortcut(.defaultAction)
                 Button("In 10 minutes") { nudges.snooze(nudge, minutes: 10) }
                     .buttonStyle(.candy(.soft, compact: true))
-                Button("In an hour") { nudges.snooze(nudge, minutes: 60) }
-                    .buttonStyle(.candy(.soft, compact: true))
+                if !nudge.repeatsDaily {
+                    Button("In an hour") { nudges.snooze(nudge, minutes: 60) }
+                        .buttonStyle(.candy(.soft, compact: true))
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .animation(Motion.settle, value: nudge.nagged)
     }
 
-    /// "now" when it is happening, else its time ("at 14:30").
-    private var when: String {
+    /// A routine: the days in a row so far. A reminder: "now", or its time.
+    private var subtitle: String {
+        if nudge.repeatsDaily {
+            let time = nudge.due.formatted(.dateTime.hour().minute())
+            return nudge.streak > 0 ? String(localized: "\(nudge.streak) days in a row") : String(localized: "every day at \(time)")
+        }
         if abs(nudge.due.timeIntervalSinceNow) < 90 { return String(localized: "now") }
         return nudge.due.formatted(.dateTime.weekday().hour().minute())
     }

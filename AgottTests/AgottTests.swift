@@ -1460,3 +1460,66 @@ struct PublishingTests {
     }
 }
 #endif
+
+#if os(macOS)
+@Suite("Videos and routines")
+struct VideoRoutineTests {
+    @Test func subtitlesBecomePlainText() {
+        let vtt = """
+        WEBVTT
+        Kind: captions
+        Language: pt
+
+        00:00:00.000 --> 00:00:02.000 align:start position:0%
+        faz<00:00:00.500><c> dez</c> flexões
+
+        00:00:01.000 --> 00:00:03.000
+        faz dez flexões
+
+        00:00:40.000 --> 00:00:42.000
+        descansa trinta segundos
+        """
+        #expect(VideoReader.clean(vtt: vtt) == "[0:00] faz dez flexões\n[0:40] descansa trinta segundos")
+        #expect(VideoReader.seconds("00:01:02.500") == 62)
+        #expect(VideoReader.seconds("01:02.000") == 62)
+    }
+
+    @Test func routineTimes() {
+        #expect(DailyRoutineTool.time("07:30")! == (7, 30))
+        #expect(DailyRoutineTool.time("7h")! == (7, 0))
+        #expect(DailyRoutineTool.time("7:15 pm")! == (19, 15))
+        #expect(DailyRoutineTool.time("25:00") == nil)
+    }
+
+    @Test func routinesKeepTheirStreakAndNagHarder() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Sao_Paulo")!
+        let monday7 = calendar.date(from: DateComponents(year: 2026, month: 11, day: 9, hour: 7))!
+        var routine = Nudge(title: "Calistenia", due: monday7, alert: monday7, repeatsDaily: true,
+                            nagLines: ["cadê a calistenia?", "levanta daí"])
+        #expect(routine.line == "Calistenia")
+        routine.nagged = 1
+        #expect(routine.line == "cadê a calistenia?")
+        routine.nagged = 5
+        #expect(routine.line == "levanta daí")
+
+        routine.markDone(at: monday7.addingTimeInterval(20 * 60), calendar: calendar)
+        #expect(routine.streak == 1 && routine.nagged == 0)
+        #expect(routine.due == calendar.date(byAdding: .day, value: 1, to: monday7))
+        routine.markDone(at: routine.due.addingTimeInterval(600), calendar: calendar)
+        #expect(routine.streak == 2)
+
+        // Wednesday went by undone: Thursday it is due again, streak lost.
+        let thursday = calendar.date(from: DateComponents(year: 2026, month: 11, day: 12, hour: 9))!
+        routine.catchUp(at: thursday, calendar: calendar)
+        #expect(routine.streak == 0)
+        #expect(routine.due == calendar.date(from: DateComponents(year: 2026, month: 11, day: 12, hour: 7)))
+    }
+
+    @Test func oldRemindersStillLoad() throws {
+        let old = #"[{"id":"6F9619FF-8B86-D011-B42D-00C04FC964FF","title":"Ligar","due":800000000,"alert":800000000}]"#
+        let loaded = try JSONDecoder().decode([Nudge].self, from: Data(old.utf8))
+        #expect(loaded.first?.repeatsDaily == false && loaded.first?.nagLines.isEmpty == true)
+    }
+}
+#endif

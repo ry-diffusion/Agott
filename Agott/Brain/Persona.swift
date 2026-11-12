@@ -141,7 +141,7 @@ enum Persona {
             ShowListTool(), SpotifyTopTool(),
         ]
         #if os(macOS)
-        tools += [MusicMoodTool(), SpotifyPlayTool(), PressTool(), ClickTool(), TypeTextTool(), PressKeysTool(), ScrollTool(), OpenTool(),
+        tools += [WatchVideoTool(), DailyRoutineTool(), MusicMoodTool(), SpotifyPlayTool(), PressTool(), ClickTool(), TypeTextTool(), PressKeysTool(), ScrollTool(), OpenTool(),
                   AppleScriptTool(), ScriptableAppsTool(), ReadMailTool(), DraftEmailTool()]
         #endif
         return tools

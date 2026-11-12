@@ -8545,6 +8545,132 @@
           }
         }
       }
+    },
+    "Routine" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rotina"
+          }
+        }
+      }
+    },
+    "Routine done" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Did it"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fiz"
+          }
+        }
+      }
+    },
+    "Back in 10 minutes" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volto em 10 minutos"
+          }
+        }
+      }
+    },
+    "%lld days in a row" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld dias seguidos"
+          }
+        }
+      }
+    },
+    "every day at %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "todo dia às %@"
+          }
+        }
+      }
+    },
+    "Still waiting on this: %@." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ainda tô esperando: %@."
+          }
+        }
+      }
+    },
+    "Come on, %@. Now." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bora, %@. Agora."
+          }
+        }
+      }
+    },
+    "Seriously, where is the %@? I'm not letting this go." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sério, cadê a %@? Não vou largar do teu pé."
+          }
+        }
+      }
+    },
+    "Still nothing? %@. Get up." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nada ainda? %@. Levanta."
+          }
+        }
+      }
+    },
+    "Watching the video" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Assistindo o vídeo"
+          }
+        }
+      }
+    },
+    "Setting up your routine" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Montando sua rotina"
+          }
+        }
+      }
+    },
+    "yt-dlp stopped without saying why." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O yt-dlp parou sem dizer por quê."
+          }
+        }
+      }
     }
   },
   "version" : "1.1"
