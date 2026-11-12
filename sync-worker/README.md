@@ -61,6 +61,12 @@ on the Watch, Start counts from the wrist in a workout session that also goes in
 90 % of each exercise's reps (from the routine's steps, like "3x10 flexões") proves the day; steps
 without reps (planks, stretching) are ticked by hand.
 
+Health: every counted workout is saved to Apple Health as functional strength training, each set as
+one of its activities (exercise and reps), with heart rate and energy when it comes from the Watch.
+Today → Progress on the iPhone reads them back (plus the sets synced from other devices) and shows,
+per exercise, reps per set, seconds a rep, rest, reps per minute, heart rate and the trend against
+your last workouts.
+
 ## Forgot the passphrase?
 
 There is no way back into encrypted data. Wipe the vault and connect again, Mac first:
