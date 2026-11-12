@@ -39,6 +39,9 @@ nonisolated struct AXItem: Sendable, Hashable {
     var key: String
     /// A section line (dialog, sidebar, menu) rather than an element.
     var isHeader = false
+    /// For an element of a Safari page read by Agott's extension: its number
+    /// inside the page, which the extension acts on (there is no AX handle).
+    var web: Int? = nil
 
     var line: String {
         if isHeader { return "— \(label)" }

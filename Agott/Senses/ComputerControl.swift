@@ -13,13 +13,14 @@ import Foundation
 /// Every action waits for the app to settle and reports what changed.
 enum ComputerControl {
     enum Failure: LocalizedError {
-        case notTrusted, unknownElement(Int), appNotFound(String)
+        case notTrusted, unknownElement(Int), appNotFound(String), pageElementGone(Int)
 
         var errorDescription: String? {
             switch self {
             case .notTrusted: String(localized: "Agott needs Accessibility permission to use the computer.")
             case .unknownElement(let id): String(localized: "There is no element \(id) on screen. Look at the screen again.")
             case .appNotFound(let name): String(localized: "Could not find an app or address called \(name).")
+            case .pageElementGone(let id): String(localized: "Element \(id) is no longer on the page. Look at the screen again.")
             }
         }
     }
@@ -43,11 +44,48 @@ enum ComputerControl {
 
     /// Acts on element `id` and says what changed.
     static func act(_ action: ElementAction, on id: Int) async throws -> String {
+        if let item = ScreenReader.shared.pageElement(id) { return try await actOnPage(action, on: item) }
         try ensureTrusted()
         guard let (handle, item) = await ScreenReader.shared.element(id) else { throw Failure.unknownElement(id) }
         let before = ScreenReader.shared.latest
         await focusTarget()
         let done = await perform(action, on: handle, item: item)
+        return await ScreenReader.shared.change(after: done, since: before)
+    }
+
+    // MARK: Safari pages
+
+    /// Acts on an element of the Safari page through Agott's extension: the
+    /// page hears the same events a click or typing makes, Safari need not be
+    /// in front, and the mouse does not move.
+    private static func actOnPage(_ action: ElementAction, on item: AXItem) async throws -> String {
+        let (verb, js): (String, String) = switch action {
+        case .press, .select: ("Pressed", "click")
+        case .open: ("Double-clicked", "double")
+        case .menu: ("Opened the context menu of", "context")
+        case .focus: ("Focused", "focus")
+        case .increment: ("Incremented", "increment")
+        case .decrement: ("Decremented", "decrement")
+        case .show: ("Scrolled into view", "show")
+        }
+        return try await onPage(SafariBridge.Request(op: "act", action: js, ref: item.web), item: item) { _ in
+            "\(verb) \(pageName(item)) on the page."
+        }
+    }
+
+    private static func pageName(_ item: AXItem) -> String {
+        "[\(item.id)]" + (item.label.isEmpty ? " \(item.role)" : " \(item.label)")
+    }
+
+    /// Sends `request`, then reads the page again and says what changed.
+    private static func onPage(_ request: SafariBridge.Request, item: AXItem?,
+                               summary: (SafariAnswer) -> String) async throws -> String {
+        let before = ScreenReader.shared.latest
+        let answer = try await SafariBridge.shared.act(request)
+        if answer.error == "gone", let item { throw Failure.pageElementGone(item.id) }
+        if let error = answer.error { return "Could not do it on the page: \(error)" }
+        var done = summary(answer)
+        if answer.lost == true { done += " The page did not answer; it may have gone to another page." }
         return await ScreenReader.shared.change(after: done, since: before)
     }
 
@@ -135,6 +173,15 @@ enum ComputerControl {
     /// a paste, while many (web pages, chat apps) ignore a value set from
     /// outside.
     static func type(_ text: String, into id: Int?, replace: Bool, submit: Bool) async throws -> String {
+        if let id, let item = ScreenReader.shared.pageElement(id) {
+            // On a page the value is set with the events typing makes; a
+            // select picks the option with that text.
+            let request = SafariBridge.Request(op: "act", action: "type", ref: item.web, text: text, replace: replace, submit: submit)
+            return try await onPage(request, item: item) { answer in
+                if let option = answer.chose { return "Chose \"\(option)\" in \(pageName(item))." }
+                return (submit ? "Typed and sent" : "Typed") + " into \(pageName(item))."
+            }
+        }
         try ensureTrusted()
         let before = ScreenReader.shared.latest
         var target = ""
@@ -178,6 +225,11 @@ enum ComputerControl {
 
     /// Scrolls inside element `id` (or under the mouse) and says what changed.
     static func scroll(lines: Int, in id: Int?) async throws -> String {
+        let item = id.flatMap { ScreenReader.shared.pageElement($0) }
+        if item != nil || (id == nil && ScreenReader.shared.readsPage) {
+            let request = SafariBridge.Request(op: "act", action: "scroll", ref: item?.web, lines: lines)
+            return try await onPage(request, item: item) { _ in "Scrolled the page \(lines) lines." }
+        }
         try ensureTrusted()
         let before = ScreenReader.shared.latest
         var point: CGPoint?

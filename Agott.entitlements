@@ -19,5 +19,10 @@
 	<true/>
 	<key>com.apple.security.network.client</key>
 	<true/>
+	<!-- Shared with the Safari extension, which leaves the page's answers there. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>$(TeamIdentifierPrefix)br.com.zesmoi.Agott</string>
+	</array>
 </dict>
 </plist>

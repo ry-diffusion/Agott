@@ -4,6 +4,76 @@
     "" : {
       "shouldTranslate" : false
     },
+    "Agott has no App Group container to share with its Safari extension." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Agott não tem um contêiner de App Group para compartilhar com a extensão do Safari."
+          }
+        }
+      }
+    },
+    "Element %lld is no longer on the page. Look at the screen again." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O elemento %lld não está mais na página. Olhe a tela de novo."
+          }
+        }
+      }
+    },
+    "On" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ligado"
+          }
+        }
+      }
+    },
+    "Safari pages" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Páginas no Safari"
+          }
+        }
+      }
+    },
+    "Safari Settings…" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajustes do Safari…"
+          }
+        }
+      }
+    },
+    "The Safari page did not answer." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A página do Safari não respondeu."
+          }
+        }
+      }
+    },
+    "With Agott's Safari extension on, Agott reads and uses web pages from the page itself instead of the screen." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Com a extensão do Agott ligada no Safari, o Agott lê e usa as páginas pela própria página em vez da tela."
+          }
+        }
+      }
+    },
     "“%@”" : {
       "localizations" : {
         "pt-BR" : {

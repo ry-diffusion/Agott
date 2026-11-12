@@ -142,6 +142,9 @@ struct SettingsPageView: View {
                 SettingsRow(symbol: "music.note", title: "Notice your music", detail: "What you play on Spotify or Apple Music, to sense your mood.") {
                     Toggle("", isOn: $settings.listenToMusic).labelsHidden()
                 }
+                SettingsRow(symbol: "safari", title: "Safari pages", detail: "With Agott's Safari extension on, Agott reads and uses web pages from the page itself instead of the screen.") {
+                    SafariExtensionStatus()
+                }
                 SettingsRow(symbol: "bolt", title: "Autopilot", detail: "Click, type, run scripts and send without asking first.") {
                     Toggle("", isOn: $settings.autopilot).labelsHidden()
                 }
@@ -375,6 +378,26 @@ struct SettingsRow<Control: View>: View {
 }
 
 #if os(macOS)
+/// Whether Agott's Safari extension is on, and the way to Safari's settings
+/// to turn it on (only the person can).
+private struct SafariExtensionStatus: View {
+    @State private var enabled: Bool?
+
+    var body: some View {
+        HStack(spacing: 10) {
+            if let enabled {
+                Text(enabled ? "On" : "Off").font(.callout).foregroundStyle(Ink.muted)
+            }
+            Button("Safari Settings…") { SafariBridge.openSettings() }
+                .buttonStyle(.candy(.soft, compact: true))
+        }
+        .task { enabled = await SafariBridge.isEnabled() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { enabled = await SafariBridge.isEnabled() }
+        }
+    }
+}
+
 /// Where the voice download stands, like Parakeet's below.
 private struct VoiceStatus: View {
     @State private var setup = VoiceSetup.shared

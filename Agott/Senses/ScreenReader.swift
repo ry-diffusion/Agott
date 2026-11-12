@@ -48,6 +48,8 @@ final class ScreenReader {
         var axTime: Duration = .zero
         var pixelsTime: Duration = .zero
         var date = Date()
+        /// The Safari page, read from the DOM by Agott's extension, when it was.
+        var page: String? = nil
 
         var isEmpty: Bool { items.isEmpty && text.isEmpty }
 
@@ -149,22 +151,39 @@ final class ScreenReader {
             ids = AXCompactor.IDs()
             idsPID = pid
         }
-        let read = await Self.read(pid: pid, ids: ids)
+        // Safari's page comes from the DOM when the extension is on; the
+        // window around it (tabs, address bar) still from Accessibility.
+        var page: SafariPage?
+        if let bundle = app?.bundleIdentifier, SafariBridge.safariApps.contains(bundle) {
+            page = await SafariBridge.shared.snapshot()
+        }
+        let read = await Self.read(pid: pid, ids: ids, skipWebContent: page != nil)
         ids = read.ids
+        var items = read.items
+        var focused = read.focused
+        if let page {
+            let web = page.items(ids: &ids)
+            items += web
+            if let field = web.first(where: { $0.flags.contains("focused") }) { focused = field.line }
+        }
 
         var snapshot = Snapshot(
             appName: app?.localizedName ?? "?", bundleID: app?.bundleIdentifier ?? "", pid: pid,
-            windowTitle: read.read?.windowTitle ?? "", focused: read.focused, items: read.items, menuBar: read.menuBar,
-            offscreen: (read.read?.offscreen ?? 0) + read.offscreen, truncated: read.truncated,
-            incomplete: read.read?.hitLimit ?? false, readable: AXIsProcessTrusted(), nodes: read.read?.visited ?? 0,
-            axTime: read.read?.duration ?? .zero)
+            windowTitle: read.read?.windowTitle ?? "", focused: focused, items: items, menuBar: read.menuBar,
+            offscreen: (read.read?.offscreen ?? 0) + read.offscreen + (page?.offscreen ?? 0),
+            truncated: read.truncated + (page?.truncated ?? 0),
+            incomplete: (read.read?.hitLimit ?? false) || (page?.incomplete ?? false), readable: AXIsProcessTrusted(),
+            nodes: read.read?.visited ?? 0, axTime: read.read?.duration ?? .zero, page: page?.url)
 
         switch pixels {
         case .never: snapshot.pixels = nil
         case .always: snapshot.pixels = .asked
         case .auto:
-            snapshot.pixels = read.read.map { PixelsReason.check(roots: $0.roots, items: read.items, window: $0.windowFrame) }
+            let reason = read.read.map { PixelsReason.check(roots: $0.roots, items: read.items, window: $0.windowFrame) }
                 ?? .noWindow
+            // The page was read from its DOM: its web area being empty to
+            // Accessibility says nothing.
+            snapshot.pixels = page != nil && reason != .noWindow ? nil : reason
         }
         if snapshot.pixels != nil, hasScreenRecordingPermission {
             let clock = ContinuousClock()
@@ -202,9 +221,11 @@ final class ScreenReader {
         var ids: AXCompactor.IDs
     }
 
-    @concurrent private nonisolated static func read(pid: pid_t, ids: AXCompactor.IDs) async -> Compacted {
+    @concurrent private nonisolated static func read(pid: pid_t, ids: AXCompactor.IDs, skipWebContent: Bool = false) async -> Compacted {
         var result = Compacted(ids: ids)
-        guard pid > 0, let read = AXReader.read(pid: pid) else { return result }
+        var limits = AXReader.Limits()
+        limits.skipWebContent = skipWebContent
+        guard pid > 0, let read = AXReader.read(pid: pid, limits: limits) else { return result }
         result.read = read
         let compact = AXCompactor.compact(read.roots, viewport: read.viewport, ids: &result.ids)
         result.items = compact.items
@@ -231,6 +252,18 @@ final class ScreenReader {
         if let found = current(id), Self.isAlive(found.0) { return found }
         _ = await capture(pixels: .never)
         return current(id)
+    }
+
+    /// An element of the Safari page from the last read, which the extension
+    /// acts on instead of Accessibility.
+    func pageElement(_ id: Int) -> AXItem? {
+        latest?.items.first { $0.id == id && $0.web != nil }
+    }
+
+    /// Whether the last read of Safari came from its page.
+    var readsPage: Bool {
+        guard let latest, latest.page != nil else { return false }
+        return latest.pid == targetApp?.processIdentifier
     }
 
     private func current(_ id: Int) -> (Handle, AXItem)? {

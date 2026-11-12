@@ -34,6 +34,50 @@ read and drive other Mac apps through the Accessibility API. A screenshot is onl
 
 The approval prompt (`Approvals.ask`) still comes before every action that changes something.
 
+## Safari pages, from the DOM
+
+Web pages are often thin through Accessibility, so Agott ships a Safari Web Extension (`AgottSafari`, embedded
+in the Mac app's `PlugIns`). When the app in front is Safari and the extension is on (Safari ▸ Settings ▸
+Extensions, allowed on the sites you want), `look_at_screen` reads the page from the page itself and the window
+around it (tabs, address bar) still from Accessibility; Agott's Settings ▸ Preferences shows whether it is on and
+opens Safari's settings.
+
+- **Reading** (`AgottSafari/content.js`): the active tab's content script walks the DOM (open shadow roots too,
+  only the dialog when a modal one is up), keeps what is visible and in the viewport, and names elements the way
+  the accessibility tree does (`aria-labelledby`, `aria-label`, `<label>`, alt text, own text). Roles come from
+  ARIA or the tag: link, button, field, search, password, textarea, checkbox, radio, switch, select, combobox,
+  slider, tab, menuitem, option, heading, image, text. Table cells of a row read as one line. Landmarks (nav,
+  aside, dialog, named forms and regions) become section lines. Every element gets a ref that stays the same for
+  as long as the page lives.
+- **Compaction** (`AgottSafari/page-core.js`, no DOM, unit-tested in JavaScriptCore): the same rules and the same
+  7000-character cap as `AXCompactor` — a label's text said once, empty sections dropped, plain text cut first,
+  the focused field never.
+- **One list**: `SafariPage.items(ids:)` puts the page's elements under a `— Web page "Title" · URL` line in the
+  window's own numbered list. Their ids come from the same id table (keyed by role, words and section), so they
+  never clash with the window's controls, stay the same between reads, and `AXDiff` reports what changed after
+  an action exactly as for apps. The Accessibility read skips the inside of the web area then
+  (`Limits.skipWebContent`), and no screenshot is taken for it.
+- **Acting** by id, through the content script, without moving the mouse or bringing Safari forward: `press`
+  sends the whole pointer/mouse sequence and `click()`; `focus`, `show` (scroll into view), `menu`
+  (`contextmenu`), `open` (`dblclick`), `increment`/`decrement` (`stepUp`/`stepDown`); `type_text` sets the value
+  through the prototype's setter (so React and friends see it) with `beforeinput`/`input`/`change`, uses
+  `insertText` for contenteditable, picks the option with that text in a select, and `submit` calls
+  `requestSubmit()` on the form (or sends Enter). `scroll` scrolls the element's scrollable ancestor or the page.
+  Each action waits for the page to stop changing (150 ms without mutations, 1.5 s at most), then Agott reads
+  again and returns the difference.
+- **Plumbing**, as Apple documents it ("Messaging between the app and JavaScript in a Safari web extension"): the
+  background script keeps a native port open (`browser.runtime.connectNative`); Agott sends each request with
+  `SFSafariApplication.dispatchMessage`; the background script asks the active tab's content script (putting it in
+  first if the tab was open before the extension was turned on) and answers with `browser.runtime.sendNativeMessage`;
+  the extension's handler (`SafariWebExtensionHandler`, sandboxed) writes the answer into the App Group container
+  it shares with Agott (`<team>.br.com.zesmoi.Agott`), where `SafariBridge` is waiting for it. A ping decides
+  whether the extension answers (remembered for 30 s, 8 s after a miss); when it does not, or the page cannot be
+  read (Safari's own pages, a site the extension is not allowed on), everything falls back to Accessibility.
+- Only the main frame is read; cross-origin iframes are not. Passwords show as `••••`.
+
+`LiveSafariTests` (run with `TEST_RUNNER_AGOTT_SAFARI=1`, the extension on and allowed on `127.0.0.1`) opens a
+local test page in Safari, lists it and presses, types, picks an option and submits through `ComputerControl`.
+
 ## What came from fazm
 
 fazm (github.com/mediar-ai/fazm, MIT per its README) drives native apps through its bundled

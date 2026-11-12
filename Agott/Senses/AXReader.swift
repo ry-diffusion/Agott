@@ -20,6 +20,9 @@ nonisolated enum AXReader {
         var budget: Duration = .seconds(2)
         /// Per element, so one stuck app cannot hold up the read.
         var timeout: Float = 0.5
+        /// Leave out what is inside web areas: Safari's extension reads the
+        /// page from the DOM instead.
+        var skipWebContent = false
     }
 
     /// One read. Handles are kept so the model can act on what it saw.
@@ -226,6 +229,8 @@ nonisolated enum AXReader {
                 enabled: values.bool(7) ?? true, focused: values.bool(8) ?? false, selected: values.bool(9) ?? false,
                 expanded: role == "AXDisclosureTriangle" || role == "AXRow" ? values.bool(10) : nil)
             node.ref = keep(element)
+
+            if role == "AXWebArea", limits.skipWebContent { return node }
 
             // A scroll area or a list clips what is inside it.
             var inner = clip

@@ -17,7 +17,8 @@ nonisolated struct LookAtScreenTool: Tool {
     each with an [id] to act on with press, type_text or scroll. Call it once before acting in another app; actions \
     report what changed, so look again only when you need the whole picture. Use find to search the screen for \
     words (it also shows the whole text of a matching field, e.g. find "textarea"). Set screenshot to true only when the list does not show what you need (images, a canvas, a video); a \
-    screenshot comes on its own when the app cannot be read.
+    screenshot comes on its own when the app cannot be read. In Safari, when Agott's extension is on, the page is \
+    read from the page itself (under "Web page"); its elements take the same ids and tools.
     """
 
     @Generable
@@ -108,7 +109,8 @@ nonisolated struct TypeTextTool: Tool {
     let description = """
     Type text into a field: give element (its [id]) to type there, or leave it out to type wherever the cursor \
     is (for example the WhatsApp message box). Set replace to true to replace what the field holds. Set submit to \
-    true only if the user asked to send. Returns what changed.
+    true only if the user asked to send. For a select on a web page, text is the option to choose (find shows its \
+    options). Returns what changed.
     """
 
     @Generable
