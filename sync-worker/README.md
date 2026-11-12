@@ -67,6 +67,12 @@ Today → Progress on the iPhone reads them back (plus the sets synced from othe
 per exercise, reps per set, seconds a rep, rest, reps per minute, heart rate and the trend against
 your last workouts.
 
+Tuning the counter on real motion: Today → Record motion on the iPhone (AirPods), or Record motion
+at the bottom of the Watch's list. Do one set counting it yourself, stop, and type the real count.
+Watch recordings go to the iPhone; share them from there (or the Files app) to the Mac, into
+`AgottTests/Recordings`. `MotionRecordingTests.recordedSetsCountRight` replays every one and fails
+on a count off by more than a rep (or 10 %), which is what to tune `RepCounter.Settings` on.
+
 ## Forgot the passphrase?
 
 There is no way back into encrypted data. Wipe the vault and connect again, Mac first:

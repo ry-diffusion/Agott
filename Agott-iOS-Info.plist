@@ -16,6 +16,10 @@
 	<array>
 		<string>fetch</string>
 	</array>
+	<!-- Motion recordings (Documents/Recordings) show in the Files app, to
+	     send to the Mac for tuning the rep counter. -->
+	<key>UIFileSharingEnabled</key>
+	<true/>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_agott._tcp</string>

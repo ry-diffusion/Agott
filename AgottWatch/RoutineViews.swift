@@ -21,6 +21,10 @@ struct RoutineList: View {
                 if let problem = sync.problem {
                     Text(problem).font(.footnote).foregroundStyle(.orange)
                 }
+                NavigationLink { RecorderView() } label: {
+                    Label("Record motion", systemImage: "waveform.path.ecg")
+                }
+                .foregroundStyle(.secondary)
             }
             .navigationTitle("Agott")
             .navigationDestination(for: RoutineRecord.self) { RoutineDetail(routine: $0) }

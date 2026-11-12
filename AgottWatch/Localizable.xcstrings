@@ -310,6 +310,106 @@
           }
         }
       }
+    },
+    "Record motion" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gravar movimento"
+          }
+        }
+      }
+    },
+    "Exercise" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exercício"
+          }
+        }
+      }
+    },
+    "Record a set" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gravar uma série"
+          }
+        }
+      }
+    },
+    "Do one set, counting the reps yourself, then stop and type how many you did." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Faça uma série contando as repetições você mesmo, depois pare e diga quantas fez."
+          }
+        }
+      }
+    },
+    "Sent to your iPhone: %lld" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviadas ao iPhone: %lld"
+          }
+        }
+      }
+    },
+    "Stop" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parar"
+          }
+        }
+      }
+    },
+    "How many did you do?" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quantas você fez?"
+          }
+        }
+      }
+    },
+    "Agott counted %lld" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Agott contou %lld"
+          }
+        }
+      }
+    },
+    "Discard" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descartar"
+          }
+        }
+      }
+    },
+    "Save" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salvar"
+          }
+        }
+      }
     }
   },
   "version" : "1.1"

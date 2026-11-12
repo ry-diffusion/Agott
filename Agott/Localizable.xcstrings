@@ -9441,6 +9441,136 @@
           }
         }
       }
+    },
+    "Record motion" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gravar movimento"
+          }
+        }
+      }
+    },
+    "You did %lld" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Você fez %lld"
+          }
+        }
+      }
+    },
+    "Agott counted %lld in %@." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Agott contou %lld em %@."
+          }
+        }
+      }
+    },
+    "Discard" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descartar"
+          }
+        }
+      }
+    },
+    "Save" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salvar"
+          }
+        }
+      }
+    },
+    "Exercise" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exercício"
+          }
+        }
+      }
+    },
+    "Record a set with AirPods" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gravar uma série com os AirPods"
+          }
+        }
+      }
+    },
+    "Do one set counting the reps yourself, stop, and type how many you did. Recordings from the Watch (Record motion, on the Watch) arrive here too." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Faça uma série contando as repetições você mesmo, pare e digite quantas fez. As gravações do Watch (Gravar movimento, no Watch) também chegam aqui."
+          }
+        }
+      }
+    },
+    "%@, %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, %@"
+          }
+        }
+      }
+    },
+    "Counted %lld, real %lld · %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contou %lld, real %lld · %@"
+          }
+        }
+      }
+    },
+    "Recordings" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gravações"
+          }
+        }
+      }
+    },
+    "Share all" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compartilhar todas"
+          }
+        }
+      }
+    },
+    "AirDrop them to your Mac, into AgottTests/Recordings in the project." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mande por AirDrop para o Mac, para a pasta AgottTests/Recordings do projeto."
+          }
+        }
+      }
     }
   },
   "version" : "1.1"

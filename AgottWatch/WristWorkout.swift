@@ -24,6 +24,14 @@ final class WristWorkout: NSObject, HKLiveWorkoutBuilderDelegate {
     @ObservationIgnored private var highest: Double?
 
     func start(_ workout: WorkoutSession) async {
+        await start(onSample: { gravity, acceleration, time in
+            workout.add(gravity: gravity, acceleration: acceleration, at: time)
+        }, onHeightSwing: { workout.heightSwing = $0 })
+    }
+
+    /// Motion samples (gravity, user acceleration, time) to any handler, in a
+    /// workout session so they keep coming with the wrist down.
+    func start(onSample: @escaping (Vec3, Vec3, TimeInterval) -> Void, onHeightSwing: ((Double) -> Void)? = nil) async {
         guard !isRunning else { return }
         isRunning = true
         problem = nil
@@ -35,10 +43,10 @@ final class WristWorkout: NSObject, HKLiveWorkoutBuilderDelegate {
             guard let data else { return }
             let g = data.gravity, a = data.userAcceleration
             MainActor.assumeIsolated {
-                workout.add(gravity: Vec3(g.x, g.y, g.z), acceleration: Vec3(a.x, a.y, a.z), at: data.timestamp)
+                onSample(Vec3(g.x, g.y, g.z), Vec3(a.x, a.y, a.z), data.timestamp)
             }
         }
-        if CMAltimeter.isRelativeAltitudeAvailable() {
+        if onHeightSwing != nil, CMAltimeter.isRelativeAltitudeAvailable() {
             lowest = nil
             highest = nil
             altimeter.startRelativeAltitudeUpdates(to: .main) { [weak self] data, _ in
@@ -48,7 +56,7 @@ final class WristWorkout: NSObject, HKLiveWorkoutBuilderDelegate {
                     guard let self else { return }
                     self.lowest = min(self.lowest ?? metres, metres)
                     self.highest = max(self.highest ?? metres, metres)
-                    if let low = self.lowest, let high = self.highest { workout.heightSwing = high - low }
+                    if let low = self.lowest, let high = self.highest { onHeightSwing?(high - low) }
                 }
             }
         }

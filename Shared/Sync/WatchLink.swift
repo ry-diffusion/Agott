@@ -39,12 +39,30 @@ final class WatchLink: NSObject, WCSessionDelegate {
     }
 
     #if os(iOS)
+    /// A motion recording from the Watch, into this iPhone's Recordings
+    /// (visible in Files, and shared from Agott).
+    nonisolated func session(_ session: WCSession, didReceive file: WCSessionFile) {
+        // The file is gone once this returns: move it now.
+        let folder = URL.documentsDirectory.appending(path: "Recordings")
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let name = file.metadata?["name"] as? String ?? file.fileURL.lastPathComponent
+        let target = folder.appending(path: name)
+        try? FileManager.default.removeItem(at: target)
+        try? FileManager.default.moveItem(at: file.fileURL, to: target)
+    }
+
     nonisolated func sessionDidBecomeInactive(_ session: WCSession) {}
     nonisolated func sessionDidDeactivate(_ session: WCSession) { session.activate() }
     nonisolated func sessionWatchStateDidChange(_ session: WCSession) {
         Task { @MainActor in self.sendAccount() }
     }
     #else
+    /// Sends a motion recording to the iPhone (queued until it is reachable).
+    func sendRecording(_ url: URL) {
+        guard WCSession.isSupported(), WCSession.default.activationState == .activated else { return }
+        WCSession.default.transferFile(url, metadata: ["name": url.lastPathComponent])
+    }
+
     nonisolated func session(_ session: WCSession, didReceiveApplicationContext context: [String: Any]) {
         let data = context["account"] as? Data
         Task { @MainActor in self.receive(data) }

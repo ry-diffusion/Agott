@@ -33,6 +33,13 @@ struct TodayRoutineView: View {
         }
         .background(Ink.canvas)
         .refreshable { await sync.sync() }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink { MotionRecorderView() } label: {
+                    Label("Record motion", systemImage: "waveform.path.ecg")
+                }
+            }
+        }
         .sheet(item: $workout) { routine in
             WorkoutSheet(routine: routine)
         }
