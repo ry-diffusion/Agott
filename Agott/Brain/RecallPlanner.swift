@@ -49,8 +49,8 @@ nonisolated enum RecallPlanner {
         [
             "person": .choice("""
             Which person or group is `message` about, reading `earlier` to resolve words like "she", \
-            "him", "them" or "that group"? Pick none when it is about no one in particular or about \
-            several people at once.
+            "him", "them" or "that group", and `who` (when present) for what the nicknames in it mean? \
+            Pick none when it is about no one in particular or about several people at once.
             """, candidates),
             "period": .choice("Which stretch of time does `message` ask about, given `now`?", [
                 Period.today.rawValue: "Today.",
@@ -90,18 +90,36 @@ nonisolated enum RecallPlanner {
         var candidates: [String: String] = ["none": "Nobody in particular, or several people at once."]
         var names: [String: String] = [:]
         var picked: [String: ChatSummary] = [:]
-        for (index, chat) in chats.prefix(50).enumerated() where !chat.name.isEmpty {
+        // People are listed with what they are called: the message may say
+        // "o Garicas" for someone whose chat is named Bruno Barreto.
+        let nicknames = (try? await MemoryStore.shared.nicknamesByName()) ?? [:]
+        var listed = chats.prefix(50).filter { !$0.name.isEmpty }
+        // Whoever the message names, even if they have been quiet for months.
+        let mentioned = (try? await MemoryStore.shared.peopleMentioned(in: message)) ?? []
+        var meanings: [String] = []
+        for mention in mentioned.prefix(4) where mention.ref.kind == .person {
+            if mention.alias != mention.ref.name.folded { meanings.append("\"\(mention.alias)\" is \(mention.ref.name)") }
+            guard !listed.contains(where: { $0.name.folded == mention.ref.name.folded }),
+                  let chat = try? await MemoryStore.shared.findChats(named: mention.ref.name, limit: 1).first,
+                  !chat.isGroup else { continue }
+            listed.append(chat)
+        }
+        for (index, chat) in listed.enumerated() {
             let key = "c\(index)"
-            candidates[key] = chat.isGroup ? "The group chat \"\(chat.name)\"." : "\(chat.name)."
+            let called = chat.isGroup ? [] : (nicknames[chat.name.folded] ?? [])
+            candidates[key] = chat.isGroup ? "The group chat \"\(chat.name)\"."
+                : called.isEmpty ? "\(chat.name)." : "\(chat.name), also called \(called.joined(separator: ", "))."
             names[key] = chat.name
             picked[key] = chat
         }
-        let state: [String: Any] = [
+        var state: [String: Any] = [
             "user": AppSettings.myNameSnapshot,
             "message": message,
             "earlier": earlier,
             "now": Date().formatted(.dateTime.weekday(.wide).day().month().year().hour().minute()),
         ]
+        // Nicknames in the message, already looked up.
+        if !meanings.isEmpty { state["who"] = meanings }
         let questions = questions(candidates: candidates)
         let answers: [String: Jev.Answer]? = await withTaskGroup(of: [String: Jev.Answer]?.self) { group in
             group.addTask { try? await Jev.ask(state: state, questions: questions) }

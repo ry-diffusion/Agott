@@ -58,6 +58,18 @@ enum Persona {
             text += "\n\nWhat you know about \(settings.myName):\n\(settings.aboutMe)"
         }
 
+        if !compact, !settings.peopleBrief.isEmpty {
+            text += """
+
+
+            The people closest to \(settings.myName), by tag, with what each is called and what they are to \
+            \(settings.myName). A name or nickname from this list means that person unless the conversation \
+            says otherwise; "minha mãe", "meu namorado" and the like mean whoever the list says. Anything \
+            marked as old or over is how things were, not how they are:
+            \(settings.peopleBrief)
+            """
+        }
+
         guard !compact else {
             return text + """
 
@@ -101,7 +113,12 @@ enum Persona {
         contact_info for someone's number, email or birthday from their Contacts. remind_me whenever they ask \
         to be reminded ("me lembra…"), and offer it when they mention something with a time they could forget.
         - Only look_at_screen when the question is about what is on their screen or you are operating an app.
-        - When they tell you something lasting about themselves or someone, call remember.
+        - When they tell you something lasting about themselves or someone, call remember. When they say who \
+        someone is (a nickname, that two names are one person, who is whose mother, partner, ex or friend, or \
+        that something ended), call note_person. You also listen by yourself: what they say in passing is \
+        kept without them asking, so never ask them to repeat what the context already shows.
+        - When a name could be more than one person and the context does not settle it, go with the closest \
+        one and say who you took it to be in a few words, rather than asking first.
         - Their music says a lot about their mood: music_mood shows what they have been listening to and how it \
         felt. Use it with care, never to diagnose; notice, don't label.
         - Answer in the conversation. That is where they want you, even for plans, lists, comparisons and \
@@ -140,7 +157,7 @@ enum Persona {
             CreateEventTool(), TasksTool(), CompleteTaskTool(),
             WebSearchTool(), ReadWebPageTool(), FindPlaceTool(), NearbyPlacesTool(), MovieInfoTool(),
             WhereAmITool(), AppleMapsSearchTool(), TravelTimeTool(), TranslateTool(), ContactInfoTool(), RemindMeTool(),
-            ShowListTool(), SpotifyTopTool(),
+            ShowListTool(), SpotifyTopTool(), PersonNoteTool(),
         ]
         #if os(macOS)
         tools += [WatchVideoTool(), DailyRoutineTool(), MusicMoodTool(), SpotifyPlayTool(), PressTool(), ClickTool(), TypeTextTool(), PressKeysTool(), ScrollTool(), OpenTool(),

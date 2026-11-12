@@ -237,15 +237,15 @@ extension WhatsAppSource {
     /// A row of `messageColumnsSQL` as a message: who wrote it, in which
     /// chat, named the way the rest of Agott names them.
     static func message(from row: SQLiteDB.Statement, text: String, contacts: ContactBook,
-                        externalPrefix: String = "") -> RawMessage {
+                        externalPrefix: String = "", directory: WhatsAppDirectory = .current) -> RawMessage {
         let date = Date(timeIntervalSince1970: row.double(3) + appleEpochOffset)
         let isFromMe = row.int(4) != 0
         let jid = row.text(7) ?? ""
         let isGroup = row.int(8) == 1 || jid.hasSuffix("@g.us")
         let partner = row.text(6) ?? ""
-        let chatPush = row.text(12) ?? ""
-        let chatName = isName(partner) ? partner
-            : contacts.name(forHandle: jid) ?? (isName(chatPush) ? chatPush : contacts.display(jid))
+        let chatName = isGroup
+            ? (isName(partner) ? partner : contacts.display(jid))
+            : personName(jid: jid, ownChat: partner, profile: row.text(12) ?? "", contacts: contacts, directory: directory)
 
         let sender: String
         if isFromMe {
@@ -253,11 +253,8 @@ extension WhatsAppSource {
         } else if isGroup {
             // Whoever also has a chat of their own with you goes by the name
             // that chat has, so they are one person in groups and alone.
-            let memberName = row.text(9) ?? ""
-            let memberJID = row.text(10) ?? ""
-            let ownChat = row.text(11) ?? ""
-            sender = contacts.name(forHandle: memberJID)
-                ?? (isName(ownChat) ? ownChat : isName(memberName) ? memberName : contacts.display(memberJID))
+            sender = personName(jid: row.text(10) ?? "", ownChat: row.text(11) ?? "", profile: row.text(9) ?? "",
+                                contacts: contacts, directory: directory)
         } else {
             sender = chatName
         }
@@ -267,21 +264,56 @@ extension WhatsAppSource {
             sender: sender, isFromMe: isFromMe, date: date, text: text)
     }
 
+    /// What one person is called, the same in their own chat and in every
+    /// group: the name their chat with you has, then your contacts, then
+    /// WhatsApp's address book, then the name they gave WhatsApp, then their
+    /// number, and only then their private id.
+    static func personName(jid: String, ownChat: String, profile: String, contacts: ContactBook,
+                           directory: WhatsAppDirectory) -> String {
+        if isName(ownChat) { return ownChat.trimmingCharacters(in: .whitespaces) }
+        // A private id (…@lid) is not a phone number: only its real number,
+        // when WhatsApp knows it, may be looked up in the contacts.
+        let phone = jid.hasSuffix("@lid") ? directory.phoneByLID[jid] : jid
+        if let phone, let name = contacts.name(forHandle: phone) { return name }
+        if let name = directory.nameByJID[jid], isName(name) { return name }
+        if isName(profile) { return profile.trimmingCharacters(in: .whitespaces) }
+        if let name = directory.firstNameByJID[jid], isName(name) { return name }
+        if let number = phoneNumber(ownChat) ?? phoneNumber(profile) { return number }
+        return contacts.display(phone ?? jid)
+    }
+
     /// A group member's own name. WhatsApp leaves the contact name as an
     /// empty string rather than null, so each one is skipped when empty.
+    /// (A message's own ZPUSHNAME is not a name: it holds encoded data,
+    /// "IAA=" for most, and reading it as one made thousands of strangers
+    /// in groups into a single person.)
     static let memberNameSQL = """
-    COALESCE(NULLIF(g.ZCONTACTNAME, ''), NULLIF(p.ZPUSHNAME, ''), NULLIF(m.ZPUSHNAME, ''), NULLIF(g.ZFIRSTNAME, ''), '')
+    COALESCE(NULLIF(g.ZCONTACTNAME, ''), NULLIF(p.ZPUSHNAME, ''), NULLIF(g.ZFIRSTNAME, ''), '')
     """
 
-    /// A name rather than a number written out ("+55 11 9…").
+    /// A name rather than a number written out ("+55 11 9…") or data.
     nonisolated static func isName(_ text: String) -> Bool {
-        text.contains(where: \.isLetter)
+        text.contains(where: \.isLetter) && !looksEncoded(text)
+    }
+
+    /// Base64 where a name should be: "IAA=", "CLSYy9YGGhE5OTMw…".
+    nonisolated static func looksEncoded(_ text: String) -> Bool { PersonName.looksEncoded(text) }
+
+    /// A phone number as WhatsApp writes it for someone who is not a
+    /// contact, without the invisible direction marks around it.
+    nonisolated static func phoneNumber(_ text: String) -> String? {
+        let plain = String(String.UnicodeScalarView(text.unicodeScalars.filter { $0.properties.generalCategory != .format }))
+            .replacingOccurrences(of: "\u{2011}", with: "-").replacingOccurrences(of: "\u{00A0}", with: " ")
+            .trimmingCharacters(in: .whitespaces)
+        guard plain.filter(\.isNumber).count >= 7,
+              plain.allSatisfy({ $0.isNumber || " +-().".contains($0) }) else { return nil }
+        return plain
     }
 
     /// Names WhatsApp knows for people Agott only had as an id, keyed by the
     /// name Agott used before: the id as digits ("+224064970952769"). The name
     /// of their own chat with you comes first, then the name they gave
-    /// WhatsApp, then the one a message of theirs carried.
+    /// WhatsApp, then the first name a group shows for them.
     static func profileNames() -> [String: String] {
         guard let db = try? SQLiteDB(path: path, readOnly: true) else { return [:] }
         var names: [String: String] = [:]
@@ -290,15 +322,6 @@ extension WhatsAppSource {
             let bare = jid.components(separatedBy: "@").first ?? jid
             guard bare.allSatisfy(\.isNumber), bare.count > 6 else { return }
             if replacing || names["+" + bare] == nil { names["+" + bare] = name }
-        }
-        // In a group a message's ZFROMJID is the group; the sender is the member.
-        try? db.rows("""
-            SELECT COALESCE(g.ZMEMBERJID, m.ZFROMJID), m.ZPUSHNAME FROM ZWAMESSAGE m
-            LEFT JOIN ZWAGROUPMEMBER g ON g.Z_PK = m.ZGROUPMEMBER
-            WHERE m.ZISFROMME = 0 AND m.ZPUSHNAME IS NOT NULL AND m.ZPUSHNAME != ''
-            GROUP BY COALESCE(g.ZMEMBERJID, m.ZFROMJID)
-            """) { row in
-            add(row.text(0), row.text(1), replacing: false)
         }
         try? db.rows("SELECT ZMEMBERJID, ZFIRSTNAME FROM ZWAGROUPMEMBER WHERE ZFIRSTNAME IS NOT NULL AND ZFIRSTNAME != ''") { row in
             add(row.text(0), row.text(1), replacing: false)
@@ -310,6 +333,63 @@ extension WhatsAppSource {
             add(row.text(0), row.text(1), replacing: true)
         }
         return names
+    }
+}
+
+/// WhatsApp's own address book and name tables, read once: who each private
+/// id (…@lid) is. In groups WhatsApp identifies members by these ids, not by
+/// phone number, so without it a contact is a stranger in every group.
+nonisolated struct WhatsAppDirectory: Sendable {
+    /// Full name by id, private (…@lid) and phone (…@s.whatsapp.net) alike.
+    var nameByJID: [String: String] = [:]
+    /// The phone id behind a private id.
+    var phoneByLID: [String: String] = [:]
+    /// The first name a group shows for a member who is not a contact.
+    var firstNameByJID: [String: String] = [:]
+
+    static let contactsPath = URL.homeDirectory
+        .appending(path: "Library/Group Containers/group.net.whatsapp.WhatsApp.shared/ContactsV2.sqlite").path
+
+    private static let cache = Cache()
+
+    private final class Cache: @unchecked Sendable {
+        private let lock = NSLock()
+        private var value: WhatsAppDirectory?
+        private var loaded = Date.distantPast
+
+        func get() -> WhatsAppDirectory {
+            lock.withLock {
+                if let value, Date().timeIntervalSince(loaded) < 600 { return value }
+                let fresh = WhatsAppDirectory.load()
+                value = fresh
+                loaded = .now
+                return fresh
+            }
+        }
+    }
+
+    /// The directory as of the last ten minutes.
+    static var current: WhatsAppDirectory { cache.get() }
+
+    static func load(contactsPath: String = contactsPath, chatsPath: String = WhatsAppSource.path) -> WhatsAppDirectory {
+        var directory = WhatsAppDirectory()
+        if let db = try? SQLiteDB(path: contactsPath, readOnly: true) {
+            try? db.rows("SELECT ZFULLNAME, ZLID, ZWHATSAPPID FROM ZWAADDRESSBOOKCONTACT") { row in
+                let name = (row.text(0) ?? "").trimmingCharacters(in: .whitespaces)
+                let lid = row.text(1) ?? "", phone = row.text(2) ?? ""
+                if !lid.isEmpty, !phone.isEmpty { directory.phoneByLID[lid] = phone }
+                guard WhatsAppSource.isName(name) else { return }
+                if !lid.isEmpty { directory.nameByJID[lid] = name }
+                if !phone.isEmpty { directory.nameByJID[phone] = name }
+            }
+        }
+        if let db = try? SQLiteDB(path: chatsPath, readOnly: true) {
+            try? db.rows("SELECT ZMEMBERJID, ZFIRSTNAME FROM ZWAGROUPMEMBER WHERE ZFIRSTNAME IS NOT NULL AND ZFIRSTNAME != ''") { row in
+                guard let jid = row.text(0), let name = row.text(1), WhatsAppSource.isName(name) else { return }
+                directory.firstNameByJID[jid] = name.trimmingCharacters(in: .whitespaces)
+            }
+        }
+        return directory
     }
 }
 

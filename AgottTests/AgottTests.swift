@@ -899,13 +899,19 @@ struct LearnedPeopleTests {
         participants: ["Yasmin", "Alexsander Lima"], isGroup: true)
 
     @Test func realNicknamesOnly() {
-        #expect(MemoryStore.nicknameIsProven("Ale", person: "Alexsander Lima", in: chunk))
+        let moment = MemoryChunk(
+            id: 1, source: .whatsapp, chatID: "g", chatName: "bio a ligia", start: .now, end: .now,
+            text: "[2026-01-02 10:00] Yasmin: valeu ale\n[2026-01-02 10:01] Alexsander Lima: de nada mano",
+            participants: ["Yasmin", "Alexsander Lima"], isGroup: true)
+        // Yasmin calls Alexsander "ale": his, and said to him.
+        let ale = Nicknames.judge(nickname: "ale", claimed: "Alexsander Lima", evidence: "valeu ale", in: moment, me: "Moizes")
+        #expect(ale == Nicknames.Verdict(owner: .person("Alexsander Lima"), trusted: true))
         // Everyone is "mano".
-        #expect(!MemoryStore.nicknameIsProven("mano", person: "Alexsander Lima", in: chunk))
-        // Not written in the moment.
-        #expect(!MemoryStore.nicknameIsProven("Xande", person: "Alexsander Lima", in: chunk))
-        // Not in this chat.
-        #expect(!MemoryStore.nicknameIsProven("Ale", person: "Lígia", in: chunk))
+        #expect(!Nicknames.isPlausible("mano"))
+        #expect(!Nicknames.isPlausible("galera"))
+        // Nobody calls themselves across a group: whose it is cannot be told.
+        let own = Nicknames.judge(nickname: "ale", claimed: "Yasmin", evidence: "valeu ale", in: moment, me: "Moizes")
+        #expect(own.owner == .nobody)
     }
 
     @Test func linksAreStoredOnceAndReadBothWays() async throws {
@@ -985,13 +991,13 @@ struct LearningCrossReferenceTests {
         let yasmin = try #require(try await store.ensurePerson("Yasmin Costa"))
         let gustavo = try #require(try await store.ensurePerson("Gustavo Fernandes"))
         try await store.link(yasmin, gustavo, kind: .partner, detail: "namorado", confidence: 0.85, evidence: nil, chunkID: nil, at: .now)
-        try await store.learnNickname("Yas", for: "Yasmin Costa", evidence: nil)
+        try await store.learnNickname("Yas", forID: yasmin, name: "Yasmin Costa", evidence: nil, trusted: true)
 
         let chunk = MemoryChunk(id: 1, source: .whatsapp, chatID: "g-bio", chatName: "bio a ligia", start: .now, end: .now,
                                 text: "Yasmin Costa: o gustavo vem me buscar hoje", participants: ["Yasmin Costa"], isGroup: true)
         let card = try await store.whoIsWho(for: [chunk], budget: 2000)
         #expect(card.contains("\"bio a ligia\" is a group chat, not a person"))
-        #expect(card.contains("Yasmin Costa (also called Yas, Yasmin): is dating Gustavo Fernandes (85%)"), "\(card)")
+        #expect(card.contains("Yasmin Costa (also called Yas, Yasmin): is dating Gustavo Fernandes (85%, "), "\(card)")
         // Mentioned only by first name, still recognised.
         #expect(card.contains("- Gustavo Fernandes"))
         #expect(try await store.whoIsWho(for: [chunk], budget: 100).isEmpty)
@@ -1540,3 +1546,471 @@ struct RoutinesPageTests {
     }
 }
 #endif
+
+
+/// Who is who: names without their decoration, whose nickname is whose,
+/// the closest person first, and two entries made one.
+@MainActor
+@Suite("Identity")
+struct IdentityTests {
+    private func store(_ name: String) -> MemoryStore {
+        MemoryStore(url: FileManager.default.temporaryDirectory.appending(path: "agott-\(name)-\(UUID().uuidString).sqlite"))
+    }
+
+    private func raw(_ id: Int, chat: String, name: String, group: Bool = false, sender: String, me: Bool = false,
+                     _ text: String, at offset: Double = 0) -> RawMessage {
+        RawMessage(source: .whatsapp, externalID: "i\(id)", chatID: chat, chatName: name, isGroup: group, sender: sender,
+                   isFromMe: me, date: Date(timeIntervalSince1970: 1_800_000_000 + Double(id) * 60 + offset), text: text)
+    }
+
+    @Test func namesLoseTheirDecoration() {
+        #expect(PersonName.clean("Lígia 🌻") == "Lígia")
+        #expect(PersonName.clean("~Joca~") == "Joca")
+        #expect(PersonName.clean("𝜗ৎHanna") == "Hanna")
+        #expect(PersonName.clean("Kitty🦭") == "Kitty")
+        #expect(PersonName.clean("clara amg fofa linda") == "clara amg fofa linda")
+        // A name wholly in another script is a name.
+        #expect(PersonName.clean("沈清秋") == "沈清秋")
+        #expect(PersonName.isDescriptor("irmão da minha amg"))
+        #expect(PersonName.isDescriptor("her ex"))
+        #expect(PersonName.isDescriptor("primeiro amor"))
+        #expect(!PersonName.isDescriptor("Danilo da Evelyn"))
+        #expect(!PersonName.isDescriptor("emilia"))
+    }
+
+    @Test func dataIsNotAName() {
+        // What WhatsApp stores beside a message is encoded data.
+        #expect(!WhatsAppSource.isName("IAA="))
+        #expect(!WhatsAppSource.isName("COe2zdYGIAA="))
+        #expect(!WhatsAppSource.isName("CLSYy9YGGhE5OTMwNDM0MTU4Njc2"))
+        #expect(!WhatsAppSource.isName("+EAA="))
+        #expect(!WhatsAppSource.isName("+GIO5stcGIAE="))
+        #expect(WhatsAppSource.looksEncoded("+GIO5stcGIAE"))
+        #expect(WhatsAppSource.isName("Cesander2015"))
+        #expect(WhatsAppSource.isName("Ana"))
+        #expect(WhatsAppSource.isName("Dayvid Albuquerque"))
+        #expect(!WhatsAppSource.isName("\u{202A}+55 91 98557\u{2011}4073\u{202C}"))
+        #expect(WhatsAppSource.phoneNumber("\u{202A}+55 91 98557\u{2011}4073\u{202C}") == "+55 91 98557-4073")
+        #expect(WhatsAppSource.phoneNumber("Ana 2") == nil)
+    }
+
+    @Test func aMemberIsNamedTheSameAloneAndInGroups() {
+        let contacts = ContactBook()
+        var directory = WhatsAppDirectory()
+        directory.nameByJID["111@lid"] = "Bruno Barreto"
+        directory.firstNameByJID["222@lid"] = "Dayvid"
+        // In WhatsApp's address book, with no chat of their own.
+        #expect(WhatsAppSource.personName(jid: "111@lid", ownChat: "", profile: "Bru", contacts: contacts, directory: directory) == "Bruno Barreto")
+        // The name of their own chat wins.
+        #expect(WhatsAppSource.personName(jid: "111@lid", ownChat: "Garicas", profile: "Bru", contacts: contacts, directory: directory) == "Garicas")
+        // Not a contact: the first name a group shows, before a bare number.
+        #expect(WhatsAppSource.personName(jid: "222@lid", ownChat: "\u{202A}+55 91 98557\u{2011}4073\u{202C}", profile: "", contacts: contacts, directory: directory) == "Dayvid")
+        // Nothing but a number: the number, readable.
+        #expect(WhatsAppSource.personName(jid: "333@lid", ownChat: "\u{202A}+55 91 98557\u{2011}4073\u{202C}", profile: "", contacts: contacts, directory: directory) == "+55 91 98557-4073")
+        // Nothing at all: the private id, never the encoded field.
+        #expect(WhatsAppSource.personName(jid: "44455566677@lid", ownChat: "", profile: "", contacts: contacts, directory: directory) == "+44455566677")
+    }
+
+    @Test func aNicknameBelongsToWhoIsCalled() {
+        let direct = MemoryChunk(
+            id: 1, source: .whatsapp, chatID: "d", chatName: "Yasmin Dantas", start: .now, end: .now,
+            text: """
+            [2026-01-02 10:00] Yasmin Dantas: Zé, isso, você mandou o áudio que eu expliquei
+            [2026-01-02 10:01] Moizes: mas e aí, yaya
+            [2026-01-02 10:02] Yasmin Dantas: to quase terminando o mc
+            [2026-01-02 10:03] Yasmin Dantas: meu apelido era Jesse por causa dele
+            [2026-01-02 10:04] Yasmin Dantas: o Garicas vai ligar depois
+            """, participants: ["Yasmin Dantas", "Moizes"], isGroup: false)
+        func judge(_ nickname: String, _ claimed: String, _ evidence: String) -> Nicknames.Verdict {
+            Nicknames.judge(nickname: nickname, claimed: claimed, evidence: evidence, in: direct, me: "Moizes")
+        }
+        // She wrote it, in her chat with the user: it is the user's, once heard again.
+        #expect(judge("Zé", "Yasmin Dantas", "Zé, isso, você mandou") == .init(owner: .me, trusted: false))
+        // Her own name made small is her talking about herself.
+        #expect(Nicknames.resembles("yasminzinha", name: "Yasmin Dantas"))
+        #expect(!Nicknames.resembles("Zé", name: "Yasmin Dantas"))
+        // The user wrote it to her: hers.
+        #expect(judge("yaya", "Yasmin Dantas", "mas e aí, yaya") == .init(owner: .person("Yasmin Dantas"), trusted: true))
+        #expect(judge("yaya", "Moizes", "mas e aí, yaya") == .init(owner: .person("Yasmin Dantas"), trusted: true))
+        // "o mc" is something talked about, not someone called.
+        #expect(judge("mc", "Yasmin Dantas", "to quase terminando o mc").owner == .nobody)
+        // Said outright about herself.
+        #expect(judge("Jesse", "Yasmin Dantas", "meu apelido era Jesse") == .init(owner: .person("Yasmin Dantas"), trusted: true))
+        // The name of someone else in the conversation is them being called.
+        let group = MemoryChunk(
+            id: 2, source: .whatsapp, chatID: "g", chatName: "os guri", start: .now, end: .now,
+            text: "[2026-01-02 10:00] Dayvid Albuquerque: bora julio\n[2026-01-02 10:01] Julio Ferrari: bora",
+            participants: ["Dayvid Albuquerque", "Julio Ferrari", "Bryan"], isGroup: true)
+        #expect(Nicknames.judge(nickname: "julio", claimed: "Bryan", evidence: "bora julio", in: group, me: "Moizes").owner == .nobody)
+        // Someone else, talked about: theirs, but not yet sure.
+        #expect(judge("Garicas", "Bruno Barreto", "o Garicas vai ligar") == .init(owner: .person("Bruno Barreto"), trusted: false))
+        #expect(Nicknames.isVocative("day", in: "oq acha day?"))
+        #expect(Nicknames.isVocative("Gil", in: "Ô Gil, Gilvana, Wana"))
+        #expect(!Nicknames.isVocative("manu", in: "só não pode ser maior que esse da manu por exemplo"))
+    }
+
+    @Test func aNameHeardOnceIsNotYetANickname() async throws {
+        let store = store("heard")
+        try await store.ingest([raw(1, chat: "d", name: "Bruno Barreto", sender: "Bruno Barreto", "e ai")])
+        _ = try await store.syncPeople()
+        let bruno = try #require(try await store.resolvePeople("Bruno Barreto").first)
+        #expect(try await store.learnNickname("Garicas", forID: bruno.id, name: bruno.name, evidence: "o Garicas vai ligar", trusted: false))
+        #expect(try await store.resolvePeople("Garicas").isEmpty)
+        #expect(try await store.nicknames(of: bruno.id).isEmpty)
+        // Heard again: now it is how he is called.
+        try await store.learnNickname("garicas", forID: bruno.id, name: bruno.name, evidence: nil, trusted: false)
+        #expect(try await store.resolvePeople("garicas").first?.id == bruno.id)
+        #expect(try await store.nicknames(of: bruno.id).map(\.alias) == ["Garicas"])
+        // His own name and everyone's words are never nicknames.
+        #expect(try await store.learnNickname("Bruno", forID: bruno.id, name: bruno.name, evidence: nil, trusted: true) == false)
+        #expect(try await store.learnNickname("mano", forID: bruno.id, name: bruno.name, evidence: nil, trusted: true) == false)
+        // A typo of the name recognises him, and is not shown as a nickname.
+        try await store.learnNickname("Brumo", forID: bruno.id, name: bruno.name, evidence: nil, trusted: true)
+        #expect(try await store.resolvePeople("brumo").first?.id == bruno.id)
+        #expect(try await store.nicknames(of: bruno.id).map(\.alias) == ["Garicas"])
+        // The name with a letter held down, or missing its start, is a slip.
+        #expect(PersonName.isMisspelling("dayviddddd", of: "Dayvid Albuquerque"))
+        #expect(PersonName.isMisspelling("yvid", of: "Dayvid Albuquerque"))
+        #expect(!PersonName.isMisspelling("Manu", of: "Manuella"))
+        #expect(!PersonName.isMisspelling("Garicas", of: "Bruno Barreto"))
+        // The user's own nicknames are kept apart from everyone's.
+        try await store.learnNickname("Zé", forID: MemoryStore.me, name: "Moizes", evidence: nil, trusted: true)
+        #expect(try await store.myNicknames().map(\.alias) == ["Zé"])
+        #expect(try await store.resolvePeople("Zé").isEmpty)
+    }
+
+    @Test func theClosestPersonComesFirst() async throws {
+        let store = store("closest")
+        var messages = [raw(1, chat: "d1", name: "Ana Beatriz", sender: "Ana Beatriz", "oi")]
+        // The Ana the user talks to all the time.
+        for index in 2..<60 { messages.append(raw(index, chat: "d2", name: "Ana Souza", sender: "Ana Souza", "mensagem \(index)")) }
+        messages.append(raw(100, chat: "d3", name: "Bruno Barreto", sender: "Bruno Barreto", "e ai"))
+        try await store.ingest(messages)
+        _ = try await store.syncPeople()
+        let anas = try await store.resolvePeople("Ana")
+        #expect(anas.map(\.name) == ["Ana Souza", "Ana Beatriz"])
+        let bruno = try #require(try await store.resolvePeople("Bruno Barreto").first)
+        try await store.learnNickname("Garicas", forID: bruno.id, name: bruno.name, evidence: nil, trusted: true)
+
+        let mentioned = try await store.peopleMentioned(in: "o que a ana falou do garicas ontem?")
+        #expect(mentioned.map(\.ref.name) == ["Ana Souza", "Bruno Barreto"])
+        #expect(mentioned.first?.others.map(\.name) == ["Ana Beatriz"])
+        #expect(mentioned.last?.alias == "garicas")
+        // The conversation is already about the other Ana.
+        let beatriz = try #require(anas.last)
+        #expect(try await store.peopleMentioned(in: "e a ana?", near: [beatriz.id]).first?.ref.name == "Ana Beatriz")
+        // A nickname finds the person's chat.
+        #expect(try await store.resolve(name: "garicas").chats.map(\.name) == ["Bruno Barreto"])
+        // Common words are nobody.
+        #expect(try await store.peopleMentioned(in: "mano, que dia e hoje").isEmpty)
+    }
+
+    @Test func twoEntriesBecomeOnePerson() async throws {
+        let store = store("merge")
+        try await store.ingest([
+            raw(1, chat: "d-num", name: "+55 91 98557-4073", sender: "+55 91 98557-4073", "bora jogar hoje"),
+            raw(2, chat: "d-num", name: "+55 91 98557-4073", sender: "Moizes", me: true, "bora day"),
+            raw(3, chat: "g", name: "os guri", group: true, sender: "Dayvid Albuquerque", "cheguei"),
+        ])
+        _ = try await store.syncPeople()
+        let number = try #require(try await store.resolvePeople("+55 91 98557-4073").first)
+        let dayvid = try #require(try await store.resolvePeople("Dayvid Albuquerque").first)
+        try await store.learnNickname("day", forID: number.id, name: number.name, evidence: nil, trusted: true)
+        try await store.addFact(subject: number.name, predicate: "joga", object: "Valorant", confidence: 0.8, source: .whatsapp,
+                                chunkID: nil, at: .now, subjectID: number.id)
+
+        try await store.mergePerson(number.id, into: dayvid.id)
+        #expect(try await store.person(id: number.id) == nil)
+        // Everything is his now: the chat, the nickname, the fact.
+        #expect(try await store.resolvePeople("day").first?.id == dayvid.id)
+        #expect(try await store.resolve(name: "Dayvid").chats.contains { $0.chatID == "d-num" })
+        #expect(try await store.profile(of: dayvid).map(\.object) == ["Valorant"])
+        let chunks = try await store.chunks(ids: try await store.recentChunkIDs(filter: .none, limit: 10))
+        #expect(chunks.contains { $0.text.contains("Dayvid Albuquerque: bora jogar hoje") })
+        #expect(!chunks.contains { $0.text.contains("+55 91") })
+        #expect(try await store.keywordSearch("Dayvid jogar").count >= 1)
+        // And it holds: the next message under the old name is his too.
+        try await store.ingest([raw(9, chat: "d-num", name: "+55 91 98557-4073", sender: "+55 91 98557-4073", "to on", at: 86_400)])
+        _ = try await store.syncPeople()
+        #expect(try await store.resolvePeople("+55 91 98557-4073").map(\.id) == [dayvid.id])
+        #expect(try await store.chats().contains { $0.name == "Dayvid Albuquerque" && $0.chatID == "d-num" })
+    }
+
+    @Test func lookalikesAreMergedOnlyWhenSure() async throws {
+        let store = store("dupes")
+        try await store.ingest([
+            raw(1, chat: "d1", name: "Kitty Silva 🦭", sender: "Kitty Silva 🦭", "oi"),
+            raw(2, chat: "g1", name: "grupo um", group: true, sender: "Kitty Silva", "oi gente"),
+            raw(3, chat: "d2", name: "Ana 🌸", sender: "Ana 🌸", "oi"),
+            raw(4, chat: "g2", name: "grupo dois", group: true, sender: "Ana", "oi gente"),
+            raw(5, chat: "g2", name: "grupo dois", group: true, sender: "Gustavo Rocha", "oi"),
+            raw(6, chat: "g3", name: "grupo tres", group: true, sender: "Gustavo Rock", "oi"),
+            raw(7, chat: "g3", name: "grupo tres", group: true, sender: "Mariana", "oi"),
+            raw(8, chat: "g1", name: "grupo um", group: true, sender: "Maria", "oi"),
+        ])
+        _ = try await store.syncPeople()
+        let found = try await store.findDuplicates()
+        let people = try await store.peopleNames()
+        // A whole name that differs only by an emoji is one person.
+        #expect(found.sure.map { "\(people[$0.from]?.name ?? "") → \(people[$0.into]?.name ?? "")" } == ["Kitty Silva → Kitty Silva 🦭"])
+        // A lone first name, or a near-equal surname, waits for a second opinion.
+        let maybes = Set(try await store.maybePairs().map { Set([$0.a.name, $0.b.name]) })
+        #expect(maybes == [["Ana 🌸", "Ana"], ["Gustavo Rocha", "Gustavo Rock"]])
+        // Settled as different: never asked again.
+        let pair = try #require(try await store.maybePairs().first { $0.a.name.hasPrefix("Ana") })
+        try await store.setPair(pair.a.id, pair.b.id, state: "different")
+        _ = try await store.findDuplicates()
+        #expect(try await store.maybePairs().map { Set([$0.a.name, $0.b.name]) } == [["Gustavo Rocha", "Gustavo Rock"]])
+    }
+
+    @Test func aNameThatWasSeveralPeopleIsToldApart() async throws {
+        let store = store("split")
+        try await store.ingest([
+            raw(1, chat: "g", name: "os guri", group: true, sender: "IAA=", "sou a mirela"),
+            raw(2, chat: "g", name: "os guri", group: true, sender: "IAA=", "e eu o luiz"),
+            raw(3, chat: "g", name: "os guri", group: true, sender: "IAA=", "quem sou eu"),
+        ])
+        _ = try await store.syncPeople()
+        try await store.addFact(subject: "IAA=", predicate: "tem", object: "piscina", confidence: 0.8, source: .whatsapp, chunkID: nil, at: .now)
+        let stored = try await store.senders(source: .whatsapp, after: 0, limit: 10)
+        #expect(stored.count == 3)
+        // The source says who wrote two of them; the third is gone from it.
+        try await store.write(names: [(stored[0].id, "Mirela Lima", "os guri"), (stored[1].id, "Luiz Costa", "os guri")])
+        var changes = MemoryStore.NameChanges()
+        changes.moved["IAA="] = ["Mirela Lima": 1, "Luiz Costa": 1]
+        changes.chats = ["g"]
+        changes.messages = 2
+        let outcome = try await store.settle(changes, source: .whatsapp)
+        #expect(outcome.split == ["IAA="])
+        #expect(outcome.relearn == Set(outcome.chunks))
+        try await store.rerender(chunks: outcome.chunks, relearn: true)
+        _ = try await store.syncPeople()
+
+        #expect(try await store.resolvePeople("IAA=").isEmpty)
+        #expect(try await store.facts(about: "IAA=").isEmpty)
+        #expect(Set(try await store.peopleNames().values.filter { $0.kind == .person }.map(\.name)) == ["Mirela Lima", "Luiz Costa"])
+        let chunk = try #require(try await store.chunks(ids: outcome.chunks).first)
+        #expect(chunk.participants == ["Mirela Lima", "Luiz Costa", "?"])
+        #expect(chunk.text.contains("Mirela Lima: sou a mirela"))
+        #expect(!chunk.text.contains("IAA="))
+        // Words still find the moment, under its new names.
+        #expect(try await store.keywordSearch("Mirela").contains(chunk.id))
+    }
+}
+
+
+/// Memory in time: what ended is kept as ended, a newer answer replaces
+/// the older one, and old news wears thin.
+@MainActor
+@Suite("Memory in time")
+struct MemoryInTimeTests {
+    private func store(_ name: String) -> MemoryStore {
+        MemoryStore(url: FileManager.default.temporaryDirectory.appending(path: "agott-\(name)-\(UUID().uuidString).sqlite"))
+    }
+
+    private let day = 86_400.0
+
+    @Test func exesAreNoLongerDating() async throws {
+        let store = store("time-links")
+        _ = try await store.syncPeople()
+        let tata = try #require(try await store.ensurePerson("Tata"))
+        let andre = try #require(try await store.ensurePerson("André"))
+        let start = Date(timeIntervalSince1970: 1_750_000_000)
+        try await store.link(tata, andre, kind: .partner, detail: "namorado", confidence: 0.9, evidence: nil, chunkID: nil, at: start)
+        #expect(try await store.links(of: tata).first?.phrase == "is dating")
+        // "terminou com o André"
+        try await store.link(tata, andre, kind: .ex, detail: nil, confidence: 0.9, evidence: nil, chunkID: nil,
+                             at: start.addingTimeInterval(90 * day))
+        let after = try await store.links(of: tata)
+        let dating = try #require(after.first { $0.kind == .partner })
+        #expect(dating.ended == start.addingTimeInterval(90 * day))
+        #expect(dating.phrase == "was dating")
+        #expect(dating.line.contains("until 2025-"))
+        // What holds today comes first.
+        #expect(after.first?.kind == .ex)
+        // They got back together: dating again, exes no more.
+        try await store.link(andre, tata, kind: .partner, detail: nil, confidence: 0.9, evidence: nil, chunkID: nil,
+                             at: start.addingTimeInterval(200 * day))
+        let again = try await store.links(of: andre)
+        #expect(again.first { $0.kind == .partner }?.ended == nil)
+        #expect(again.first { $0.kind == .ex }?.ended != nil)
+        // Said outright to be over.
+        try await store.link(andre, tata, kind: .partner, detail: nil, confidence: 0.9, evidence: nil, chunkID: nil,
+                             at: start.addingTimeInterval(300 * day), ended: true)
+        #expect(try await store.links(of: andre).first { $0.kind == .partner }?.ended != nil)
+    }
+
+    @Test func aNewPartnerEndsAnOldOneOnlyWhenSure() async throws {
+        let store = store("time-partners")
+        _ = try await store.syncPeople()
+        let bruno = try #require(try await store.ensurePerson("Bruno"))
+        let isa = try #require(try await store.ensurePerson("Isabelly"))
+        let gabi = try #require(try await store.ensurePerson("Gabriele"))
+        let rumour = try #require(try await store.ensurePerson("Ingrid"))
+        let start = Date(timeIntervalSince1970: 1_750_000_000)
+        try await store.link(bruno, isa, kind: .partner, detail: nil, confidence: 0.8, evidence: nil, chunkID: nil, at: start)
+        // A rumour, later: not enough to end anything.
+        try await store.link(bruno, rumour, kind: .partner, detail: nil, confidence: 0.4, evidence: nil, chunkID: nil,
+                             at: start.addingTimeInterval(200 * day))
+        #expect(try await store.settleLinks() == 0)
+        // Sure, and months later.
+        try await store.link(bruno, gabi, kind: .partner, detail: nil, confidence: 0.9, evidence: nil, chunkID: nil,
+                             at: start.addingTimeInterval(400 * day))
+        #expect(try await store.settleLinks() == 2)
+        let links = try await store.links(of: bruno)
+        #expect(links.filter { $0.ended == nil }.map(\.other.name) == ["Gabriele"])
+        // A contact saved as "Mãe" is the user's mother.
+        try await store.ingest([RawMessage(source: .whatsapp, externalID: "k1", chatID: "d-mae", chatName: "Mãe", isGroup: false,
+                                           sender: "Mãe", isFromMe: false, date: start, text: "filho, almoço tá pronto")])
+        _ = try await store.syncPeople()
+        #expect(try await store.tiesFromContactNames() == 1)
+        let mother = try #require(try await store.resolvePeople("Mãe").first)
+        #expect(try await store.tiesToUser(of: mother.id).first?.toUser.hasPrefix("the user's parent (“mãe”, 90%") == true)
+        #expect(try await store.peopleBrief().contains("Mãe: the user's parent"))
+        #expect(try await store.tiesFromContactNames() == 0)
+        // The user's own ties are kept the same way.
+        try await store.link(MemoryStore.me, isa, kind: .parent, detail: "filha", confidence: 0.95, evidence: nil, chunkID: nil, at: start)
+        #expect(try await store.tiesToUser(of: isa).first?.toUser.hasPrefix("the user's child (“filha”, 95%") == true)
+        #expect(try await store.links(of: isa).allSatisfy { $0.other.id != MemoryStore.me })
+    }
+
+    @Test func aNewerAnswerReplacesTheOlderOne() async throws {
+        let store = store("time-facts")
+        let old = Date(timeIntervalSince1970: 1_700_000_000), new = Date(timeIntervalSince1970: 1_780_000_000)
+        try await store.addFact(subject: "Ana", predicate: "está", object: "solteira", confidence: 0.9, source: .whatsapp,
+                                chunkID: nil, at: old, kind: .relationship)
+        try await store.addFact(subject: "Ana", predicate: "gosta de", object: "açaí", confidence: 0.9, source: .whatsapp,
+                                chunkID: nil, at: old, kind: .likes)
+        try await store.addFact(subject: "Ana", predicate: "está", object: "namorando", confidence: 0.8, source: .whatsapp,
+                                chunkID: nil, at: new, kind: .relationship)
+        #expect(try await store.settleFacts() == 1)
+        let known = try await store.facts(about: "Ana")
+        #expect(Set(known.map(\.object)) == ["namorando", "açaí"])
+        let all = try await store.facts(about: "Ana", includeEnded: true)
+        #expect(all.first { $0.object == "solteira" }?.ended == new)
+        #expect(all.first { $0.object == "solteira" }?.withProof.contains("a newer answer replaced it on") == true)
+        // Where someone lives is said in too many ways to replace: both stay.
+        try await store.addFact(subject: "Bia", predicate: "mora em", object: "Goiânia", confidence: 0.9, source: .whatsapp,
+                                chunkID: nil, at: old, kind: .livesIn)
+        try await store.addFact(subject: "Bia", predicate: "mora em", object: "Anápolis", confidence: 0.9, source: .whatsapp,
+                                chunkID: nil, at: new, kind: .livesIn)
+        // A sentence filed as an answer replaces nothing, and neither does the same week.
+        try await store.addFact(subject: "Bia", predicate: "está", object: "solteira", confidence: 0.9, source: .whatsapp,
+                                chunkID: nil, at: old, kind: .relationship)
+        try await store.addFact(subject: "Bia", predicate: "está", object: "ficando com um menino da sala dela", confidence: 0.9,
+                                source: .whatsapp, chunkID: nil, at: new, kind: .relationship)
+        try await store.addFact(subject: "Bia", predicate: "está", object: "enrolada", confidence: 0.9, source: .whatsapp,
+                                chunkID: nil, at: old.addingTimeInterval(3 * day), kind: .relationship)
+        #expect(try await store.settleFacts() == 0)
+        // "namorada" is not where someone lives.
+        #expect(FactKind.guess("tem namorada") != .livesIn)
+        #expect(FactKind.guess("mora em") == .livesIn)
+        // Seen again later: true again.
+        try await store.addFact(subject: "Ana", predicate: "está", object: "solteira", confidence: 0.9, source: .whatsapp,
+                                chunkID: nil, at: new.addingTimeInterval(day), kind: .relationship)
+        #expect(try await store.facts(about: "Ana").contains { $0.object == "solteira" })
+        #expect(FactKind.guess("está namorando") == .relationship)
+        #expect(FactKind.guess("é solteira") == .relationship)
+    }
+
+    @Test func oldNewsWearsThin() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        func fact(_ kind: FactKind, daysAgo: Double, odds: Double = 0.9) -> MemoryFact {
+            MemoryFact(id: Int64(daysAgo), subject: "Ana", predicate: "p", object: "o", confidence: odds, source: .whatsapp,
+                       date: now.addingTimeInterval(-daysAgo * 86_400), kind: kind)
+        }
+        // A mood from last year says less than a job from last year.
+        #expect(fact(.feels, daysAgo: 365).strength(at: now) < fact(.works, daysAgo: 365).strength(at: now))
+        // A birthday does not age.
+        #expect(fact(.birthday, daysAgo: 3000).strength(at: now) == 0.9)
+        #expect(fact(.plans, daysAgo: 400).isStale(at: now))
+        #expect(!fact(.likes, daysAgo: 400).isStale(at: now))
+        let ranked = MemoryFact.ranked([fact(.plans, daysAgo: 900, odds: 0.95), fact(.works, daysAgo: 30, odds: 0.8)], at: now)
+        #expect(ranked.first?.kind == .works)
+        // A crush from two years ago reads as the past.
+        let crush = MemoryStore.PersonLink(other: PersonRef(id: 4, kind: .person, name: "Helena"), kind: .crush, outgoing: true,
+                                           detail: nil, confidence: 0.8, evidence: nil, date: Date().addingTimeInterval(-700 * 86_400))
+        #expect(crush.phrase == "had a crush on")
+        #expect(crush.line.contains("may have changed"))
+    }
+
+    @Test func nicknamesGoBackToWhoTheyBelongTo() async throws {
+        let store = store("rejudge")
+        func raw(_ id: Int, sender: String, me: Bool = false, _ text: String) -> RawMessage {
+            RawMessage(source: .whatsapp, externalID: "n\(id)", chatID: "d", chatName: "Yasmin Dantas", isGroup: false, sender: sender,
+                       isFromMe: me, date: Date(timeIntervalSince1970: 1_800_000_000 + Double(id) * 60), text: text)
+        }
+        try await store.ingest([
+            raw(1, sender: "Yasmin Dantas", "Zé, isso, você mandou o áudio que eu expliquei"),
+            raw(2, sender: "Moizes", me: true, "valeu yaya"),
+        ])
+        _ = try await store.syncPeople()
+        let yasmin = try #require(try await store.resolvePeople("Yasmin Dantas").first)
+        // Filed the old way: both under her.
+        let db = try await store.openForRepair()
+        for (alias, proof) in [("Zé", "Zé, isso, você mandou o áudio"), ("yaya", "valeu yaya"), ("galera", "oi galera")] {
+            try db.run("INSERT INTO person_aliases(person_id, alias, folded, kind, evidence) VALUES (?, ?, ?, 'nickname', ?)",
+                       [.int(yasmin.id), .text(alias), .text(alias.folded), .text(proof)])
+        }
+        let result = try await store.rejudgeNicknames(me: "Moizes")
+        #expect(result.mine == 1)
+        #expect(result.fixed == 1)
+        // Said to the user once: heard, not yet what they are called.
+        #expect(try await store.myNicknames().isEmpty)
+        try await store.learnNickname("Zé", forID: MemoryStore.me, name: "Moizes", evidence: nil, trusted: false)
+        #expect(try await store.myNicknames().map(\.alias) == ["Zé"])
+        #expect(try await store.nicknames(of: yasmin.id).map(\.alias) == ["yaya"])
+    }
+
+    @Test func listeningSkipsWhatSaysNothing() {
+        #expect(!Listening.mayHoldSomething("abre o spotify"))
+        #expect(!Listening.mayHoldSomething("que horas são em tóquio agora?"))
+        #expect(Listening.mayHoldSomething("o Garicas é o Bruno Barreto, meu chefe"))
+        #expect(Listening.mayHoldSomething("terminei com a Ana semana passada"))
+        #expect(Listening.mayHoldSomething("o que eu dou de presente pra minha namorada?"))
+        #expect(KnowledgeGraph.isUser("me", me: "Moizes"))
+        #expect(KnowledgeGraph.isUser("Zé", me: "Moizes", alsoCalled: ["ze"]))
+        #expect(!KnowledgeGraph.isUser("Ana", me: "Moizes"))
+    }
+}
+
+
+/// A dream over a copy of real memory, to see what it would change. Runs
+/// only when asked: TEST_RUNNER_AGOTT_EVAL_DB=/path/to/copy.sqlite.
+@MainActor
+struct DreamEvaluation {
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["AGOTT_EVAL_DB"] != nil))
+    func dreamOverACopy() async throws {
+        let path = try #require(ProcessInfo.processInfo.environment["AGOTT_EVAL_DB"])
+        let store = MemoryStore(url: URL(fileURLWithPath: path))
+        func counts() async throws -> String {
+            let db = try await store.openForRepair()
+            func n(_ sql: String) -> Int { (try? db.scalarInt(sql)) ?? -1 }
+            return [
+                "people \(n("SELECT COUNT(*) FROM people WHERE kind = 'person'"))",
+                "placeholder-named \(n("SELECT COUNT(*) FROM people WHERE kind = 'person' AND name NOT GLOB '*[A-Za-z]*'"))",
+                "nicknames \(n("SELECT COUNT(*) FROM person_aliases WHERE kind = 'nickname' AND person_id != 0"))",
+                "heard \(n("SELECT COUNT(*) FROM person_aliases WHERE kind = 'heard'"))",
+                "spellings \(n("SELECT COUNT(*) FROM person_aliases WHERE kind = 'spelling'"))",
+                "mine \(n("SELECT COUNT(*) FROM person_aliases WHERE person_id = 0"))",
+                "links \(n("SELECT COUNT(*) FROM person_links"))",
+                "ended links \(n("SELECT COUNT(*) FROM person_links WHERE ended_ts IS NOT NULL"))",
+                "facts \(n("SELECT COUNT(*) FROM facts"))",
+                "ended facts \(n("SELECT COUNT(*) FROM facts WHERE ended_ts IS NOT NULL"))",
+                "IAA= messages \(n("SELECT COUNT(*) FROM messages WHERE sender = 'IAA='"))",
+                "unknown-sender messages \(n("SELECT COUNT(*) FROM messages WHERE sender = '?'"))",
+                "to learn \(n("SELECT COUNT(*) FROM chunks WHERE learned = 0"))",
+                "without vector \(n("SELECT COUNT(*) FROM chunks c LEFT JOIN vectors v ON v.chunk_id = c.id WHERE v.chunk_id IS NULL"))",
+                "maybes \(n("SELECT COUNT(*) FROM person_pairs WHERE state = 'maybe'"))",
+            ].joined(separator: " · ")
+        }
+        print("EVAL before:", try await counts())
+        let started = Date()
+        let report = await Dreams.dream(in: store, me: AppSettings.myNameSnapshot, contacts: ContactBook(), deep: false) { print("EVAL note:", $0) }
+        print("EVAL took \(Int(Date().timeIntervalSince(started)))s")
+        print("EVAL after:", try await counts())
+        for line in report.lines { print("EVAL report:", line) }
+        print("EVAL merged:", report.merged.count, "maybes:", report.maybes)
+        for line in try await store.peopleBrief().split(separator: "\n") { print("EVAL brief:", line) }
+    }
+}

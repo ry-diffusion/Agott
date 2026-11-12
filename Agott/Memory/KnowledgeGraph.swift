@@ -37,7 +37,7 @@ enum KnowledgeGraph {
         try await store.graphBatch { store in
             let meID = try store.upsertEntity(kind: .me, name: me, at: .now, mentions: 0)
             for chunk in chunks {
-                let others = chunk.participants.filter { $0 != me && $0 != "Claude" }
+                let others = chunk.participants.filter { $0 != me && $0 != "Claude" && $0 != MemoryStore.unknownSender }
                 let isGroup = chunk.participants.count > 2 || (others.count > 1)
                 let lineCount = Double(chunk.text.split(separator: "\n").count)
                 var participantIDs: [String: Int64] = [:]
@@ -159,35 +159,108 @@ enum KnowledgeGraph {
         return parts.last ?? path
     }
 
+    /// How a model refers to the user.
+    nonisolated static func isUser(_ name: String, me: String, alsoCalled: Set<String> = []) -> Bool {
+        let folded = name.folded
+        return ["me", "eu", "user", "o usuario", "usuario", "the user"].contains(folded) || folded == me.folded
+            || alsoCalled.contains(folded)
+    }
+
     /// Nicknames and links between people, each checked against its moment.
-    static func learnPeople(_ extraction: Extraction, pack: [MemoryChunk], me: String) async {
+    /// `spoken` is for what the user told Agott directly: theirs to say, so
+    /// a nickname needs no second sighting.
+    static func learnPeople(_ extraction: Extraction, pack: [MemoryChunk], me: String, spoken: Bool = false) async {
         let store = MemoryStore.shared
+        let mine = Set(((try? await store.myNicknames()) ?? []).map(\.folded))
         func person(_ name: String, in chunk: MemoryChunk) -> String {
-            ["me", "eu", "user", "o usuário"].contains(name.lowercased()) ? me : canonicalName(name, in: chunk)
+            isUser(name, me: me, alsoCalled: mine) ? me : canonicalName(name, in: chunk)
         }
         for nickname in extraction.nicknames {
             let chunk = pack.indices.contains(nickname.moment - 1) ? pack[nickname.moment - 1] : pack[0]
             let who = person(nickname.person, in: chunk)
-            guard who != me, MemoryStore.nicknameIsProven(nickname.nickname, person: who, in: chunk) else { continue }
-            let proof = chunk.text.folded.contains(nickname.evidence.folded) ? String(nickname.evidence.prefix(120)) : nil
-            try? await store.learnNickname(nickname.nickname, for: who, evidence: proof)
+            if spoken {
+                let proof = chunk.text.folded.contains(nickname.evidence.folded) ? String(nickname.evidence.prefix(120)) : nil
+                if who == me {
+                    _ = try? await store.learnNickname(nickname.nickname, forID: MemoryStore.me, name: me, evidence: proof, trusted: true)
+                } else if let id = try? await store.ensurePerson(who), let ref = try? await store.person(id: id) {
+                    _ = try? await store.learnNickname(nickname.nickname, forID: id, name: ref.name, evidence: proof, trusted: true)
+                }
+            } else {
+                _ = try? await store.learnNickname(nickname.nickname, claimed: who, evidence: nickname.evidence, in: chunk, me: me)
+            }
         }
         for relation in extraction.relations {
             let chunk = pack.indices.contains(relation.moment - 1) ? pack[relation.moment - 1] : pack[0]
             let a = person(relation.person, in: chunk), b = person(relation.other, in: chunk)
-            // The user's own relationships are facts about the user; these are between others.
-            guard a != me, b != me, a.folded != b.folded,
+            guard a.folded != b.folded,
                   let kept = vetted(confidence: relation.confidence, evidence: relation.evidence, in: chunk.text,
                                     selfStated: false, sensitive: false),
-                  let kind = MemoryStore.LinkKind(rawValue: "\(relation.kind)"),
-                  let first = try? await store.ensurePerson(a), let second = try? await store.ensurePerson(b)
-            else { continue }
+                  let kind = MemoryStore.LinkKind(rawValue: "\(relation.kind)") else { continue }
+            // The user is a side of their own ties: their mother, their ex.
+            let first = a == me ? MemoryStore.me : try? await store.ensurePerson(a)
+            let second = b == me ? MemoryStore.me : try? await store.ensurePerson(b)
+            guard let first, let second else { continue }
             try? await store.link(first, second, kind: kind, detail: relation.detail.isEmpty ? nil : relation.detail,
-                                  confidence: kept.confidence, evidence: kept.evidence, chunkID: chunk.id, at: chunk.end)
+                                  confidence: kept.confidence, evidence: kept.evidence, chunkID: chunk.id > 0 ? chunk.id : nil,
+                                  at: chunk.end, ended: relation.ended)
             // And in the graph you can see.
-            await link(subject: a, predicate: kind.phrase(outgoing: true).replacingOccurrences(of: "is ", with: ""), object: b,
-                       kind: .person, at: chunk.end)
+            if !relation.ended {
+                await link(subject: a, predicate: kind.phrase.replacingOccurrences(of: "is ", with: ""), object: b,
+                           kind: .person, at: chunk.end)
+            }
         }
+    }
+
+    /// Files what a model read in some moments: facts with their proof,
+    /// then nicknames and ties. Shared by reading old conversations and by
+    /// listening to what the user says to Agott.
+    static func absorb(_ extraction: Extraction, pack: [MemoryChunk], me: String, spoken: Bool = false) async throws {
+        let store = MemoryStore.shared
+        let mine = Set(((try? await store.myNicknames()) ?? []).map(\.folded))
+        for fact in extraction.facts where !fact.object.isEmpty {
+            let chunk = pack.indices.contains(fact.moment - 1) ? pack[fact.moment - 1] : pack[0]
+            let isMe = isUser(fact.subject, me: me, alsoCalled: mine)
+            let subject = isMe ? me : canonicalName(fact.subject, in: chunk)
+            let sentence = "\(subject) \(fact.predicate) \(fact.object)"
+            guard !isSensitive(sentence), fact.object.folded != subject.folded,
+                  isMe || !PersonName.isDescriptor(subject) else { continue }
+            // The fact belongs to a person by id when the name is unambiguous.
+            let candidates = isMe ? [] : ((try? await store.resolvePeople(subject)) ?? []).filter { $0.kind == .person }
+            let subjectID = candidates.count == 1 ? candidates[0].id : candidates.first { $0.name.folded == subject.folded }?.id
+            guard let kept = Self.vetted(confidence: fact.confidence, evidence: fact.evidence, in: chunk.text,
+                                         selfStated: fact.selfStated, sensitive: fact.sensitive) else { continue }
+            let factKind = FactKind(rawValue: fact.about) ?? FactKind.guess(fact.predicate)
+            let chunkID: Int64? = chunk.id > 0 ? chunk.id : nil
+            // Already known in other words: only strengthen it. Only this
+            // person's facts count ("Ana" is not "Mariana"), and the same
+            // kind with the same meaning is the same fact.
+            let known = ((try? await store.facts(about: subject, limit: 200)) ?? []).filter { other in
+                other.subject.folded == subject.folded || (subjectID != nil && other.subjectID == subjectID)
+            }
+            if let twin = known.first(where: { other in
+                let sameKind = factKind != .other && other.kind == factKind
+                return (sameKind || other.predicate.folded == fact.predicate.folded) && sameMeaning(other.object, fact.object)
+            }) {
+                try await store.addFact(subject: twin.subject, predicate: twin.predicate, object: twin.object,
+                                        confidence: kept.confidence, source: chunk.source, chunkID: chunkID, at: chunk.end,
+                                        evidence: kept.evidence, selfStated: fact.selfStated, sensitive: fact.sensitive,
+                                        subjectID: subjectID, kind: twin.kind ?? factKind)
+                continue
+            }
+            try await store.addFact(
+                subject: subject, predicate: fact.predicate, object: fact.object,
+                confidence: kept.confidence, source: chunk.source, chunkID: chunkID, at: chunk.end,
+                evidence: kept.evidence, selfStated: fact.selfStated, sensitive: fact.sensitive,
+                subjectID: subjectID, kind: factKind)
+            // Where someone lives, how old they are, whether they are
+            // single: the newer answer replaces the older one.
+            if factKind.singleValued, kept.confidence >= 0.6 {
+                try? await store.supersede(subject: subject, subjectID: subjectID, kind: factKind, object: fact.object, at: chunk.end)
+            }
+            await link(subject: subject, predicate: fact.predicate, object: fact.object,
+                       kind: entityKind(fact.kind), at: chunk.end)
+        }
+        await learnPeople(extraction, pack: pack, me: me, spoken: spoken)
     }
 
     /// Checks a fact against its proof. The quote has to really be in the
@@ -263,16 +336,16 @@ enum KnowledgeGraph {
         @Guide(description: "Nicknames people are called by in the moments. Empty if there are none.", .maximumCount(60))
         var nicknames: [Nickname]
 
-        @Guide(description: "Relationships between two people (not the user's own feelings), seen in the moments. Empty if there are none.", .maximumCount(80))
+        @Guide(description: "Relationships between two people, the user's own included (the user is \"me\"), seen in the moments. Empty if there are none.", .maximumCount(80))
         var relations: [Relation]
 
         @Generable
         struct Nickname {
             @Guide(description: "The number of the moment it comes from")
             var moment: Int
-            @Guide(description: "The person, exactly as their name appears as a sender in the moment, or \"me\" for the user")
+            @Guide(description: "The person who is called by it: the one spoken to or about, never the one writing the line (unless they say it is their own nickname). Their name exactly as it appears as a sender in the moment, or \"me\" for the user")
             var person: String
-            @Guide(description: "The nickname used for them, as written (\"Ale\", \"Lili\"). Not generic words like mano, amor, bb, amiga")
+            @Guide(description: "The nickname used for them, as written (\"Ale\", \"Lili\"). Not generic words like mano, amor, bb, amiga, galera, and not their own first name")
             var nickname: String
             @Guide(description: "The exact words from the moment where the nickname is used for them, at most 120 characters")
             var evidence: String
@@ -294,6 +367,8 @@ enum KnowledgeGraph {
             var evidence: String
             @Guide(description: "How sure, from 0.0 to 1.0. A joke or a rumour is low", .range(0.0...1.0))
             var confidence: Double
+            @Guide(description: "true only when the moment says the link is over: they broke up, stopped being friends, moved out, left the job. false while it holds")
+            var ended: Bool
         }
 
         @Generable
@@ -311,7 +386,7 @@ enum KnowledgeGraph {
             var object: String
             @Guide(description: "What kind of thing the value is")
             var kind: Kind
-            @Guide(description: "What the fact is about, one of: likes, dislikes, works, studies, livesIn, isFrom, plays, watches, listensTo, reads, owns, uses, wants, plans, learning, goodAt, birthday, age, feels, believes, said, other")
+            @Guide(description: "What the fact is about, one of: likes, dislikes, works, studies, livesIn, isFrom, plays, watches, listensTo, reads, owns, uses, wants, plans, learning, goodAt, birthday, age, feels, believes, said, relationship (single, dating, married, with no partner named), other")
             var about: String
             @Guide(description: "How sure, from 0.0 to 1.0", .range(0.0...1.0))
             var confidence: Double
@@ -403,11 +478,13 @@ enum KnowledgeGraph {
 
                 """
 
+            let nicknames = ((try? await store.myNicknames()) ?? []).prefix(5).map(\.alias)
+            let called = nicknames.isEmpty ? "" : ", also called " + nicknames.joined(separator: ", ")
             let extraction: Extraction
             do {
                 extraction = try await ModelHub.generate(
                     Extraction.self,
-                    prompt: "The user is \(me). Lines from \(me) are the user speaking.\n\n\(context)\(moments)",
+                    prompt: "The user is \(me)\(called). Lines from \(me) are the user speaking.\n\n\(context)\(moments)",
                     instructions: """
                     You build a private memory of one person, the user, from their own messages, which they \
                     shared with you on purpose. You get several numbered moments. Extract only lasting facts: \
@@ -417,10 +494,15 @@ enum KnowledgeGraph {
                     as a sender: where they study or work, who they are close to, what they like, what happened \
                     in their life, and how they describe themselves. Keep people apart: a group named after \
                     someone is not that person, and what one person says about another is not self-stated. \
-                    Also list the nicknames people are called by (each with the words where it is used), and \
-                    the relationships between people: who dates whom, exes, crushes, family, best friends, \
-                    classmates, coworkers, who is fighting with whom. A relationship needs two named people; \
-                    "Gustavo's boyfriend" with no name for him is not one. \
+                    Also list the nicknames people are called by (each with the words where it is used). A \
+                    nickname belongs to whoever is being called, not to whoever wrote the line: when Yasmin \
+                    writes "Zé, me liga" in her chat with the user, Zé is the user. \
+                    And the relationships between people, the user's own included (the user is "me"): who \
+                    dates whom, exes, crushes, family (say which: mother, cousin), best friends, classmates, \
+                    coworkers, who is fighting with whom. A relationship needs two named people; "Gustavo's \
+                    boyfriend" with no name for him is not one, but "Gustavo is dating" is a fact about \
+                    Gustavo (about: relationship). Relationships change: when a moment shows one is over \
+                    (they broke up, fell out, moved out), report it with ended true rather than leaving it out. \
                     Every fact needs proof: copy the exact words from the moment that show it. Rate confidence \
                     honestly: a joke, sarcasm or a rumour is low; something someone says plainly about \
                     themselves is high. Mark sensitive facts (sexuality, gender, health, religion, politics) \
@@ -453,43 +535,7 @@ enum KnowledgeGraph {
             }
 
             skippedInARow = 0
-            for fact in extraction.facts where !fact.object.isEmpty {
-                let chunk = pack.indices.contains(fact.moment - 1) ? pack[fact.moment - 1] : pack[0]
-                let isMe = ["me", "eu", "user", "o usuário"].contains(fact.subject.lowercased())
-                let subject = isMe ? me : canonicalName(fact.subject, in: chunk)
-                let sentence = "\(subject) \(fact.predicate) \(fact.object)"
-                guard !isSensitive(sentence), fact.object.folded != subject.folded else { continue }
-                // The fact belongs to a person by id when the name is unambiguous.
-                let candidates = isMe ? [] : ((try? await store.resolvePeople(subject)) ?? []).filter { $0.kind == .person }
-                let subjectID = candidates.count == 1 ? candidates[0].id : nil
-                guard let kept = Self.vetted(confidence: fact.confidence, evidence: fact.evidence, in: chunk.text,
-                                             selfStated: fact.selfStated, sensitive: fact.sensitive) else { continue }
-                let factKind = FactKind(rawValue: fact.about) ?? FactKind.guess(fact.predicate)
-                // Already known in other words: only strengthen it. Only this
-                // person's facts count ("Ana" is not "Mariana"), and the same
-                // kind with the same meaning is the same fact.
-                let known = ((try? await store.facts(about: subject, limit: 200)) ?? []).filter { other in
-                    other.subject.folded == subject.folded || (subjectID != nil && other.subjectID == subjectID)
-                }
-                if let twin = known.first(where: { other in
-                    let sameKind = factKind != .other && other.kind == factKind
-                    return (sameKind || other.predicate.folded == fact.predicate.folded) && sameMeaning(other.object, fact.object)
-                }) {
-                    try await store.addFact(subject: twin.subject, predicate: twin.predicate, object: twin.object,
-                                            confidence: kept.confidence, source: chunk.source, chunkID: chunk.id, at: chunk.end,
-                                            evidence: kept.evidence, selfStated: fact.selfStated, sensitive: fact.sensitive,
-                                            subjectID: subjectID, kind: twin.kind ?? factKind)
-                    continue
-                }
-                try await store.addFact(
-                    subject: subject, predicate: fact.predicate, object: fact.object,
-                    confidence: kept.confidence, source: chunk.source, chunkID: chunk.id, at: chunk.end,
-                    evidence: kept.evidence, selfStated: fact.selfStated, sensitive: fact.sensitive,
-                    subjectID: subjectID, kind: factKind)
-                await link(subject: subject, predicate: fact.predicate, object: fact.object,
-                           kind: entityKind(fact.kind), at: chunk.end)
-            }
-            await learnPeople(extraction, pack: pack, me: me)
+            try await absorb(extraction, pack: pack, me: me)
             try await store.markLearned(pack.map(\.id))
             done += pack.count
             onProgress(done)

@@ -29,7 +29,8 @@ nonisolated final class ContactBook: @unchecked Sendable {
         try? store.enumerateContacts(with: request) { contact, _ in
             let name = CNContactFormatter.string(from: contact, style: .fullName)
                 ?? (contact.nickname.isEmpty ? nil : contact.nickname)
-            guard let name, !name.isEmpty else { return }
+            // A contact saved with only its number has no name to give.
+            guard let name, !name.isEmpty, name.contains(where: \.isLetter) else { return }
             for number in contact.phoneNumbers {
                 let key = Self.phoneKey(number.value.stringValue)
                 if !key.isEmpty { self.byPhone[key] = name }

@@ -29,6 +29,10 @@ actor MemoryStore {
     private var vectorCache: VectorIndex?
     /// Every person alias, folded; see People.swift.
     var aliasCache: [String: [PersonRef]]?
+    /// How close each person is; see Identity.swift.
+    var salienceCache: (Date, [Int64: Double])?
+    /// Names decided to be someone else's, applied as messages are read.
+    var nameOverrides: [String: String]?
 
     init(url: URL) {
         self.url = url
@@ -48,9 +52,11 @@ actor MemoryStore {
             }
         }
         try addMissing("facts", ["evidence TEXT", "self_stated INTEGER NOT NULL DEFAULT 0", "sensitive INTEGER NOT NULL DEFAULT 0",
-                                 "subject_id INTEGER", "kind TEXT"])
+                                 "subject_id INTEGER", "kind TEXT", "ended_ts REAL"])
         try db.execute(Self.peopleSchema)
-        try addMissing("person_aliases", ["evidence TEXT"])
+        // How often and when a name was heard; when a link began and ended.
+        try addMissing("person_aliases", ["evidence TEXT", "count INTEGER NOT NULL DEFAULT 1", "ts REAL"])
+        try addMissing("person_links", ["first_ts REAL", "ended_ts REAL", "count INTEGER NOT NULL DEFAULT 1"])
         self.db = db
         return db
     }
@@ -180,6 +186,8 @@ actor MemoryStore {
     func ingest(_ messages: [RawMessage]) throws -> Int {
         guard !messages.isEmpty else { return 0 }
         let db = try open()
+        // A name decided to be someone else's is written as that person.
+        let renamed = try overrides()
         var earliestByChat: [String: (MemorySource, String, Double)] = [:]
         var latestByChat: [String: Double] = [:]
         var inserted = 0
@@ -193,10 +201,12 @@ actor MemoryStore {
                 let text = message.text.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !text.isEmpty else { continue }
                 let ts = message.date.timeIntervalSince1970
+                let sender = message.isFromMe ? message.sender : (renamed[message.sender] ?? message.sender)
+                let chatName = message.isGroup ? message.chatName : (renamed[message.chatName] ?? message.chatName)
                 try insert.bind([
                     .text(message.source.rawValue), .text(message.externalID),
-                    .text(message.chatID), .text(message.chatName), .of(message.isGroup),
-                    .text(message.sender), .of(message.isFromMe), .double(ts), .text(text),
+                    .text(message.chatID), .text(chatName), .of(message.isGroup),
+                    .text(sender), .of(message.isFromMe), .double(ts), .text(text),
                 ])
                 try insert.step()
                 guard db.changes > 0 else { continue }
@@ -319,7 +329,7 @@ actor MemoryStore {
         return formatter.string(from: Date(timeIntervalSince1970: ts))
     }
 
-    private func refreshChats(db: SQLiteDB, keys: [(MemorySource, String)]) throws {
+    func refreshChats(db: SQLiteDB, keys: [(MemorySource, String)]) throws {
         try db.transaction {
             let upsert = try db.prepare("""
                 INSERT OR REPLACE INTO chats(source, chat_id, name, is_group, msg_count, my_count, first_ts, last_ts)
@@ -559,12 +569,33 @@ actor MemoryStore {
         var spellings: [String]
     }
 
-    private var nameCache: [String: (Date, NameTarget)] = [:]
+    var nameCache: [String: (Date, NameTarget)] = [:]
 
     func resolve(name: String) throws -> NameTarget {
         let needle = name.folded
         if let (date, cached) = nameCache[needle], Date().timeIntervalSince(date) < 300 { return cached }
-        let target = Self.target(for: name, in: try chats(limit: 4000))
+        let all = try chats(limit: 4000)
+        var target = Self.target(for: name, in: all)
+        // By any name they go by: a nickname, or the number they were
+        // before someone said who they are.
+        if let ref = try resolvePeople(name).first(where: { $0.kind == .person }) {
+            var keys: [String] = []
+            try open().rows("SELECT source, chat_id FROM chat_people WHERE person_id = ? AND role = 'direct'", [.int(ref.id)]) {
+                keys.append("\($0.text(0) ?? ""):\($0.text(1) ?? "")")
+            }
+            let known = Set(target.chats.map(\.id))
+            let direct = all.filter { keys.contains($0.id) && !known.contains($0.id) }
+            if !direct.isEmpty || target.chats.isEmpty || target.chats.allSatisfy(\.isGroup) {
+                // A person by that name: their chats, not a group that has the word.
+                target.chats = direct + target.chats.filter { !$0.isGroup || $0.name.folded == needle }
+            }
+            var spellings = target.spellings.isEmpty ? [ref.name] : target.spellings
+            try open().rows("SELECT alias FROM person_aliases WHERE person_id = ? AND kind = 'name'", [.int(ref.id)]) { row in
+                if let alias = row.text(0), !spellings.contains(alias) { spellings.append(alias) }
+            }
+            if !spellings.contains(ref.name) { spellings.append(ref.name) }
+            target.spellings = spellings
+        }
         nameCache[needle] = (.now, target)
         return target
     }
@@ -1009,7 +1040,8 @@ actor MemoryStore {
                 self_stated = MAX(self_stated, excluded.self_stated),
                 sensitive = MAX(sensitive, excluded.sensitive),
                 subject_id = COALESCE(NULLIF(subject_id, 0), excluded.subject_id),
-                kind = COALESCE(kind, excluded.kind)
+                kind = COALESCE(kind, excluded.kind),
+                ended_ts = CASE WHEN ended_ts IS NOT NULL AND excluded.ts > ended_ts THEN NULL ELSE ended_ts END
             """,
             [.text(subject), .text(predicate), .text(object), .double(Self.odds(confidence)), .text(source.rawValue),
              chunkID.map { .int($0) } ?? .null, .double(date.timeIntervalSince1970),
@@ -1017,8 +1049,9 @@ actor MemoryStore {
              subjectID.map { .int($0) } ?? .null, .text((kind ?? FactKind.guess(predicate)).rawValue)])
     }
 
-    func facts(about subject: String? = nil, matching text: String? = nil, limit: Int = 40) throws -> [MemoryFact] {
-        var sql = Self.factColumnsSQL + " WHERE 1=1"
+    func facts(about subject: String? = nil, matching text: String? = nil, limit: Int = 40,
+               includeEnded: Bool = false) throws -> [MemoryFact] {
+        var sql = Self.factColumnsSQL + (includeEnded ? " WHERE 1=1" : " WHERE f.ended_ts IS NULL")
         var values: [SQLiteDB.Value] = []
         if let subject {
             sql += " AND subject LIKE ?"
@@ -1035,11 +1068,43 @@ actor MemoryStore {
         return result
     }
 
+    /// A newer value of something a person has one of at a time (where
+    /// they live, their age, whether they are single) ends the older ones.
+    /// They are kept, marked as no longer true. Returns how many ended.
+    @discardableResult
+    func supersede(subject: String, subjectID: Int64?, kind: FactKind, object: String, at date: Date) throws -> Int {
+        guard kind.singleValued, Self.isPlainValue(object) else { return 0 }
+        let db = try open()
+        var older: [(Int64, String)] = []
+        // Only an answer a month or more older: two cities in one week is
+        // a trip, not a move.
+        try db.rows(
+            "SELECT id, object FROM facts WHERE kind = ? AND ended_ts IS NULL AND ts < ? AND (subject = ? COLLATE NOCASE OR (subject_id = ? AND subject_id != 0))",
+            [.text(kind.rawValue), .double(date.timeIntervalSince1970 - Self.replaceAfter), .text(subject), .int(subjectID ?? 0)]
+        ) { older.append((Int64($0.int(0)), $0.text(1) ?? "")) }
+        var ended = 0
+        for (id, other) in older where Self.isPlainValue(other) && !KnowledgeGraph.sameMeaning(other, object) {
+            try db.run("UPDATE facts SET ended_ts = ? WHERE id = ?", [.double(date.timeIntervalSince1970), .int(id)])
+            ended += 1
+        }
+        return ended
+    }
+
+    /// How much older an answer has to be for a newer one to replace it.
+    nonisolated static let replaceAfter: Double = 30 * 86_400
+
+    /// A value short enough to be one answer ("Lisboa", "17 anos",
+    /// "solteiro"), not a sentence that happens to be filed as one.
+    nonisolated static func isPlainValue(_ object: String) -> Bool {
+        let words = object.wordList
+        return !words.isEmpty && words.count <= 4
+    }
+
     /// A fact with where it was said, from the moment it cites.
     static let factColumnsSQL = """
         SELECT f.id, f.subject, f.predicate, f.object, f.confidence, f.source, f.ts, f.evidence, f.self_stated, f.sensitive,
                c.chat_name, (SELECT ch.is_group FROM chats ch WHERE ch.source = c.source AND ch.chat_id = c.chat_id),
-               f.subject_id, f.kind
+               f.subject_id, f.kind, f.ended_ts
         FROM facts f LEFT JOIN chunks c ON c.id = f.chunk_id
         """
 
@@ -1052,7 +1117,8 @@ actor MemoryStore {
             date: Date(timeIntervalSince1970: row.double(6)),
             evidence: row.text(7), selfStated: row.int(8) != 0, sensitive: row.int(9) != 0,
             chatName: chat, inGroup: row.int(11) != 0, subjectID: row.int(12) == 0 ? nil : Int64(row.int(12)),
-            kind: row.text(13).flatMap(FactKind.init(rawValue:)))
+            kind: row.text(13).flatMap(FactKind.init(rawValue:)),
+            ended: row.isNull(14) ? nil : Date(timeIntervalSince1970: row.double(14)))
     }
 
     /// Everything known about one person, however their name is written:
@@ -1074,9 +1140,9 @@ actor MemoryStore {
         var result: [MemoryFact] = []
         try open().rows(
             Self.factColumnsSQL + " WHERE f.subject IN (\(subjects.map { _ in "?" }.joined(separator: ","))) ORDER BY f.confidence DESC, f.ts DESC LIMIT ?",
-            subjects.map { .text($0) } + [.of(limit)]
+            subjects.map { .text($0) } + [.of(max(limit * 4, 120))]
         ) { result.append(Self.factRow($0)) }
-        return result
+        return Array(MemoryFact.ranked(result).prefix(limit))
     }
 
     func deleteFact(id: Int64) throws {

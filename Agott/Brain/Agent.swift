@@ -253,12 +253,12 @@ final class Agent {
     private(set) var currentID = UUID()
 
     /// Recall, or nil when the store does not answer in time.
-    private static func recall(_ text: String, within limit: Duration) async -> Retriever.Recall? {
+    private static func recall(_ text: String, near: Set<Int64> = [], within limit: Duration) async -> Retriever.Recall? {
         final class Once { var done = false }
         let once = Once()
         return await withCheckedContinuation { continuation in
             Task {
-                let recall = await Retriever().recall(text, limit: 6)
+                let recall = await Retriever().recall(text, limit: 6, near: near)
                 guard !once.done else { return }
                 once.done = true
                 continuation.resume(returning: recall)
@@ -398,7 +398,10 @@ final class Agent {
             guard let plan = await RecallPlanner.plan(for: text, earlier: earlier), !plan.isEmpty else { return [] }
             return await RecallPlanner.gather(plan, query: text)
         }
-        let recall = await Self.recall(text, within: .seconds(10))
+        // Who the conversation is already about: "a Ana" after talking
+        // about one Ana is that Ana.
+        let near = Set(turns.suffix(6).flatMap { PeopleDirectory.tags(in: $0.text) })
+        let recall = await Self.recall(text, near: near, within: .seconds(10))
         if let recall, !recall.isEmpty {
             context.append(recall.rendered(characterBudget: 7000))
             user.memoryCount = recall.hits.count + recall.facts.count
@@ -466,6 +469,21 @@ final class Agent {
         if !told.isEmpty { update(replyID) { $0.text = PeopleDirectory.tagNames($0.text, people: told) } }
         save(conversation)
         nameConversation(conversation)
+        // What they said in passing is kept without them asking: who someone
+        // is, a nickname, that something ended. It runs after the reply, so
+        // it never makes them wait, and says what it kept.
+        if !text.isEmpty {
+            Task { [weak self] in
+                let heard = await Listening.hear(text, earlier: earlier)
+                guard !heard.isEmpty, let self else { return }
+                let kept = heard.facts + heard.nicknames + heard.ties
+                let step = Step(id: "heard", kind: .context,
+                                title: kept == 1 ? String(localized: "Kept one thing you told me")
+                                    : String(localized: "Kept \(kept) things you told me"),
+                                symbol: "pin", state: .done, started: .now, ended: .now)
+                if self.update(replyID, { $0.steps.append(step) }) { self.save(conversation) }
+            }
+        }
         // Only the run that still owns them lets go of the card channel and
         // of a chat you left (its reply has landed and is saved).
         guard taskToken == runToken else { return }

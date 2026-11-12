@@ -255,6 +255,7 @@ enum StepTracker {
         case "remind_me": return (String(localized: "Setting a reminder"), "bell")
         case "watch_video": return (String(localized: "Watching the video"), "play.rectangle")
         case "daily_routine": return (String(localized: "Setting up your routine"), "figure.strengthtraining.functional")
+        case "note_person": return (String(localized: "Noting who \(arg("person")) is"), "person.text.rectangle")
         case "contact_info": return (String(localized: "Looking up \(arg("name")) in Contacts"), "person.crop.circle")
         default: return (tool.replacingOccurrences(of: "_", with: " "), "wrench.and.screwdriver")
         }

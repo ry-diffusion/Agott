@@ -169,12 +169,103 @@ nonisolated struct RememberTool: Tool {
     }
 
     @concurrent func call(arguments: Arguments) async throws -> String {
-        let subject = arguments.subject.lowercased() == "me" ? AppSettings.myNameSnapshot : arguments.subject
-        try await MemoryStore.shared.addFact(
+        let store = MemoryStore.shared
+        let me = AppSettings.myNameSnapshot
+        let mine = Set(((try? await store.myNicknames()) ?? []).map(\.folded))
+        var subject = arguments.subject
+        var subjectID: Int64?
+        if KnowledgeGraph.isUser(subject, me: me, alsoCalled: mine) {
+            subject = me
+        } else if let ref = try? await store.resolvePeople(subject).first(where: { $0.kind == .person }) {
+            // Filed under the person, whatever name the user used for them.
+            subject = ref.name
+            subjectID = ref.id
+        }
+        let kind = FactKind.guess(arguments.predicate)
+        try await store.addFact(
             subject: subject, predicate: arguments.predicate, object: arguments.object,
-            confidence: 0.95, source: .note, chunkID: nil, at: .now)
+            confidence: 0.95, source: .note, chunkID: nil, at: .now, selfStated: subject == me,
+            subjectID: subjectID, kind: kind)
+        if kind.singleValued {
+            try? await store.supersede(subject: subject, subjectID: subjectID, kind: kind, object: arguments.object, at: .now)
+        }
         await KnowledgeGraph.link(subject: subject, predicate: arguments.predicate, object: arguments.object, kind: .thing, at: .now)
         return "Saved: \(subject) \(arguments.predicate) \(arguments.object)"
+    }
+}
+
+nonisolated struct PersonNoteTool: Tool {
+    let name = "note_person"
+    let description = """
+    Record who someone is, when the user says so or corrects you: a nickname they go by, that two names (or a \
+    name and a number) are the same person, or how two people are related and whether that is over. The user \
+    can be a side ("me"): their mother, partner, ex, best friend, boss.
+    """
+
+    @Generable
+    struct Arguments {
+        @Guide(description: "The person, by name, or \"me\" for the user")
+        var person: String
+        @Guide(description: "A nickname this person goes by, if that is what was said")
+        var nickname: String?
+        @Guide(description: "Another name, contact name or number that is this same person, if that is what was said")
+        var sameAs: String?
+        @Guide(description: "How the person relates to `other`, one of: partner, ex, crush, family, sibling, parent, friend, bestFriend, classmate, coworker, roommate, conflict. parent means the person is the parent of `other`; crush means the person likes `other`")
+        var relation: String?
+        @Guide(description: "The other person in the relation, by name, or \"me\" for the user")
+        var other: String?
+        @Guide(description: "The relation in the user's words: mãe, namorada, primo, chefe")
+        var detail: String?
+        @Guide(description: "true when the relation is over (they broke up, fell out)")
+        var ended: Bool?
+    }
+
+    @concurrent func call(arguments: Arguments) async throws -> String {
+        let store = MemoryStore.shared
+        let me = AppSettings.myNameSnapshot
+        let mine = Set(((try? await store.myNicknames()) ?? []).map(\.folded))
+        func id(_ name: String) async -> (id: Int64, name: String)? {
+            if KnowledgeGraph.isUser(name, me: me, alsoCalled: mine) { return (MemoryStore.me, me) }
+            if let ref = try? await store.resolvePeople(name).first(where: { $0.kind == .person }) { return (ref.id, ref.name) }
+            guard let new = try? await store.ensurePerson(name) else { return nil }
+            return (new, name)
+        }
+        guard let person = await id(arguments.person) else { return "I could not tell who \(arguments.person) is." }
+        var done: [String] = []
+
+        if let nickname = arguments.nickname?.trimmingCharacters(in: .whitespaces), !nickname.isEmpty {
+            let kept = (try? await store.learnNickname(nickname, forID: person.id, name: person.name, evidence: nil, trusted: true)) ?? false
+            done.append(kept ? "\(person.name) is also called \(nickname)" : "\(nickname) is too common a word to keep as a nickname")
+        }
+        if let same = arguments.sameAs?.trimmingCharacters(in: .whitespaces), !same.isEmpty, person.id != MemoryStore.me {
+            let others = ((try? await store.resolvePeople(same)) ?? []).filter { $0.kind == .person && $0.id != person.id }
+            if let other = others.first(where: { $0.name.folded == same.folded }) ?? (others.count == 1 ? others[0] : nil) {
+                // Into the entry with a real name; between two names, the one the user called them by.
+                let keepOther = PersonName.isPlaceholder(person.name) && !PersonName.isPlaceholder(other.name)
+                try? await store.mergePerson(keepOther ? person.id : other.id, into: keepOther ? other.id : person.id)
+                done.append("\(other.name) and \(person.name) are now one person")
+            } else if others.isEmpty {
+                _ = try? await store.learnNickname(same, forID: person.id, name: person.name, evidence: nil, trusted: true)
+                done.append("\(person.name) is also \(same)")
+            } else {
+                done.append("\(same) could be " + others.prefix(4).map(\.name).joined(separator: " or ") + "; ask which one")
+            }
+        }
+        if let relation = arguments.relation, let kind = MemoryStore.LinkKind(rawValue: relation),
+           let otherName = arguments.other, let other = await id(otherName), other.id != person.id {
+            let ended = arguments.ended ?? false
+            try? await store.link(person.id, other.id, kind: kind, detail: arguments.detail, confidence: 0.95,
+                                  evidence: nil, chunkID: nil, at: .now, ended: ended)
+            done.append("\(person.name) \(ended ? kind.pastPhrase : kind.phrase) \(other.name)" + (ended ? " (over)" : ""))
+        } else if arguments.ended == true, let otherName = arguments.other, let other = await id(otherName) {
+            try? await store.endLinks(between: person.id, and: other.id, kinds: [.partner, .crush, .friend, .bestFriend, .roommate],
+                                      at: .now)
+            done.append("what there was between \(person.name) and \(other.name) is marked as over")
+        }
+        guard !done.isEmpty else { return "Nothing to record: give a nickname, a same-as name, or a relation with the other person." }
+        await PeopleDirectory.shared.refresh()
+        await PeopleBrief.refresh()
+        return "Saved: " + done.joined(separator: "; ")
     }
 }
 

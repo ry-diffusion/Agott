@@ -145,6 +145,13 @@ final class AppSettings {
     /// A paragraph about you, written by Agott from what it has learned and
     /// editable by you. Every conversation starts from it.
     var aboutMe: String { didSet { save(aboutMe, "aboutMe") } }
+    /// The people closest to you, what each is called and what they are to
+    /// you. Rewritten by Agott as it learns; every conversation starts
+    /// knowing who "a mãe", "o Garicas" and "minha namorada" are.
+    var peopleBrief: String { didSet { save(peopleBrief, "peopleBrief") } }
+    /// When memory last reorganised itself, and whether it does so alone.
+    var lastDream: Double { didSet { save(lastDream, "lastDream") } }
+    var dreams: Bool { didSet { save(dreams, "dreams") } }
 
     var apiKey: String {
         didSet { Keychain.set(apiKey, for: "opencode-api-key") }
@@ -187,6 +194,9 @@ final class AppSettings {
         publishWorker = defaults.string(forKey: "publishWorker") ?? "agott-artifacts"
         publishAccount = defaults.string(forKey: "publishAccount") ?? ""
         aboutMe = defaults.string(forKey: "aboutMe") ?? ""
+        peopleBrief = defaults.string(forKey: "peopleBrief") ?? ""
+        lastDream = defaults.double(forKey: "lastDream")
+        dreams = defaults.object(forKey: "dreams") as? Bool ?? true
         apiKey = Keychain.get("opencode-api-key") ?? ""
     }
 

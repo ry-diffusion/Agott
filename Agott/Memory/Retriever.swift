@@ -129,8 +129,15 @@ nonisolated struct Retriever: Sendable {
         }
     }
 
-    @concurrent func recall(_ query: String, filter: MemoryStore.Filter = .none, limit: Int = 8) async -> Recall {
-        let keyword = (try? await store.keywordSearch(query, filter: filter, limit: 40)) ?? []
+    /// `near` is who the conversation is already about (their ids): a name
+    /// several people share means one of them first.
+    @concurrent func recall(_ query: String, filter: MemoryStore.Filter = .none, limit: Int = 8,
+                            near: Set<Int64> = []) async -> Recall {
+        // Who the question names, by any name they go by. "o Garicas" is
+        // Bruno, and what Bruno wrote is filed under Bruno: search both.
+        let mentioned = (try? await store.peopleMentioned(in: query, near: near)) ?? []
+        let spelled = mentioned.filter { !query.folded.contains($0.ref.name.folded) }.map(\.ref.name)
+        let keyword = (try? await store.keywordSearch(([query] + spelled).joined(separator: " "), filter: filter, limit: 40)) ?? []
 
         var meaning: [Int64] = []
         if await embedder.isReady, let vector = try? await embedder.embed(query),
@@ -146,6 +153,13 @@ nonisolated struct Retriever: Sendable {
         let anchors = (try? await store.entitiesMentioned(in: query)) ?? []
         var graphIDs: [Int64] = []
         var connections: [String] = []
+        // The chats of the people named come first: a nickname matches no
+        // graph node, but it is still a question about that person.
+        for mention in mentioned.prefix(3) {
+            var personFilter = filter
+            personFilter.chatName = mention.ref.name
+            graphIDs += (try? await store.recentChunkIDs(filter: personFilter, limit: 6)) ?? []
+        }
         for anchor in anchors.prefix(3) {
             var anchorFilter = filter
             anchorFilter.chatName = anchor.name
@@ -209,9 +223,23 @@ nonisolated struct Retriever: Sendable {
         names += anchors.filter { $0.kind == .person || $0.kind == .group }.prefix(4).map(\.name)
         var whoIsWho: [String] = []
         var askedAbout = Set<String>()
+        /// The people the question is about, by id.
+        var asked = Set<Int64>()
+        for mention in mentioned {
+            add([mention.ref])
+            asked.insert(mention.ref.id)
+            askedAbout.insert(mention.ref.name.folded)
+            guard !mention.others.isEmpty else { continue }
+            // Said as a guess, with who else it could be.
+            add(Array(mention.others.prefix(3)))
+            whoIsWho.append("\"\(mention.alias)\" most likely means \(mention.ref.tag) (\(mention.ref.name), the closest to the user by that name); it could also be "
+                + mention.others.prefix(3).map { "\($0.tag) (\($0.name))" }.joined(separator: " or ")
+                + ". If the conversation does not settle which, say who you took it to be.")
+        }
         for name in names where askedAbout.insert(name.folded).inserted {
             let found = (try? await store.resolvePeople(name)) ?? []
             add(Array(found.prefix(3)))
+            if let first = found.first(where: { $0.kind == .person }) { asked.insert(first.id) }
             // The name as a word in other chats' names: groups named after someone.
             let first = name.wordList.first ?? name.folded
             let lookalikes = ((try? await store.resolvePeople(first)) ?? []) + ((try? await store.groupsNamed(containing: first)) ?? [])
@@ -238,16 +266,25 @@ nonisolated struct Retriever: Sendable {
         for ref in refs.prefix(18) {
             let links = (try? await store.connections(of: ref, limit: 6)) ?? (direct: [], others: [])
             var line = Recall.line(for: ref, direct: links.direct, others: links.others)
-            // Who they are to other people, learned with proof.
-            if ref.kind == .person, let ties = try? await store.links(of: ref.id, limit: 5), !ties.isEmpty {
-                line += "; " + ties.map(\.line).joined(separator: "; ")
+            if ref.kind == .person {
+                // What they are called, who they are to the user, and who
+                // they are to other people, learned with proof and dated.
+                let nicknames = ((try? await store.nicknames(of: ref.id, limit: 4)) ?? []).map(\.alias)
+                if !nicknames.isEmpty { line += "; also called " + nicknames.joined(separator: ", ") }
+                if let mine = try? await store.tiesToUser(of: ref.id), !mine.isEmpty {
+                    line += "; " + mine.prefix(2).map(\.toUser).joined(separator: "; ")
+                }
+                if let ties = try? await store.links(of: ref.id, limit: 5), !ties.isEmpty {
+                    line += "; " + ties.map(\.line).joined(separator: "; ")
+                }
             }
             people.append((ref, line))
         }
 
         // A profile for each person the question is about, by id.
         var profiles: [(name: String, facts: [MemoryFact])] = []
-        for ref in refs.prefix(4) where ref.kind == .person && names.contains(where: { ref.name.folded.contains($0.wordList.first ?? "~") }) {
+        for ref in refs.prefix(6) where ref.kind == .person && profiles.count < 4
+            && (asked.contains(ref.id) || names.contains(where: { ref.name.folded.contains($0.wordList.first ?? "~") })) {
             let known = (try? await store.profile(of: ref, limit: 25)) ?? []
             if !known.isEmpty { profiles.append(("\(ref.tag) \(ref.name)", known)) }
         }

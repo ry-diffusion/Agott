@@ -121,6 +121,13 @@ final class Indexer {
     @ObservationIgnored private var lastTotals = Date.distantPast
     @ObservationIgnored private var timer: Task<Void, Never>?
     @ObservationIgnored private let contacts = ContactBook()
+
+    /// The address book messages are named from, loaded.
+    func contactBook() async -> ContactBook {
+        let contacts = self.contacts
+        if !contacts.isLoaded { await Task.detached(priority: .utility) { contacts.load() }.value }
+        return contacts
+    }
     @ObservationIgnored private let log = Logger(subsystem: "br.com.zesmoi.Agott", category: "indexer")
 
     private init() {}
@@ -248,6 +255,8 @@ final class Indexer {
         if !Task.isCancelled, AppSettings.shared.autoLearn, ModelHub.isAvailable(AppSettings.shared.learningProvider) {
             learn()
         }
+        // And once a day memory goes over itself.
+        if !Task.isCancelled { Dreams.shared.runIfDue() }
     }
 
     /// Smaller pages newest-first: the first page is what you talked about

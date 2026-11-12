@@ -50,6 +50,7 @@ struct MemoryView: View {
                     }
                 MemoryDigest()
                 DeepMoments()
+                DreamsCard()
                 sources
                 search
                 if query.isEmpty || hits.isEmpty {

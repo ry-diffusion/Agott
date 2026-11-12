@@ -147,6 +147,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task {
             _ = try? await MemoryStore.shared.syncPeople()
             await PeopleDirectory.shared.refresh()
+            // Who matters, in mind before the first message.
+            await PeopleBrief.refresh()
             await ContactPhotos.shared.refresh()
         }
         MessageWatcher.shared.start()

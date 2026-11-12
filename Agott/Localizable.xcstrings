@@ -9781,6 +9781,426 @@
           }
         }
       }
+    },
+    "Dreams" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sonhos"
+          }
+        }
+      }
+    },
+    "Memory goes over itself" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A memória se reorganiza"
+          }
+        }
+      }
+    },
+    "Dream now" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sonhar agora"
+          }
+        }
+      }
+    },
+    "Dreaming…" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sonhando…"
+          }
+        }
+      }
+    },
+    "Are these the same person?" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "São a mesma pessoa?"
+          }
+        }
+      }
+    },
+    "Same" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mesma"
+          }
+        }
+      }
+    },
+    "Different" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diferentes"
+          }
+        }
+      }
+    },
+    "Dream by itself" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sonhar sozinho"
+          }
+        }
+      }
+    },
+    "Once a day, after memory updates" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uma vez por dia, depois de atualizar a memória"
+          }
+        }
+      }
+    },
+    "Gives people their right names, joins entries that are one person, checks whose nickname is whose, and marks what is over as over." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dá o nome certo a cada pessoa, junta registros que são a mesma pessoa, confere de quem é cada apelido e marca como encerrado o que já acabou."
+          }
+        }
+      }
+    },
+    "Last dream %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Último sonho %@"
+          }
+        }
+      }
+    },
+    "Giving people their right names…" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dando o nome certo a cada pessoa…"
+          }
+        }
+      }
+    },
+    "Working out who is who…" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descobrindo quem é quem…"
+          }
+        }
+      }
+    },
+    "Putting things in their time…" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Colocando cada coisa no seu tempo…"
+          }
+        }
+      }
+    },
+    "Tidying up what I know…" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arrumando o que eu sei…"
+          }
+        }
+      }
+    },
+    "Deciding who is the same person…" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Decidindo quem é a mesma pessoa…"
+          }
+        }
+      }
+    },
+    "Rewriting who matters to you…" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reescrevendo quem importa para você…"
+          }
+        }
+      }
+    },
+    "1 message got its sender's real name" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 mensagem ganhou o nome real de quem escreveu"
+          }
+        }
+      }
+    },
+    "%lld messages got their sender's real name" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld mensagens ganharam o nome real de quem escreveu"
+          }
+        }
+      }
+    },
+    "1 name that was really several people was told apart" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 nome que na verdade era várias pessoas foi separado"
+          }
+        }
+      }
+    },
+    "%lld names that were really several people were told apart" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld nomes que na verdade eram várias pessoas foram separados"
+          }
+        }
+      }
+    },
+    "2 entries that were one person were joined" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2 registros que eram a mesma pessoa foram unidos"
+          }
+        }
+      }
+    },
+    "%lld pairs of entries that were one person were joined" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld pares de registros que eram a mesma pessoa foram unidos"
+          }
+        }
+      }
+    },
+    "1 nickname went back to who it belongs to" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 apelido voltou para quem é dono dele"
+          }
+        }
+      }
+    },
+    "%lld nicknames went back to who they belong to" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld apelidos voltaram para quem é dono deles"
+          }
+        }
+      }
+    },
+    "1 nickname turned out to be yours" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 apelido era seu"
+          }
+        }
+      }
+    },
+    "%lld nicknames turned out to be yours" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld apelidos eram seus"
+          }
+        }
+      }
+    },
+    "1 relationship marked as over" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 relacionamento marcado como encerrado"
+          }
+        }
+      }
+    },
+    "%lld relationships marked as over" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld relacionamentos marcados como encerrados"
+          }
+        }
+      }
+    },
+    "1 fact replaced by a newer one" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 fato substituído por um mais novo"
+          }
+        }
+      }
+    },
+    "%lld facts replaced by newer ones" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld fatos substituídos por mais novos"
+          }
+        }
+      }
+    },
+    "1 repeated fact merged" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 fato repetido unido"
+          }
+        }
+      }
+    },
+    "%lld repeated facts merged" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld fatos repetidos unidos"
+          }
+        }
+      }
+    },
+    "1 entry that named nobody was removed" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 registro que não era ninguém foi removido"
+          }
+        }
+      }
+    },
+    "%lld entries that named nobody were removed" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld registros que não eram ninguém foram removidos"
+          }
+        }
+      }
+    },
+    "1 moment will be read again with the right names" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 momento vai ser lido de novo com os nomes certos"
+          }
+        }
+      }
+    },
+    "%lld moments will be read again with the right names" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld momentos vão ser lidos de novo com os nomes certos"
+          }
+        }
+      }
+    },
+    "Everything was already in place." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Já estava tudo no lugar."
+          }
+        }
+      }
+    },
+    "Noting who %@ is" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anotando quem é %@"
+          }
+        }
+      }
+    },
+    "Kept one thing you told me" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guardei uma coisa que você me contou"
+          }
+        }
+      }
+    },
+    "Kept %lld things you told me" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guardei %lld coisas que você me contou"
+          }
+        }
+      }
+    },
+    "relationship" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "relacionamento"
+          }
+        }
+      }
     }
   },
   "version" : "1.1"

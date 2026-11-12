@@ -35,6 +35,10 @@ extension MemoryStore {
         confidence REAL NOT NULL, evidence TEXT, chunk_id INTEGER, ts REAL NOT NULL,
         PRIMARY KEY(a, b, kind));
     CREATE INDEX IF NOT EXISTS person_links_b ON person_links(b);
+    CREATE TABLE IF NOT EXISTS person_pairs(
+        a INTEGER NOT NULL, b INTEGER NOT NULL, state TEXT NOT NULL, score REAL NOT NULL, reason TEXT, ts REAL NOT NULL,
+        PRIMARY KEY(a, b));
+    CREATE TABLE IF NOT EXISTS person_names(old TEXT PRIMARY KEY, new TEXT NOT NULL);
     """
 
     /// The key that makes two mentions the same entry: a person by their
@@ -67,26 +71,32 @@ extension MemoryStore {
         "bro", "brother", "cara", "vei", "vey", "veio", "amg", "amiga", "amigo", "miga", "migo", "irmao", "irma",
         "mae", "pai", "mamae", "papai", "vc", "voce", "tu", "parca", "parceiro", "chefe", "fofa", "fofo", "neném",
         "nenem", "princesa", "querida", "querido", "lindona", "guria", "guri", "moço", "moca", "moco", "senhor",
+        "br", "bro", "mn", "galera", "gente", "pessoal", "povo", "turma", "familia", "meninas", "meninos", "guys", "everyone", "todos",
+        "mores", "mor", "vida", "anjo", "nega", "nego", "neguinha", "neguinho", "man", "dude", "babe", "honey", "dear",
+        "doutor", "doutora", "professor", "professora", "tio", "tia", "vo", "vovo", "filho", "filha", "primo", "prima",
     ]
 
-    /// A nickname the moment proves: it is really written there, it is not
-    /// what everyone gets called, and the person really is in that chat.
-    nonisolated static func nicknameIsProven(_ nickname: String, person: String, in chunk: MemoryChunk) -> Bool {
-        let alias = nickname.folded
-        guard alias.count >= 2, alias.count <= 30, !genericNicknames.contains(alias), alias != person.folded else { return false }
-        let words = chunk.text.wordList.joined(separator: " ")
-        guard (" " + words + " ").contains(" " + alias.wordList.joined(separator: " ") + " ") else { return false }
-        let present = chunk.participants + (chunk.isGroup == false ? [chunk.chatName] : [])
-        return present.contains { $0.folded == person.folded }
-    }
-
-    /// Saves a nickname for a person who is in the moment.
-    func learnNickname(_ nickname: String, for person: String, evidence: String?) throws {
-        let people = try resolvePeople(person).filter { $0.kind == .person }
-        guard let ref = people.first(where: { $0.name.folded == person.folded }) ?? (people.count == 1 ? people[0] : nil)
-        else { return }
-        try addAlias(ref.id, nickname, kind: "nickname", evidence: evidence)
-        aliasCache = nil
+    /// Saves a nickname the moment uses, for whoever it really belongs to:
+    /// the words that use it are checked for who wrote them. Returns
+    /// whether it was kept.
+    @discardableResult
+    func learnNickname(_ nickname: String, claimed: String, evidence: String, in chunk: MemoryChunk, me: String) throws -> Bool {
+        let verdict = Nicknames.judge(nickname: nickname, claimed: claimed, evidence: evidence, in: chunk, me: me)
+        let proof = chunk.text.folded.contains(evidence.folded) && evidence.count >= 3 ? String(evidence.prefix(120)) : nil
+        // It has to really be written there.
+        let words = " " + chunk.text.wordList.joined(separator: " ") + " "
+        guard words.contains(" " + nickname.wordList.joined(separator: " ") + " ") else { return false }
+        switch verdict.owner {
+        case .nobody:
+            return false
+        case .me:
+            return try learnNickname(nickname, forID: Self.me, name: me, evidence: proof, trusted: verdict.trusted, at: chunk.end)
+        case .person(let name):
+            let people = try resolvePeople(name).filter { $0.kind == .person }
+            guard let ref = people.first(where: { $0.name.folded == name.folded }) ?? (people.count == 1 ? people[0] : nil)
+            else { return false }
+            return try learnNickname(nickname, forID: ref.id, name: ref.name, evidence: proof, trusted: verdict.trusted, at: chunk.end)
+        }
     }
 
     /// The person a learned name stands for: one we know without doubt, or
@@ -97,6 +107,8 @@ extension MemoryStore {
         let people = try resolvePeople(trimmed).filter { $0.kind == .person }
         if people.count == 1 { return people[0].id }
         if people.count > 1 { return people.first { $0.name.folded == trimmed.folded }?.id }
+        // "irmão", "her ex", encoded data: nobody to start a page on.
+        guard !PersonName.isDescriptor(trimmed), !PersonName.looksEncoded(trimmed) else { return nil }
         let id = try upsertPerson(kind: .person, name: trimmed, key: Self.personKey(trimmed))
         try addAlias(id, trimmed, kind: "mentioned")
         aliasCache = nil
@@ -108,6 +120,57 @@ extension MemoryStore {
         case partner, ex, crush, family, sibling, parent, friend, bestFriend, classmate, coworker, roommate, conflict
 
         var symmetric: Bool { self != .parent && self != .crush }
+
+        /// After how many days the link is as likely to have changed as
+        /// not. Family does not stop being family; a crush fades in months.
+        var halfLifeDays: Double? {
+            switch self {
+            case .crush: 240
+            case .conflict: 150
+            case .partner: 540
+            case .roommate: 720
+            case .classmate, .coworker: 900
+            case .friend, .bestFriend: 1500
+            case .ex, .family, .sibling, .parent: nil
+            }
+        }
+
+        /// The link once it is over, or too old to be sure of.
+        var pastPhrase: String {
+            switch self {
+            case .partner: "was dating"
+            case .ex: "is the ex of"
+            case .crush: "had a crush on"
+            case .family: "is family of"
+            case .sibling: "is a sibling of"
+            case .parent: "is a parent of"
+            case .friend: "was friends with"
+            case .bestFriend: "was best friends with"
+            case .classmate: "studied with"
+            case .coworker: "worked with"
+            case .roommate: "lived with"
+            case .conflict: "had a conflict with"
+            }
+        }
+
+        /// What someone is to the user. `outgoing` is the person's side of
+        /// a one-way link: they are the parent, they have the crush.
+        func toUser(outgoing: Bool) -> String {
+            switch self {
+            case .partner: "the user's partner"
+            case .ex: "the user's ex"
+            case .crush: outgoing ? "has a crush on the user" : "the user's crush"
+            case .family: "the user's family"
+            case .sibling: "the user's sibling"
+            case .parent: outgoing ? "the user's parent" : "the user's child"
+            case .friend: "the user's friend"
+            case .bestFriend: "the user's best friend"
+            case .classmate: "studies with the user"
+            case .coworker: "works with the user"
+            case .roommate: "lives with the user"
+            case .conflict: "in conflict with the user"
+            }
+        }
 
         var phrase: String {
             switch self {
@@ -127,21 +190,68 @@ extension MemoryStore {
         }
     }
 
-    /// Links two people with proof. A stronger or newer sighting raises it.
+    /// Links two people with proof. A stronger or newer sighting raises it;
+    /// `ended` says the moment shows it is over ("terminaram"). Either side
+    /// may be the user (`MemoryStore.me`).
+    ///
+    /// Links live in time. One seen again after it ended is on again. And
+    /// only what a moment says outright ends another link: becoming exes
+    /// ends the dating and the crush, dating again ends being exes. A new
+    /// mention of two people never retires what is known about them by
+    /// itself.
     func link(_ a: Int64, _ b: Int64, kind: LinkKind, detail: String?, confidence: Double,
-              evidence: String?, chunkID: Int64?, at date: Date) throws {
+              evidence: String?, chunkID: Int64?, at date: Date, ended: Bool = false) throws {
         guard a != b else { return }
         let (first, second) = kind.symmetric && b < a ? (b, a) : (a, b)
-        try open().run(
+        let ts = date.timeIntervalSince1970
+        let db = try open()
+        try db.run(
             """
-            INSERT INTO person_links(a, b, kind, detail, confidence, evidence, chunk_id, ts) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO person_links(a, b, kind, detail, confidence, evidence, chunk_id, ts, first_ts, ended_ts, count)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
             ON CONFLICT(a, b, kind) DO UPDATE SET
                 confidence = MIN(1.0, MAX(confidence, excluded.confidence) + 0.05),
                 evidence = COALESCE(evidence, excluded.evidence), detail = COALESCE(detail, excluded.detail),
+                count = count + 1,
+                first_ts = MIN(COALESCE(first_ts, ts), excluded.ts),
+                ended_ts = CASE
+                    WHEN excluded.ended_ts IS NOT NULL THEN MAX(COALESCE(ended_ts, 0), excluded.ended_ts)
+                    WHEN ended_ts IS NOT NULL AND excluded.ts > ended_ts THEN NULL
+                    ELSE ended_ts END,
                 ts = MAX(ts, excluded.ts)
             """,
             [.int(first), .int(second), .text(kind.rawValue), detail.map { .text($0) } ?? .null, .double(Self.odds(confidence)),
-             evidence.map { .text($0) } ?? .null, chunkID.map { .int($0) } ?? .null, .double(date.timeIntervalSince1970)])
+             evidence.map { .text($0) } ?? .null, chunkID.map { .int($0) } ?? .null, .double(ts), .double(ts),
+             ended ? .double(ts) : .null])
+        salienceCache = nil
+        guard !ended, Self.odds(confidence) >= 0.6 else { return }
+        // What this link ends, between the same two people.
+        let over: [LinkKind] = switch kind {
+        case .ex: [.partner, .crush]
+        case .partner: [.ex, .crush]
+        default: []
+        }
+        for other in over {
+            try db.run(
+                """
+                UPDATE person_links SET ended_ts = ? WHERE kind = ? AND ended_ts IS NULL AND ts <= ?
+                    AND ((a = ? AND b = ?) OR (a = ? AND b = ?))
+                """,
+                [.double(ts), .text(other.rawValue), .double(ts), .int(a), .int(b), .int(b), .int(a)])
+        }
+    }
+
+    /// Ends a link that is known to be over ("eles terminaram").
+    func endLinks(between a: Int64, and b: Int64, kinds: [LinkKind], at date: Date) throws {
+        guard !kinds.isEmpty else { return }
+        try open().run(
+            """
+            UPDATE person_links SET ended_ts = ? WHERE ended_ts IS NULL
+                AND kind IN (\(kinds.map { "'\($0.rawValue)'" }.joined(separator: ",")))
+                AND ((a = ? AND b = ?) OR (a = ? AND b = ?))
+            """,
+            [.double(date.timeIntervalSince1970), .int(a), .int(b), .int(b), .int(a)])
+        salienceCache = nil
     }
 
     nonisolated struct PersonLink: Sendable, Hashable {
@@ -152,18 +262,99 @@ extension MemoryStore {
         var detail: String?
         var confidence: Double
         var evidence: String?
+        /// The last time it was seen.
         var date: Date
+        /// The first time it was seen, and when it was seen to be over.
+        var first: Date? = nil
+        var ended: Date? = nil
+        var count = 1
 
-        var phrase: String { outgoing || kind.symmetric ? kind.phrase : (kind == .parent ? "is a child of" : "is the crush of") }
+        /// Still on as far as anyone said, but not seen for so long that it
+        /// may have changed.
+        func isStale(at now: Date = .now) -> Bool {
+            guard ended == nil, let days = kind.halfLifeDays else { return false }
+            return now.timeIntervalSince(date) / 86400 > days
+        }
 
-        /// "is dating <e id=9/> Gustavo (85%, proof: “…”)"
+        /// How well the link holds today: its odds, worn down by time.
+        func strength(at now: Date = .now) -> Double {
+            if ended != nil { return confidence * 0.3 }
+            guard let days = kind.halfLifeDays else { return confidence }
+            return confidence * max(0.2, pow(0.5, max(0, now.timeIntervalSince(date)) / 86400 / days))
+        }
+
+        var isCurrent: Bool { ended == nil && !isStale() }
+
+        var phrase: String {
+            if !(outgoing || kind.symmetric) {
+                return kind == .parent ? "is a child of" : (isCurrent ? "is the crush of" : "was the crush of")
+            }
+            return isCurrent ? kind.phrase : kind.pastPhrase
+        }
+
+        /// When it holds, in words: "since 2025-03", "until 2026-01", "as of 2024-06, may have changed".
+        var when: String {
+            let day = { (date: Date) in String(MemoryStore.stamp(date.timeIntervalSince1970).prefix(10)) }
+            if let ended { return "until \(day(ended))" }
+            if isStale() { return "as of \(day(date)), not heard of since: may have changed" }
+            if let first, date.timeIntervalSince(first) > 30 * 86400 { return "since \(day(first)), last seen \(day(date))" }
+            return day(date)
+        }
+
+        /// "is dating <e id=9/> Gustavo (85%, since 2025-03, proof: “…”)"
         var line: String {
             var text = "\(phrase) \(other.tag) \(other.name)"
             if let detail, !detail.isEmpty { text += " (“\(detail)”)" }
-            text += " (\(Int((confidence * 100).rounded()))%, \(MemoryStore.stamp(date.timeIntervalSince1970))"
+            text += " (\(Int((confidence * 100).rounded()))%, \(when)"
             if let evidence, !evidence.isEmpty { text += ", proof: “\(evidence)”" }
             return text + ")"
         }
+
+        /// What the person is to the user: "the user's partner (“namorada”, 90%, since 2025-03)".
+        var toUser: String {
+            var text = kind.toUser(outgoing: outgoing)
+            if !isCurrent { text = "was " + text }
+            var notes: [String] = []
+            if let detail, !detail.isEmpty { notes.append("“\(detail)”") }
+            notes.append("\(Int((confidence * 100).rounded()))%")
+            notes.append(when)
+            return text + " (" + notes.joined(separator: ", ") + ")"
+        }
+    }
+
+    static let linkColumns = "l.a, l.b, l.kind, l.detail, l.confidence, l.evidence, l.ts, l.first_ts, l.ended_ts, l.count"
+
+    private static func linkRow(_ row: SQLiteDB.Statement, of id: Int64, other: PersonRef) -> PersonLink? {
+        guard let kind = LinkKind(rawValue: row.text(2) ?? "") else { return nil }
+        return PersonLink(other: other, kind: kind, outgoing: Int64(row.int(0)) == id, detail: row.text(3),
+                          confidence: row.double(4), evidence: row.text(5),
+                          date: Date(timeIntervalSince1970: row.double(6)),
+                          first: row.isNull(7) ? nil : Date(timeIntervalSince1970: row.double(7)),
+                          ended: row.isNull(8) ? nil : Date(timeIntervalSince1970: row.double(8)),
+                          count: max(1, row.int(9)))
+    }
+
+    /// Who the user is tied to: mother, girlfriend, best friend. The other
+    /// person's side is what `outgoing` describes.
+    func myLinks(limit: Int = 60) throws -> [PersonLink] {
+        var result: [PersonLink] = []
+        try open().rows(
+            """
+            SELECT \(Self.linkColumns), p.id, p.kind, p.name
+            FROM person_links l JOIN people p ON p.id = CASE WHEN l.a = 0 THEN l.b ELSE l.a END
+            WHERE l.a = 0 OR l.b = 0
+            """
+        ) { row in
+            let other = PersonRef(id: Int64(row.int(10)), kind: PersonRef.Kind(rawValue: row.text(11) ?? "") ?? .person,
+                                  name: row.text(12) ?? "")
+            if let link = Self.linkRow(row, of: other.id, other: other) { result.append(link) }
+        }
+        return Array(result.sorted { $0.strength() > $1.strength() }.prefix(limit))
+    }
+
+    /// What one person is to the user, best supported first.
+    func tiesToUser(of id: Int64) throws -> [PersonLink] {
+        try myLinks(limit: 400).filter { $0.other.id == id }
     }
 
     /// The names someone goes by besides their own: nicknames and first name.
@@ -228,7 +419,8 @@ extension MemoryStore {
                 line = ref.name
                 let others = try otherNames(of: id).filter { $0.folded != ref.name.folded }
                 if !others.isEmpty { line += " (also called " + others.joined(separator: ", ") + ")" }
-                let ties = try links(of: id, limit: 4).map { "\($0.phrase) \($0.other.name) (\(Int(($0.confidence * 100).rounded()))%)" }
+                var ties = try tiesToUser(of: id).prefix(2).map { $0.toUser }
+                ties += try links(of: id, limit: 4).map { "\($0.phrase) \($0.other.name) (\(Int(($0.confidence * 100).rounded()))%, \($0.when))" }
                 let known = try profile(of: ref, limit: 4).map { "\($0.predicate) \($0.object) (\(Int(($0.confidence * 100).rounded()))%)" }
                 let about = ties + known
                 if !about.isEmpty { line += ": " + about.joined(separator: "; ") }
@@ -240,25 +432,22 @@ extension MemoryStore {
         return lines.joined(separator: "\n")
     }
 
-    /// Everyone a person is linked to, best supported first.
+    /// Everyone a person is linked to, what holds best today first.
     func links(of id: Int64, limit: Int = 8) throws -> [PersonLink] {
         var result: [PersonLink] = []
         try open().rows(
             """
-            SELECT l.a, l.b, l.kind, l.detail, l.confidence, l.evidence, l.ts, p.id, p.kind, p.name
+            SELECT \(Self.linkColumns), p.id, p.kind, p.name
             FROM person_links l JOIN people p ON p.id = CASE WHEN l.a = ? THEN l.b ELSE l.a END
-            WHERE l.a = ? OR l.b = ? ORDER BY l.confidence DESC, l.ts DESC LIMIT ?
+            WHERE l.a = ? OR l.b = ?
             """,
-            [.int(id), .int(id), .int(id), .of(limit)]
+            [.int(id), .int(id), .int(id)]
         ) { row in
-            guard let kind = LinkKind(rawValue: row.text(2) ?? "") else { return }
-            let other = PersonRef(id: Int64(row.int(7)), kind: PersonRef.Kind(rawValue: row.text(8) ?? "") ?? .person,
-                                  name: row.text(9) ?? "")
-            result.append(PersonLink(other: other, kind: kind, outgoing: Int64(row.int(0)) == id, detail: row.text(3),
-                                     confidence: row.double(4), evidence: row.text(5),
-                                     date: Date(timeIntervalSince1970: row.double(6))))
+            let other = PersonRef(id: Int64(row.int(10)), kind: PersonRef.Kind(rawValue: row.text(11) ?? "") ?? .person,
+                                  name: row.text(12) ?? "")
+            if let link = Self.linkRow(row, of: id, other: other) { result.append(link) }
         }
-        return result
+        return Array(result.sorted { $0.strength() > $1.strength() }.prefix(limit))
     }
 
     /// Builds the directory from the chats: each direct chat is a person,
@@ -291,13 +480,14 @@ extension MemoryStore {
                     var senders: [String] = []
                     try db.rows("SELECT DISTINCT sender FROM messages WHERE source = ? AND chat_id = ? AND is_me = 0",
                                 [.text(source.rawValue), .text(chatID)]) { if let s = $0.text(0) { senders.append(s) } }
-                    for sender in senders where !sender.isEmpty && sender.folded != me {
+                    for sender in senders where !sender.isEmpty && sender.folded != me && sender != Self.unknownSender {
                         let person = try upsertPerson(kind: .person, name: sender, key: Self.personKey(sender))
                         try addPersonAliases(person, sender)
                         try db.run("INSERT OR IGNORE INTO chat_people(source, chat_id, person_id, role) VALUES (?, ?, ?, 'member')",
                                    [.text(source.rawValue), .text(chatID), .int(person)])
                     }
-                } else {
+                } else if name.folded != me {
+                    // (A chat with yourself is not someone else.)
                     let person = try upsertPerson(kind: .person, name: name, key: Self.personKey(name))
                     try addPersonAliases(person, name)
                     try db.run("INSERT OR IGNORE INTO chat_people(source, chat_id, person_id, role) VALUES (?, ?, ?, 'direct')",
@@ -312,24 +502,44 @@ extension MemoryStore {
         return chats.count
     }
 
-    /// A person's full name, and their first name when it is a real word.
+    /// A person's full name, the name without its decoration ("Lígia 🌻" is
+    /// also "Lígia"), and their first name when it is a real word.
     private func addPersonAliases(_ id: Int64, _ name: String) throws {
         try addAlias(id, name, kind: "name")
-        let words = name.split(separator: " ").map(String.init)
-        if words.count > 1, let first = words.first, first.count >= 3, first.rangeOfCharacter(from: .decimalDigits) == nil {
+        let clean = PersonName.clean(name)
+        if clean.folded != name.folded, !PersonName.isPlaceholder(clean) { try addAlias(id, clean, kind: "name") }
+        let words = clean.split(separator: " ").map(String.init)
+        if words.count > 1, let first = words.first, first.count >= 3, first.rangeOfCharacter(from: .decimalDigits) == nil,
+           !PersonName.descriptors.contains(first.folded) {
             try addAlias(id, first, kind: "first_name")
         }
+    }
+
+    /// Gives everyone the names their own name holds once cleaned, for
+    /// people filed before names were cleaned. Returns how many gained one.
+    @discardableResult
+    func refreshNameAliases() throws -> Int {
+        let db = try open()
+        var people: [(Int64, String)] = []
+        try db.rows("SELECT id, name FROM people WHERE kind = 'person'") { people.append((Int64($0.int(0)), $0.text(1) ?? "")) }
+        let before = try db.scalarInt("SELECT COUNT(*) FROM person_aliases")
+        try db.transaction {
+            for (id, name) in people { try addPersonAliases(id, name) }
+        }
+        aliasCache = nil
+        return try db.scalarInt("SELECT COUNT(*) FROM person_aliases") - before
     }
 
     // MARK: Lookup
 
     /// Every alias, folded, with who it may mean. Small; kept in memory.
-    private func aliases() throws -> [String: [PersonRef]] {
+    func aliases() throws -> [String: [PersonRef]] {
         if let aliasCache { return aliasCache }
         let db = try open()
         try db.execute(Self.peopleSchema)
         var result: [String: [PersonRef]] = [:]
-        try db.rows("SELECT a.folded, p.id, p.kind, p.name FROM person_aliases a JOIN people p ON p.id = a.person_id") { row in
+        // A name heard once for someone is not yet a way to find them.
+        try db.rows("SELECT a.folded, p.id, p.kind, p.name FROM person_aliases a JOIN people p ON p.id = a.person_id WHERE a.kind != 'heard'") { row in
             let ref = PersonRef(id: Int64(row.int(1)), kind: PersonRef.Kind(rawValue: row.text(2) ?? "") ?? .person,
                                 name: row.text(3) ?? "")
             result[row.text(0) ?? "", default: []].append(ref)
@@ -339,11 +549,12 @@ extension MemoryStore {
     }
 
     /// Who a name means, people before groups: "Ligia" is the person Lígia;
-    /// "bio a ligia" is the group. Several when the name is ambiguous.
+    /// "bio a ligia" is the group. Several when the name is ambiguous, the
+    /// one the user is closest to first.
     func resolvePeople(_ name: String) throws -> [PersonRef] {
         let all = try aliases()
         let folded = name.folded
-        if let exact = all[folded], !exact.isEmpty { return Self.peopleFirst(exact, name: folded) }
+        if let exact = all[folded], !exact.isEmpty { return try closestFirst(Self.peopleFirst(Array(Set(exact)), name: folded)) }
         // Whole words: "Alexsander" finds "Alexsander Lima".
         let words = Set(name.wordList)
         guard !words.isEmpty else { return [] }
@@ -351,7 +562,7 @@ extension MemoryStore {
         for (alias, refs) in all where words.isSubset(of: Set(alias.split(separator: " ").map(String.init))) {
             found += refs
         }
-        return Self.peopleFirst(Array(Set(found)), name: folded)
+        return try closestFirst(Self.peopleFirst(Array(Set(found)), name: folded))
     }
 
     nonisolated static func peopleFirst(_ refs: [PersonRef], name: String) -> [PersonRef] {
@@ -466,7 +677,9 @@ extension MemoryStore {
     func profile(of ref: PersonRef, limit: Int = 30) throws -> [MemoryFact] {
         var result: [MemoryFact] = []
         try open().rows(Self.factColumnsSQL + " WHERE f.subject_id = ? ORDER BY f.confidence DESC, f.ts DESC LIMIT ?",
-                        [.int(ref.id), .of(limit)]) { result.append(Self.factRow($0)) }
+                        [.int(ref.id), .of(max(limit * 4, 120))]) { result.append(Self.factRow($0)) }
+        // What holds best today first: an old mood does not outrank a new job.
+        result = Array(MemoryFact.ranked(result).prefix(limit))
         if result.count < limit, ref.kind == .person {
             let ids = Set(result.map(\.id))
             result += try profile(of: ref.name, limit: limit).filter { !ids.contains($0.id) && ($0.subjectID ?? 0) == 0 }
