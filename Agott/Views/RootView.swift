@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum AppSection: String, CaseIterable, Identifiable, Hashable {
-    case home, chat, people, memory, graph, library, you
+    case home, chat, routines, people, memory, graph, library, you
 
     var id: String { rawValue }
 
@@ -9,6 +9,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .home: "Home"
         case .chat: "Chat"
+        case .routines: "Routines"
         case .people: "People"
         case .memory: "Memory"
         case .graph: "Graph"
@@ -21,6 +22,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .home: "house"
         case .chat: "bubble.left"
+        case .routines: "checklist"
         case .people: "person.2"
         case .memory: "brain.head.profile"
         case .graph: "point.3.connected.trianglepath.dotted"
@@ -32,7 +34,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
     var tint: Color {
         switch self {
         case .home: Ink.text
-        case .chat, .people: Ink.spot
+        case .chat, .people, .routines: Ink.spot
         case .memory: Ink.violet
         case .graph, .library: Ink.sky
         case .you: Ink.mint
@@ -81,6 +83,7 @@ struct RootView: View {
                 switch section {
                 case .home: HomeView()
                 case .chat: ChatView()
+                case .routines: RoutinesView()
                 case .people: PeopleView()
                 case .memory: MemoryView()
                 case .graph: GraphView()

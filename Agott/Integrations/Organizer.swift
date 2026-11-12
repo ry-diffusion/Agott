@@ -47,6 +47,22 @@ nonisolated final class Organizer: @unchecked Sendable {
 
     /// `alarm` false: the reminder is listed with its time but does not ring
     /// (Agott brings it up itself on the Mac).
+    /// An open task in Reminders, as plain values.
+    struct OpenTask: Identifiable, Hashable, Sendable {
+        var id: String
+        var title: String
+        var due: Date?
+        var list: String?
+    }
+
+    /// Open tasks in Reminders, soonest first, undated last.
+    func openTasks() async throws -> [OpenTask] {
+        try await openReminders().map { reminder in
+            OpenTask(id: reminder.calendarItemIdentifier, title: reminder.title ?? "",
+                     due: reminder.dueDateComponents?.date, list: reminder.calendar?.title)
+        }
+    }
+
     func createReminder(title: String, due: Date?, alert: Date? = nil, alarm: Bool = true, notes: String?) throws -> EKReminder {
         if !remindersAuthorized { throw CocoaError(.featureUnsupported) }
         let reminder = EKReminder(eventStore: store)

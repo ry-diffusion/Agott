@@ -8791,6 +8791,206 @@
           }
         }
       }
+    },
+    "Routines" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rotinas"
+          }
+        }
+      }
+    },
+    "What Agott holds you to, every day and today." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O que o Agott cobra de você, todo dia e hoje."
+          }
+        }
+      }
+    },
+    "Every day" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todo dia"
+          }
+        }
+      }
+    },
+    "New routine" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nova rotina"
+          }
+        }
+      }
+    },
+    "Ask Agott to make you do something every day, like a workout from a video, or add one here." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Peça para o Agott te fazer fazer algo todo dia, tipo um treino de um vídeo, ou crie uma aqui."
+          }
+        }
+      }
+    },
+    "Reminders you ask Agott for pop up here at their time." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os lembretes que você pede ao Agott aparecem aqui e no popup na hora certa."
+          }
+        }
+      }
+    },
+    "Tasks in Reminders" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarefas do app Lembretes"
+          }
+        }
+      }
+    },
+    "Agott can show and tick off your tasks from Reminders." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Agott pode mostrar e concluir suas tarefas do app Lembretes."
+          }
+        }
+      }
+    },
+    "Connect Reminders" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conectar Lembretes"
+          }
+        }
+      }
+    },
+    "No open tasks." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma tarefa aberta."
+          }
+        }
+      }
+    },
+    "Mark as done" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marcar como feita"
+          }
+        }
+      }
+    },
+    "Time every day" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Horário de todo dia"
+          }
+        }
+      }
+    },
+    "Stop this routine" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parar esta rotina"
+          }
+        }
+      }
+    },
+    "done today" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "feita hoje"
+          }
+        }
+      }
+    },
+    "Delete" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apagar"
+          }
+        }
+      }
+    },
+    "Name, like Calisthenics" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nome, tipo Calistenia"
+          }
+        }
+      }
+    },
+    "Steps, one per line (optional)" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passos, um por linha (opcional)"
+          }
+        }
+      }
+    },
+    "Add routine" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Criar rotina"
+          }
+        }
+      }
+    },
+    "See all" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ver tudo"
+          }
+        }
+      }
+    },
+    "Nothing to do today." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nada para hoje."
+          }
+        }
+      }
     }
   },
   "version" : "1.1"

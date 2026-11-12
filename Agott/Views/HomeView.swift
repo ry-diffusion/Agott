@@ -30,6 +30,7 @@ struct HomeView: View {
                     .foregroundStyle(Ink.text)
                     .padding(.top, 8)
                 calendarCard
+                TodayCard()
                 recents
             }
             .frame(maxWidth: Self.column, alignment: .leading)
