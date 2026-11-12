@@ -8671,6 +8671,66 @@
           }
         }
       }
+    },
+    "Push-ups" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flexões"
+          }
+        }
+      }
+    },
+    "Squats" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agachamentos"
+          }
+        }
+      }
+    },
+    "Pull-ups" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Barras"
+          }
+        }
+      }
+    },
+    "Could not encrypt." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não deu para criptografar."
+          }
+        }
+      }
+    },
+    "A synced record is not in a format Agott knows." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um registro sincronizado veio num formato que o Agott não conhece."
+          }
+        }
+      }
+    },
+    "This passphrase does not open your synced data." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Essa frase-senha não abre seus dados sincronizados."
+          }
+        }
+      }
     }
   },
   "version" : "1.1"

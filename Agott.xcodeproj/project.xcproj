@@ -24,6 +24,7 @@
     { "kind": "folder", "path": "Agott", "target-membership": [ "Agott" ] },
     { "kind": "folder", "path": "AgottTests", "target-membership": [ "AgottTests" ] },
     { "kind": "folder", "path": "AgottUITests", "target-membership": [ "AgottUITests" ] },
+    { "kind": "folder", "path": "Shared", "target-membership": [ "Agott" ] },
     {
       "kind": "group",
       "name": "Products",
@@ -76,6 +77,7 @@
         "INFOPLIST_KEY_NSLocationUsageDescription": "Agott uses your city so it knows where you are when you ask about places, routes, the time or the weather.",
         "INFOPLIST_KEY_NSLocationWhenInUseUsageDescription": "Agott uses your city so it knows where you are when you ask about places, routes, the time or the weather.",
         "INFOPLIST_KEY_NSMicrophoneUsageDescription": "Agott listens while you hold the talk key, so you can speak to it.",
+        "INFOPLIST_KEY_NSMotionUsageDescription": "Agott counts your reps from your AirPods' motion.",
         "INFOPLIST_KEY_NSRemindersFullAccessUsageDescription": "Agott reads and adds tasks when you ask it to.",
         "INFOPLIST_KEY_NSSpeechRecognitionUsageDescription": "Agott turns what you say into text on this device.",
         "INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]": "YES",
