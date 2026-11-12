@@ -411,6 +411,7 @@ struct APIKeyField: View {
                 }
                 .textFieldStyle(.plain)
                 .font(.system(.body, design: .monospaced))
+                .onChange(of: settings.apiKey) { RoutineSync.shared.keysChanged() }
                 Button {
                     revealed.toggle()
                 } label: {

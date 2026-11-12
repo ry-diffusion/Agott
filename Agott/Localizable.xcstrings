@@ -8991,6 +8991,136 @@
           }
         }
       }
+    },
+    "Sync" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sincronização"
+          }
+        }
+      }
+    },
+    "Synced %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sincronizado %@"
+          }
+        }
+      }
+    },
+    "Routines, the days you did them and your API keys are encrypted on this device with your passphrase. The Worker only stores what it cannot read." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As rotinas, os dias em que você fez e suas chaves de API são criptografados neste aparelho com a sua frase-senha. O Worker só guarda o que não consegue ler."
+          }
+        }
+      }
+    },
+    "Sync now" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sincronizar agora"
+          }
+        }
+      }
+    },
+    "Worker address (https://…workers.dev)" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Endereço do Worker (https://…workers.dev)"
+          }
+        }
+      }
+    },
+    "Token" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Token"
+          }
+        }
+      }
+    },
+    "Passphrase" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Frase-senha"
+          }
+        }
+      }
+    },
+    "Deploy the Worker in sync-worker (see the README), then type its address, your token and a passphrase. Use the same passphrase on every device; it never leaves them." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Publique o Worker que está em sync-worker (veja o README) e digite o endereço dele, seu token e uma frase-senha. Use a mesma frase-senha em todos os aparelhos; ela nunca sai deles."
+          }
+        }
+      }
+    },
+    "Connecting…" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conectando…"
+          }
+        }
+      }
+    },
+    "Connect" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conectar"
+          }
+        }
+      }
+    },
+    "The Worker did not accept this token." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Worker não aceitou esse token."
+          }
+        }
+      }
+    },
+    "The Worker answered %lld: %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Worker respondeu %lld: %@"
+          }
+        }
+      }
+    },
+    "That address is not an Agott sync Worker." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esse endereço não é um Worker de sincronização do Agott."
+          }
+        }
+      }
     }
   },
   "version" : "1.1"

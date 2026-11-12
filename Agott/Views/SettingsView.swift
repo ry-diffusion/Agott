@@ -100,6 +100,10 @@ struct SettingsView: View {
             }
             #endif
 
+            Section("Sync") {
+                SyncSettings()
+            }
+
             Section("Permissions") {
                 ForEach(Permissions.Kind.relevant) { kind in
                     PermissionRow(kind: kind, tick: tick)

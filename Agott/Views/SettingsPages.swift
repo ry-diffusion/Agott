@@ -257,6 +257,8 @@ struct SettingsPageView: View {
             SettingsCard { SpotifyConnect().padding(14) }
             SettingsSection(title: "iPhone")
             SettingsCard { VStack(alignment: .leading, spacing: 8) { IPhonePairingSection() }.padding(14) }
+            SettingsSection(title: "Sync")
+            SettingsCard { SyncSettings().textFieldStyle(.roundedBorder).padding(14) }
             SettingsSection(title: "Hooks")
             SettingsCard { HooksEditor().padding(14) }
             SettingsSection(title: "Publishing")

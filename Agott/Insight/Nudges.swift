@@ -127,6 +127,7 @@ final class Nudges {
     @ObservationIgnored private var timer: Task<Void, Never>?
     @ObservationIgnored private var nagTimer: Task<Void, Never>?
     @ObservationIgnored private var started = false
+    @ObservationIgnored private var syncLoop: Task<Void, Never>?
     private static let url = URL.applicationSupportDirectory.appending(path: "Agott/nudges.json")
 
     private init() {
@@ -146,9 +147,97 @@ final class Nudges {
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
         ) { _ in
-            Task { @MainActor in Nudges.shared.arm() }
+            Task { @MainActor in
+                Nudges.shared.arm()
+                await RoutineSync.shared.sync()
+            }
         }
         arm()
+        startSync()
+    }
+
+    // MARK: Sync
+
+    /// Routines go to the iPhone and Watch through the sync Worker, and a day
+    /// done there is done here: the pop-up closes and the streak goes on.
+    private func startSync() {
+        let sync = RoutineSync.shared
+        sync.onReceive = { payload in Nudges.shared.receive(payload) }
+        publishAll()
+        syncLoop = Task { [weak self] in
+            while !Task.isCancelled {
+                await RoutineSync.shared.sync()
+                // While a routine is on screen, look often: it may be done on the Watch.
+                let often = self?.showing?.repeatsDaily == true
+                try? await Task.sleep(for: .seconds(often ? 30 : 300))
+            }
+        }
+    }
+
+    /// Every routine here, up to the Worker (the ones it already has are left).
+    /// A streak kept before sync becomes the days it stands for.
+    func publishAll() {
+        let sync = RoutineSync.shared
+        guard sync.isConnected else { return }
+        for routine in routines {
+            if sync.routines[routine.id] == nil { sync.save(record(routine)) }
+            if sync.days(routine.id).isEmpty, routine.streak > 0, let lastDone = routine.lastDone {
+                for offset in 0..<routine.streak {
+                    if let day = Calendar.current.date(byAdding: .day, value: -offset, to: lastDone) {
+                        sync.markDone(routine.id, at: day)
+                    }
+                }
+            }
+        }
+    }
+
+    private func record(_ routine: Nudge, stopped: Bool = false) -> RoutineRecord {
+        let time = Calendar.current.dateComponents([.hour, .minute], from: routine.due)
+        return RoutineRecord(id: routine.id, title: routine.title, hour: time.hour ?? 8, minute: time.minute ?? 0,
+                             steps: routine.details, nagLines: routine.nagLines, stopped: stopped, updatedAt: Date())
+    }
+
+    private func receive(_ payload: SyncPayload) {
+        switch payload {
+        case .routine(let remote):
+            let index = pending.firstIndex { $0.id == remote.id }
+            if remote.stopped {
+                guard let index else { return }
+                let id = pending[index].id
+                pending.remove(at: index)
+                if showing?.id == id { close() } else { save(); arm() }
+                return
+            }
+            var routine = index.map { pending[$0] }
+                ?? Nudge(title: remote.title, due: Date(), alert: Date(), repeatsDaily: true)
+            routine.id = remote.id
+            routine.title = remote.title
+            routine.details = remote.steps
+            routine.nagLines = remote.nagLines
+            let time = Calendar.current.dateComponents([.hour, .minute], from: routine.due)
+            if index == nil || time.hour != remote.hour || time.minute != remote.minute {
+                let now = Date()
+                let today = Calendar.current.date(bySettingHour: remote.hour, minute: remote.minute, second: 0, of: now) ?? now
+                let doneToday = routine.lastDone.map { Calendar.current.isDateInToday($0) } ?? false
+                routine.due = today > now && !doneToday ? today : Calendar.current.date(byAdding: .day, value: 1, to: today)!
+                routine.alert = routine.due
+            }
+            routine.streak = RoutineSync.shared.streak(remote.id)
+            if let index { pending[index] = routine } else { pending.append(routine) }
+            pending.sort { $0.alert < $1.alert }
+            save()
+            if showing == nil { arm() }
+        case .done(let record):
+            guard record.day == RoutineDays.day(Date()),
+                  let index = pending.firstIndex(where: { $0.id == record.routineID && $0.repeatsDaily }) else { return }
+            if let lastDone = pending[index].lastDone, Calendar.current.isDateInToday(lastDone) { return }
+            pending[index].markDone(at: record.at)
+            pending[index].streak = max(pending[index].streak, RoutineSync.shared.streak(record.routineID))
+            pending.sort { $0.alert < $1.alert }
+            if showing?.id == record.routineID { close() } else { save(); arm() }
+        case .keys:
+            break
+        }
     }
 
     func add(title: String, due: Date, alert: Date, reminderID: String?) {
@@ -158,6 +247,9 @@ final class Nudges {
     /// A routine every day at `time`, replacing one with the same name.
     @discardableResult
     func addRoutine(title: String, hour: Int, minute: Int, steps: String?, nagLines: [String]) -> Nudge {
+        for replaced in pending where replaced.repeatsDaily && replaced.title.folded == title.folded {
+            RoutineSync.shared.save(record(replaced, stopped: true))
+        }
         pending.removeAll { $0.repeatsDaily && $0.title.folded == title.folded }
         let now = Date()
         let today = Calendar.current.date(bySettingHour: hour, minute: minute, second: 0, of: now) ?? now
@@ -165,6 +257,7 @@ final class Nudges {
         let routine = Nudge(title: title, due: first, alert: first, repeatsDaily: true,
                             details: steps, nagLines: nagLines.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty })
         insert(routine)
+        RoutineSync.shared.save(record(routine))
         return routine
     }
 
@@ -172,6 +265,7 @@ final class Nudges {
     func stopRoutines(matching words: String) -> [String] {
         let match = pending.filter { $0.repeatsDaily && (words.isEmpty || $0.title.folded.contains(words.folded)) }
         guard !match.isEmpty else { return [] }
+        for routine in match { RoutineSync.shared.save(record(routine, stopped: true)) }
         pending.removeAll { item in match.contains { $0.id == item.id } }
         if let showing, match.contains(where: { $0.id == showing.id }) { close() } else { save(); arm() }
         return match.map(\.title)
@@ -183,6 +277,10 @@ final class Nudges {
         guard let index = pending.firstIndex(where: { $0.id == nudge.id }) else { return finish(nudge) }
         if pending[index].repeatsDaily {
             pending[index].markDone()
+            if RoutineSync.shared.isConnected {
+                RoutineSync.shared.markDone(nudge.id)
+                pending[index].streak = max(pending[index].streak, RoutineSync.shared.streak(nudge.id))
+            }
             pending.sort { $0.alert < $1.alert }
         } else {
             pending.remove(at: index)

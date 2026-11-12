@@ -15,6 +15,7 @@ struct AgottApp: App {
 
     init() {
         Lettering.register()
+        AppSync.configure()
     }
 
     var body: some Scene {

@@ -15,7 +15,10 @@ struct TypeSafeKeyField: View {
                 }
                 .textFieldStyle(.plain)
                 .font(.system(.body, design: .monospaced))
-                .onChange(of: key) { _, value in Keychain.set(value.trimmingCharacters(in: .whitespacesAndNewlines), for: Jev.keychainAccount) }
+                .onChange(of: key) { _, value in
+                    Keychain.set(value.trimmingCharacters(in: .whitespacesAndNewlines), for: Jev.keychainAccount)
+                    RoutineSync.shared.keysChanged()
+                }
                 Button { revealed.toggle() } label: {
                     Image(systemName: revealed ? "eye.slash.fill" : "eye.fill").foregroundStyle(Ink.muted)
                 }
