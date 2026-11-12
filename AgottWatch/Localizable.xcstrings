@@ -1,0 +1,246 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Push-ups" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flexões"
+          }
+        }
+      }
+    },
+    "Squats" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agachamentos"
+          }
+        }
+      }
+    },
+    "Pull-ups" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Barras"
+          }
+        }
+      }
+    },
+    "Could not encrypt." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não deu para criptografar."
+          }
+        }
+      }
+    },
+    "A synced record is not in a format Agott knows." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um registro sincronizado veio num formato que o Agott não conhece."
+          }
+        }
+      }
+    },
+    "This passphrase does not open your synced data." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Essa frase-senha não abre seus dados sincronizados."
+          }
+        }
+      }
+    },
+    "The Worker did not accept this token." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Worker não aceitou esse token."
+          }
+        }
+      }
+    },
+    "The Worker answered %lld: %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Worker respondeu %lld: %@"
+          }
+        }
+      }
+    },
+    "That address is not an Agott sync Worker." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esse endereço não é um Worker de sincronização do Agott."
+          }
+        }
+      }
+    },
+    "Still waiting on this: %@." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ainda tô esperando: %@."
+          }
+        }
+      }
+    },
+    "Come on, %@. Now." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bora, %@. Agora."
+          }
+        }
+      }
+    },
+    "Seriously, where is the %@? I'm not letting this go." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sério, cadê a %@? Não vou largar do teu pé."
+          }
+        }
+      }
+    },
+    "Still nothing? %@. Get up." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nada ainda? %@. Levanta."
+          }
+        }
+      }
+    },
+    "No routines yet. Ask Agott on your Mac to make you do something every day." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma rotina ainda. Peça ao Agott no Mac para te fazer fazer algo todo dia."
+          }
+        }
+      }
+    },
+    "Start" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Começar"
+          }
+        }
+      }
+    },
+    "Done" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        }
+      }
+    },
+    "Cancel" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancelar"
+          }
+        }
+      }
+    },
+    "Open Agott on your iPhone and connect sync in Settings." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abra o Agott no iPhone e conecte a sincronização nos Ajustes."
+          }
+        }
+      }
+    },
+    "Done today" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Feito hoje"
+          }
+        }
+      }
+    },
+    "Steps" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passos"
+          }
+        }
+      }
+    },
+    "of %lld" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "de %lld"
+          }
+        }
+      }
+    },
+    "Next exercise" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Próximo exercício"
+          }
+        }
+      }
+    },
+    "Nothing to count in this routine; tick the steps." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nada para contar nesta rotina; marque os passos."
+          }
+        }
+      }
+    },
+    "Done without proof" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Feito sem prova"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.1"
+}
